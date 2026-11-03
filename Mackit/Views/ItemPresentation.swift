@@ -51,7 +51,7 @@ struct ItemNameCell: View {
         let split = bundleName.flatMap { DisplayName.bundleIDParts($0) }
         let location = DisplayName.location(of: item.url)
         HStack(spacing: 10) {
-            Image(nsImage: app?.icon ?? IconCache.icon(for: item.url.path))
+            Image(nsImage: app?.icon ?? IconCache.icon(for: item.url))
                 .resizable()
                 .frame(width: 28, height: 28)
             VStack(alignment: .leading, spacing: 1) {
