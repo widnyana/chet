@@ -63,17 +63,3 @@ struct ReviewBadge: View {
             .help("Check this item before cleaning. It goes to the Trash.")
     }
 }
-
-struct RevealButton: View {
-    let url: URL
-
-    var body: some View {
-        Button {
-            NSWorkspace.shared.activateFileViewerSelecting([url])
-        } label: {
-            Image(systemName: "magnifyingglass")
-        }
-        .buttonStyle(.borderless)
-        .help("Reveal in Finder")
-    }
-}

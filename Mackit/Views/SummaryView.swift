@@ -5,6 +5,7 @@ import SwiftUI
 struct SummaryView: View {
     @Environment(ScanModel.self) private var model
     let report: CleanReport
+    @State private var appeared = false
 
     private var problems: [CleanResult] {
         report.results.filter { result in
@@ -16,32 +17,44 @@ struct SummaryView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Freed \(report.freedBytes.formatted(.byteCount(style: .file)))").font(.title.bold())
-            Text("\(report.results.count - problems.count) of \(report.results.count) items cleaned.")
+        VStack(spacing: 14) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 56))
+                .foregroundStyle(.green)
+                .symbolEffect(.bounce, value: appeared)
+            Text(report.freedBytes.formatted(.byteCount(style: .file)))
+                .font(.system(size: 40, weight: .bold, design: .rounded))
+                .monospacedDigit()
+            Text("freed. \(report.results.count - problems.count) of \(report.results.count) items cleaned.")
                 .foregroundStyle(.secondary)
             if !problems.isEmpty {
-                Text("Not cleaned").font(.headline)
-                List(problems, id: \.item.url) { result in
-                    VStack(alignment: .leading) {
-                        Text(result.item.url.lastPathComponent)
-                        Text(Self.reason(result.outcome)).font(.caption).foregroundStyle(.secondary)
+                DisclosureGroup("\(problems.count) items left alone") {
+                    List(problems, id: \.item.url) { result in
+                        VStack(alignment: .leading) {
+                            Text(result.item.url.lastPathComponent)
+                            Text(Self.reason(result.outcome)).font(.caption).foregroundStyle(.secondary)
+                        }
                     }
+                    .frame(height: 160)
                 }
-                .frame(minHeight: 160)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             ForEach(model.snapshotErrors, id: \.self) { error in
                 Text("Snapshot \(error)").font(.caption).foregroundStyle(.red)
             }
             HStack {
-                Button("Open audit log") { NSWorkspace.shared.open(AuditLog().url) }
+                Button("Show Audit Log") { NSWorkspace.shared.open(AuditLog().url) }
                 Spacer()
                 Button("Done") { model.report = nil }
+                    .buttonStyle(.glassProminent)
+                    .controlSize(.large)
                     .keyboardShortcut(.defaultAction)
             }
+            .padding(.top, 6)
         }
-        .padding(24)
-        .frame(width: 480)
+        .padding(28)
+        .frame(width: 440)
+        .onAppear { appeared = true }
     }
 
     static func reason(_ outcome: CleanOutcome) -> String {

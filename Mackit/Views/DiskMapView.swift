@@ -11,28 +11,46 @@ struct DiskMapView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
+            HStack(spacing: 6) {
                 ForEach(Array(stack.enumerated()), id: \.offset) { index, node in
-                    if index > 0 { Image(systemName: "chevron.right").foregroundStyle(.secondary) }
+                    if index > 0 {
+                        Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+                    }
                     Button(index == 0 ? "Home" : node.url.lastPathComponent) {
                         stack.removeSubrange((index + 1)...)
                     }
-                    .buttonStyle(.link)
+                    .buttonStyle(.glass)
+                    .controlSize(.small)
                 }
                 Spacer()
-                if let hovered {
-                    Text("\(hovered.url.lastPathComponent)  \(hovered.size.formatted(.byteCount(style: .file)))")
-                        .monospacedDigit()
-                }
+                if !stack.isEmpty { legend }
             }
-            .padding(8)
+            .padding(12)
             if let current = stack.last {
                 TreemapCanvas(
                     node: current,
                     onHover: { hovered = $0 },
                     onOpen: { child in
                         if !child.children.isEmpty { stack.append(child) }
-                    })
+                    }
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding([.horizontal, .bottom], 12)
+                .overlay(alignment: .bottomLeading) {
+                    if let hovered {
+                        HStack(spacing: 8) {
+                            Text(hovered.url.lastPathComponent).fontWeight(.medium)
+                            Text(hovered.size.formatted(.byteCount(style: .file)))
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .glassEffect(.regular, in: .capsule)
+                        .padding(24)
+                        .allowsHitTesting(false)
+                    }
+                }
             } else if loading {
                 ProgressView("Measuring folders")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -42,12 +60,29 @@ struct DiskMapView: View {
                 } description: {
                     Text("See which folders take the most space. Click a folder to look inside.")
                 } actions: {
-                    Button("Map home folder") { Task { await load() } }
-                        .buttonStyle(.borderedProminent)
+                    Button("Map Home Folder") { Task { await load() } }
+                        .buttonStyle(.glassProminent)
+                        .controlSize(.large)
                 }
             }
         }
         .navigationTitle("Disk map")
+    }
+
+    private var legend: some View {
+        HStack(spacing: 12) {
+            ForEach(
+                [("Caches and logs", Color.orange), ("Developer", .purple), ("Media", .green), ("Other", .blue)],
+                id: \.0
+            ) { item in
+                HStack(spacing: 4) {
+                    Circle().fill(item.1).frame(width: 8, height: 8)
+                    Text(item.0)
+                }
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
 
     private func load() async {
