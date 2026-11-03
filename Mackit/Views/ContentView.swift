@@ -35,7 +35,9 @@ struct ContentView: View {
     }
 
     @ViewBuilder private var detail: some View {
-        if selection == "snapshots" {
+        if selection == "disk-map" {
+            DiskMapView()
+        } else if selection == "snapshots" {
             SnapshotsView()
         } else if let id = selection, let category = model.categories.first(where: { $0.id == id }) {
             CategoryDetailView(category: category)

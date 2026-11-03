@@ -28,6 +28,10 @@ struct SidebarView: View {
                     .tag(category.id)
                 }
             }
+            Section("Inspect") {
+                Label("Disk map", systemImage: "square.grid.3x3.fill")
+                    .tag("disk-map")
+            }
         }
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 8) {
