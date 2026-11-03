@@ -11,3 +11,4 @@
 MackitCore/.build/
 MackitCore/.swiftpm/
 .DS_Store
+.worktrees/

@@ -6,7 +6,7 @@ let package = Package(
     platforms: [.macOS(.v26)],
     products: [.library(name: "MackitCore", targets: ["MackitCore"])],
     targets: [
-        .target(name: "MackitCore"),
+        .target(name: "MackitCore", resources: [.copy("Shaders")]),
         .testTarget(name: "MackitCoreTests", dependencies: ["MackitCore"]),
     ]
 )
