@@ -1,0 +1,6 @@
+# Ignore everything by default. To commit a file, add an explicit "!path" line below.
+*
+# Keep directories traversable so nested "!path" lines work.
+!*/
+
+!.gitignore
