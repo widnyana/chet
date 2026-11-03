@@ -30,6 +30,7 @@ struct ContentView: View {
         ) {
             if let report = model.report { SummaryView(report: report) }
         }
+        .overlay(alignment: .top) { ScanFinishedToast().padding(.top, 8) }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.refreshAccess()
         }
@@ -52,16 +53,7 @@ struct ContentView: View {
 
     @ToolbarContentBuilder private var scanButton: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
-            if model.isScanning {
-                Button("Stop", systemImage: "stop.fill") { model.cancel() }
-                    .help("Stop the scan (Command-R)")
-            } else {
-                Button(model.lastScan == nil ? "Scan" : "Scan Again", systemImage: "magnifyingglass") {
-                    model.scan()
-                }
-                .buttonStyle(.glassProminent)
-                .help("Scan this Mac for junk (Command-R)")
-            }
+            ScanStatusView()
         }
     }
 }

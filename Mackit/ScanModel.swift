@@ -54,6 +54,8 @@ final class ScanModel {
     var confirmItems: [ScanItem] = []
     var confirmSnapshots: [LocalSnapshot] = []
     var lastScan: Date?
+    /// True after a scan ended by finishing, not by Stop.
+    var didFinishScan = false
     /// Bumped on every scan start and stop; events from stale sessions are dropped.
     private var generation = 0
     private var scanTask: Task<Void, Never>?
@@ -101,6 +103,7 @@ final class ScanModel {
         confirmItems = []
         confirmSnapshots = []
         report = nil
+        didFinishScan = false
         isScanning = true
         steps = ScanStepState.all
         let session = ScanSession()
@@ -211,6 +214,7 @@ final class ScanModel {
         case .finished(let step):
             markDone(step)
         case .done:
+            didFinishScan = true
             lastScan = Date()
             if !snapshots.isEmpty {
                 categories.append(CategoryState(id: "snapshots", title: Self.titles["snapshots"] ?? "Snapshots"))
