@@ -41,6 +41,17 @@ public enum DisplayName {
         owner ?? LeftoverScanner.bundleID(fromName: url.lastPathComponent)
     }
 
+    /// Splits a reverse-DNS folder name: "com.apple.HomeKit" -> ("HomeKit", "Apple").
+    /// Only the vendor prefix is understood; the rest is kept verbatim.
+    public static func bundleIDParts(_ name: String) -> (title: String, vendor: String)? {
+        guard name.contains(".") else { return nil }
+        let parts = name.split(separator: ".").map(String.init)
+        guard parts.count >= 2 else { return nil }
+        let vendor = parts[1]
+        let title = parts.count > 2 ? parts[2...].joined(separator: ".") : parts[1]
+        return (title, vendor)
+    }
+
     static func relative(_ url: URL, _ home: URL) -> String? {
         let path = url.standardizedFileURL.path
         let base = home.standardizedFileURL.path

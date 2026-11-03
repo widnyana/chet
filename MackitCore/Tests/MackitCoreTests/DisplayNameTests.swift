@@ -39,4 +39,13 @@ struct DisplayNameTests {
                 == "com.spotify.client")
         #expect(DisplayName.sourceBundleID(for: url("Library/Caches/foo"), owner: nil) == nil)
     }
+
+    @Test func bundleIDPartsSplitsReverseDNS() throws {
+        #expect(try #require(DisplayName.bundleIDParts("com.apple.HomeKit")) == (title: "HomeKit", vendor: "apple"))
+        #expect(try #require(DisplayName.bundleIDParts("com.example.tool")) == (title: "tool", vendor: "example"))
+        #expect(
+            try #require(DisplayName.bundleIDParts("com.apple.managedappdistributionagent"))
+                == (title: "managedappdistributionagent", vendor: "apple"))
+        #expect(DisplayName.bundleIDParts("HomeKit") == nil)
+    }
 }

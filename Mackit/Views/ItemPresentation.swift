@@ -2,6 +2,20 @@ import AppKit
 import MackitCore
 import SwiftUI
 
+/// Caches workspace icons by path so row renders stay cheap.
+@MainActor
+enum IconCache {
+    private static var cache: [String: NSImage] = [:]
+
+    static func icon(for url: URL) -> NSImage {
+        if let image = cache[url.path] { return image }
+        if cache.count > 512 { cache.removeAll() }
+        let image = NSWorkspace.shared.icon(forFile: url.path)
+        cache[url.path] = image
+        return image
+    }
+}
+
 /// App name and icon for a bundle ID. Cached: Launch Services lookups touch the disk.
 @MainActor
 enum AppInfo {
@@ -29,22 +43,36 @@ struct ItemNameCell: View {
         let app = DisplayName.sourceBundleID(for: item.url, owner: item.ownerBundleID).flatMap(AppInfo.lookup)
         // A cache folder named after a bundle ID: show the app's name instead of the ID.
         let titledByApp = item.ownerBundleID == nil && app != nil
+        // Unresolved bundle-ID folder: split "com.apple.HomeKit" -> "HomeKit" + vendor "Apple".
+        let bundleName =
+            item.ownerBundleID == nil && app == nil
+            ? DisplayName.sourceBundleID(for: item.url, owner: item.ownerBundleID)
+            : nil
+        let split = bundleName.flatMap { DisplayName.bundleIDParts($0) }
         let location = DisplayName.location(of: item.url)
         HStack(spacing: 10) {
-            Image(nsImage: app?.icon ?? NSWorkspace.shared.icon(forFile: item.url.path))
+            Image(nsImage: app?.icon ?? IconCache.icon(for: item.url.path))
                 .resizable()
                 .frame(width: 28, height: 28)
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
-                    Text(titledByApp ? (app?.name ?? "") : DisplayName.title(for: item.url))
-                        .lineLimit(1)
+                    Text(
+                        titledByApp
+                            ? (app?.name ?? "")
+                            : (split.map { $0.title } ?? DisplayName.title(for: item.url))
+                    )
+                    .lineLimit(1)
                     if item.risk == .review { ReviewBadge() }
                 }
-                Text(item.ownerBundleID != nil && app != nil ? "\(app?.name ?? "") · \(location)" : location)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                Text(
+                    item.ownerBundleID != nil && app != nil
+                        ? "\(app?.name ?? "") · \(location)"
+                        : (split.map { "\($0.vendor) · \(location)" } ?? location)
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
             }
         }
         .padding(.vertical, 2)

@@ -22,4 +22,10 @@ extension ScanModel {
     func setSelected(_ urls: [URL], _ on: Bool) {
         if on { selected.formUnion(urls) } else { selected.subtract(urls) }
     }
+
+    func invertSelection(_ urls: [URL]) {
+        for url in urls {
+            if selected.contains(url) { selected.remove(url) } else { selected.insert(url) }
+        }
+    }
 }

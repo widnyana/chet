@@ -39,6 +39,7 @@ public struct RuleScanner: Sendable {
             var found: [ScanItem] = []
             for child in children {
                 try Task.checkCancellation()
+                if child.lastPathComponent == ".DS_Store" { continue }
                 let name = child.lastPathComponent
                 let rel = rule.wholeRoots ? root : root + "/" + name
                 if rule.excluded.contains(name) { continue }

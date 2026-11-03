@@ -27,6 +27,14 @@ struct RuleScannerTests {
         #expect(result.totalBytes > 7_900_000 && result.totalBytes < 8_200_000)
     }
 
+    @Test func cachesSkipDotDSStore() throws {
+        let dir = try TempDir()
+        try dir.file("Library/Caches/.DS_Store", bytes: 100)
+        try dir.file("Library/Caches/blob/x", bytes: 100)
+        let result = try RuleScanner(home: dir.url).scan(try rule("caches"))
+        #expect(result.items.map(\.url.lastPathComponent) == ["blob"])
+    }
+
     @Test func missingRootIsEmptyNotError() throws {
         let dir = try TempDir()
         let result = try RuleScanner(home: dir.url).scan(try rule("package-caches"))

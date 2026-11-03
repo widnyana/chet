@@ -16,13 +16,21 @@ struct CategoryDetailView: View {
     private var allSafe: Bool { category.items.allSatisfy { $0.risk == .safe } }
 
     var body: some View {
-        Group {
+        VStack(spacing: 0) {
+            ListHeaderBar(items: category.items)
             if let groups = model.groups[category.id] {
                 GroupedItemsView(groups: groups)
             } else {
                 table
             }
         }
+        .focusedValue(
+            \.selectionActions,
+            SelectionActions(
+                all: { model.setSelected(urls, true) },
+                none: { model.setSelected(urls, false) },
+                invert: { model.invertSelection(urls) })
+        )
         .safeAreaInset(edge: .bottom) {
             ActionBar(
                 items: categorySelected,
@@ -36,24 +44,6 @@ struct CategoryDetailView: View {
             "\(category.bytes.formatted(.byteCount(style: .file))) · "
                 + (allSafe ? "Apps rebuild this data when needed" : "Check each item. Removed items go to the Trash")
         )
-        .toolbar {
-            ToolbarItem {
-                Menu {
-                    Button("Select All") { model.setSelected(urls, true) }
-                    Button("Select None") { model.setSelected(urls, false) }
-                    Divider()
-                    Button("Select Safe Items Only") {
-                        model.setSelected(urls, false)
-                        model.setSelected(category.items.filter { $0.risk == .safe }.map(\.url), true)
-                    }
-                } label: {
-                    Label("\(selectedCount) of \(category.items.count)", systemImage: "checklist")
-                        .monospacedDigit()
-                }
-                .labelStyle(.titleAndIcon)
-                .help("Choose which items to clean")
-            }
-        }
     }
 
     private var table: some View {
