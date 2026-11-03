@@ -49,6 +49,20 @@ public final class GPUContext: @unchecked Sendable {
         return state
     }
 
+    public func renderPipeline(vertex: String, fragment: String, pixelFormat: MTLPixelFormat) throws
+        -> MTLRenderPipelineState
+    {
+        guard let vertexFunction = library.makeFunction(name: vertex) else { throw GPUError.missingFunction(vertex) }
+        guard let fragmentFunction = library.makeFunction(name: fragment) else {
+            throw GPUError.missingFunction(fragment)
+        }
+        let descriptor = MTLRenderPipelineDescriptor()
+        descriptor.vertexFunction = vertexFunction
+        descriptor.fragmentFunction = fragmentFunction
+        descriptor.colorAttachments[0].pixelFormat = pixelFormat
+        return try device.makeRenderPipelineState(descriptor: descriptor)
+    }
+
     /// Runs kernel `name` over `grid` threads and waits for it to finish.
     public func run(_ name: String, grid: MTLSize, encode: (MTLComputeCommandEncoder) -> Void) throws {
         let state = try pipeline(name)
