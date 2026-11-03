@@ -97,7 +97,8 @@ public final class FlightRecorder: Sendable {
         self.slotSize = Self.slotBytes
         self.now = now
         let initial = now()
-        self.state = Mutex(State(slotBytes: slotSize, ringSlots: ringSlotsLimit, pendingSlots: min(max(flushEvery, 1), 64) + 2))
+        self.state = Mutex(
+            State(slotBytes: slotSize, ringSlots: ringSlotsLimit, pendingSlots: min(max(flushEvery, 1), 64) + 2))
         self.mirror = TailMirror(capacity: tailEvents * slotSize)
         state.withLock { $0.lastFlush = initial }
         openMirrorFile()
@@ -248,12 +249,18 @@ public final class FlightRecorder: Sendable {
             }
             let current = directory.appendingPathComponent("flight.current").path
             let fd = open(current, O_WRONLY | O_CREAT | O_APPEND, 0o644)
-            guard fd >= 0 else { s.available = false; return }
+            guard fd >= 0 else {
+                s.available = false
+                return
+            }
             if flock(fd, LOCK_EX | LOCK_NB) != 0 {
                 _ = close(fd)
                 let fallback = directory.appendingPathComponent("flight-\(getpid()).log").path
                 let ffd = open(fallback, O_WRONLY | O_CREAT | O_APPEND, 0o644)
-                guard ffd >= 0 else { s.available = false; return }
+                guard ffd >= 0 else {
+                    s.available = false
+                    return
+                }
                 s.fd = ffd
                 s.fileSize = 0
             } else {
@@ -299,8 +306,15 @@ public final class FlightRecorder: Sendable {
             try? FileManager.default.removeItem(at: base("flight.current"))
         }
         let fd = open(base("flight.current").path, O_WRONLY | O_CREAT | O_APPEND, 0o644)
-        guard fd >= 0 else { s.available = false; return }
-        if flock(fd, LOCK_EX | LOCK_NB) != 0 { s.available = false; _ = close(fd); return }
+        guard fd >= 0 else {
+            s.available = false
+            return
+        }
+        if flock(fd, LOCK_EX | LOCK_NB) != 0 {
+            s.available = false
+            _ = close(fd)
+            return
+        }
         s.fd = fd
         s.fileSize = 0
     }

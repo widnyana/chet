@@ -53,7 +53,7 @@ struct RecorderInstrumentationTests {
         let items = [
             ScanItem(
                 url: a, categoryID: "test", risk: .safe, mode: .permanent, reclaimableBytes: stampA.size,
-                stamp: stampA),
+                stamp: stampA)
         ]
         _ = cleaner.clean(items)
         recorder.flushForTesting()

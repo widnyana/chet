@@ -7,7 +7,7 @@ import Testing
 // fork is annotated unavailable in the Swift overlay; the C symbol works fine and the child
 // here never returns into the test framework (it only raises a signal).
 @_silgen_name("fork")
-private func c_fork() -> pid_t
+private func posixFork() -> pid_t
 
 /// The chained dummy handler writes here; a file-scope global because a C function pointer
 /// cannot capture context.
@@ -92,7 +92,7 @@ struct CrashHandlerTests {
             FlightRecorder.shared = recorder
         }
         CrashHandler.install(directory: dir.url, recorder: record ? recorder : nil)
-        let pid = c_fork()
+        let pid = posixFork()
         #expect(pid >= 0)
         if pid == 0 {
             raise(sig)
@@ -102,7 +102,7 @@ struct CrashHandlerTests {
         waitpid(pid, &status, 0)
         // The child died from the signal (our handler re-raised it, so its death signal is
         // the raised one even when a chained handler exists).
-        let signaled = WIFSIGNALED(status)
+        let signaled = childSignaled(status)
         var result = ChildCrash()
         result.signaled = signaled
         result.crashText = (try? String(contentsOf: crashURL, encoding: .utf8)) ?? ""
@@ -134,7 +134,7 @@ struct CrashHandlerTests {
         let recorder = FlightRecorder(directory: dir.url)
         FlightRecorder.shared = recorder
         CrashHandler.install(directory: dir.url, recorder: recorder)
-        let pid = c_fork()
+        let pid = posixFork()
         #expect(pid >= 0)
         if pid == 0 { kill(getpid(), SIGKILL) }
         var status: Int32 = 0
@@ -146,6 +146,6 @@ struct CrashHandlerTests {
 }
 
 /// Status macros are C preprocessor macros; these are the POSIX expansions.
-private func WIFSIGNALED(_ status: Int32) -> Bool {
+private func childSignaled(_ status: Int32) -> Bool {
     ((status & 0x7F) + 1) >> 1 > 0
 }

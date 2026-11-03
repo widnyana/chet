@@ -24,7 +24,8 @@ public enum LogMaintenance {
     /// Keeps the newest `kept` `crash-<timestamp>.txt` files, deletes older ones.
     public static func pruneCrashHistory(in directory: URL, kept: Int = 5) {
         let contents = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
-        let history = contents
+        let history =
+            contents
             .filter { $0.hasPrefix("crash-") && $0.hasSuffix(".txt") }
             .sorted()
         guard history.count > kept else { return }

@@ -20,16 +20,22 @@ public enum CrashHandler {
             var i = 0
             while s[i] != 0 && offset < capacity {
                 (out + offset).storeBytes(of: s[i], as: UInt8.self)
-                i += 1; offset += 1
+                i += 1
+                offset += 1
             }
         }
         func emitNumber(_ value: UInt) {
             var digits = [UInt8](repeating: 0, count: 24)
             var n = digits.count
             var v = value
-            repeat { n -= 1; digits[n] = UInt8(0x30 + v % 10); v /= 10 } while v > 0 && n > 0
+            repeat {
+                n -= 1
+                digits[n] = UInt8(0x30 + v % 10)
+                v /= 10
+            } while v > 0 && n > 0
             for i in n..<digits.count where offset < capacity {
-                (out + offset).storeBytes(of: digits[i], as: UInt8.self); offset += 1
+                (out + offset).storeBytes(of: digits[i], as: UInt8.self)
+                offset += 1
             }
         }
         func emitHex(_ value: UInt) {
@@ -41,7 +47,10 @@ public enum CrashHandler {
                 let nibble = Int((value >> UInt(shift)) & 0xF)
                 if nibble != 0 || started || shift == 0 {
                     started = true
-                    if offset < capacity { (out + offset).storeBytes(of: hex[nibble], as: UInt8.self); offset += 1 }
+                    if offset < capacity {
+                        (out + offset).storeBytes(of: hex[nibble], as: UInt8.self)
+                        offset += 1
+                    }
                 }
                 shift -= 4
             }
@@ -74,7 +83,8 @@ public enum CrashHandler {
             var i = 0
             while i < tailLen && offset < capacity {
                 (out + offset).storeBytes(of: tail.load(fromByteOffset: i, as: UInt8.self), as: UInt8.self)
-                i += 1; offset += 1
+                i += 1
+                offset += 1
             }
         }
         return offset
@@ -133,7 +143,8 @@ public enum CrashHandler {
             var current = sigaction()
             sigaction(sig, &action, &current)
             if let f = current.__sigaction_u.__sa_sigaction,
-                Int(bitPattern: unsafeBitCast(f, to: UnsafeRawPointer.self)) != handlerAddress {
+                Int(bitPattern: unsafeBitCast(f, to: UnsafeRawPointer.self)) != handlerAddress
+            {
                 previous[sig] = current
             }
         }
@@ -143,9 +154,10 @@ public enum CrashHandler {
 
     /// C function pointer for sigaction; must not capture context, so it goes through the
     /// global `active` state.
-    private static let handler: @convention(c) (Int32, UnsafeMutablePointer<siginfo_t>?, UnsafeMutableRawPointer?) -> Void = { sig, info, _ in
-        handle(sig, info)
-    }
+    private static let handler:
+        @convention(c) (Int32, UnsafeMutablePointer<siginfo_t>?, UnsafeMutableRawPointer?) -> Void = { sig, info, _ in
+            handle(sig, info)
+        }
 
     private static let handlerAddress: Int = {
         Int(bitPattern: unsafeBitCast(handler, to: UnsafeRawPointer.self))

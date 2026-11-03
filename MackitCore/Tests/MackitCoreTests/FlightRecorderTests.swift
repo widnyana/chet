@@ -80,7 +80,10 @@ struct FlightRecorderTests {
         let dir = try TempDir()
         let clock = Clock()
         let recorder = FlightRecorder(directory: dir.url, flushEvery: 3, flushAfter: 60, now: { clock.now })
-        for i in 0..<3 { recorder.record(step: "s", "e\(i)"); clock.advance(0.1) }
+        for i in 0..<3 {
+            recorder.record(step: "s", "e\(i)")
+            clock.advance(0.1)
+        }
         let lines = try readLines(dir.url.appendingPathComponent("flight.current"))
         #expect(lines.count == 3)
     }
@@ -89,9 +92,11 @@ struct FlightRecorderTests {
         let dir = try TempDir()
         let clock = Clock()
         let recorder = FlightRecorder(directory: dir.url, flushEvery: 100, flushAfter: 5, now: { clock.now })
-        recorder.record(step: "s", "first"); clock.advance(0.1)
+        recorder.record(step: "s", "first")
+        clock.advance(0.1)
         #expect(try readLines(dir.url.appendingPathComponent("flight.current")).count == 0)
-        recorder.record(step: "s", "second"); clock.advance(10)
+        recorder.record(step: "s", "second")
+        clock.advance(10)
         recorder.record(step: "s", "third")
         let lines = try readLines(dir.url.appendingPathComponent("flight.current"))
         #expect(lines.count == 3)
@@ -120,7 +125,10 @@ struct FlightRecorderTests {
         let fd = open(path, O_WRONLY | O_CREAT | O_APPEND, 0o644)
         #expect(fd >= 0)
         #expect(flock(fd, LOCK_EX | LOCK_NB) == 0)
-        defer { flock(fd, LOCK_UN); close(fd) }
+        defer {
+            flock(fd, LOCK_UN)
+            close(fd)
+        }
         let recorder = FlightRecorder(directory: dir.url)
         recorder.record(step: "s", "from second instance")
         recorder.flushForTesting()
