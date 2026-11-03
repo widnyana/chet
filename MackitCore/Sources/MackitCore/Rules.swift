@@ -54,7 +54,7 @@ extension Rule {
             excluded: ["com.apple.bird", "CloudKit", "com.apple.akd", "id.web.widnyana.mackit"]),
         Rule(
             id: "logs", title: "Logs and crash reports", roots: ["Library/Logs"], risk: .safe, mode: .permanent,
-            excluded: ["Mackit"]),
+            excluded: ["Mackit", "DiagnosticReports"]),
         Rule(
             id: "xcode", title: "Xcode build data",
             roots: ["Library/Developer/Xcode/DerivedData", "Library/Developer/CoreSimulator/Caches"],

@@ -1,4 +1,20 @@
+import MackitCore
 import SwiftUI
+import UserNotifications
+
+/// Installs the crash handler and flight recorder at launch, after rotating any stale crash
+/// report aside. Order matters: rotation must precede install (see LogMaintenance).
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        let directory = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(
+            "Library/Logs/Mackit")
+        let sawCrash = LogMaintenance.launchCheck(in: directory)
+        let recorder = FlightRecorder(directory: directory)
+        if sawCrash { recorder.record(step: "launch", "previous crash detected") }
+        FlightRecorder.shared = recorder
+        CrashHandler.install(directory: directory, recorder: recorder)
+    }
+}
 
 /// Select All / None / Invert for the visible category list, via keyboard.
 struct SelectionActions {
@@ -35,6 +51,7 @@ struct SelectCommands: Commands {
 
 @main
 struct MackitApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var model = ScanModel()
 
     var body: some Scene {
