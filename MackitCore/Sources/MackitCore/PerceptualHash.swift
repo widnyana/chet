@@ -39,8 +39,14 @@ public enum PerceptualHash {
             kCGImageSourceCreateThumbnailWithTransform: true,
         ]
         guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary),
-            let space = CGColorSpace(name: CGColorSpace.sRGB)
+            let rgba = bitmap(thumbnail)
         else { return nil }
+        return (rgba, width * height)
+    }
+
+    /// Draws an image into a side x side RGBA bitmap (stretched).
+    public static func bitmap(_ image: CGImage) -> [UInt8]? {
+        guard let space = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
         var rgba = [UInt8](repeating: 0, count: side * side * 4)
         let drawn = rgba.withUnsafeMutableBytes { buffer -> Bool in
             guard
@@ -49,10 +55,10 @@ public enum PerceptualHash {
                     space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
             else { return false }
             context.interpolationQuality = .high
-            context.draw(thumbnail, in: CGRect(x: 0, y: 0, width: side, height: side))
+            context.draw(image, in: CGRect(x: 0, y: 0, width: side, height: side))
             return true
         }
-        return drawn ? (rgba, width * height) : nil
+        return drawn ? rgba : nil
     }
 
     public static func cpu(_ rgba: [UInt8]) -> Features {
