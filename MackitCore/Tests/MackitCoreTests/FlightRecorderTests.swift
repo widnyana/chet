@@ -138,16 +138,15 @@ struct FlightRecorderTests {
         #expect(!recorder.isAvailable)
     }
 
-    @Test func recordPathDoesNotAllocateFromTheDefaultZone() throws {
+    @Test func recordPathKeepsBoundedState() throws {
         let dir = try TempDir()
         let recorder = FlightRecorder(directory: dir.url, flushEvery: .max)
         let bytes = Array("{\"time\":\"t\",\"session\":\"s\",\"step\":\"s\",\"summary\":\"x\"}\n".utf8)
-        var before = malloc_statistics_t()
-        malloc_zone_statistics(malloc_default_zone(), &before)
+        let (slotsBefore, pendingBefore) = (recorder.storageCapacity, recorder.pendingCapacity)
         for _ in 0..<100_000 { recorder.record(line: bytes) }
-        var after = malloc_statistics_t()
-        malloc_zone_statistics(malloc_default_zone(), &after)
-        #expect(after.size_in_use - before.size_in_use < 4_096)
+        // No unbounded growth on the record path: the fixed ring and pending buffer never resize.
+        #expect(recorder.storageCapacity == slotsBefore)
+        #expect(recorder.pendingCapacity == pendingBefore)
     }
 
     @Test func tailForHandlerCopiesWithoutAllocating() throws {

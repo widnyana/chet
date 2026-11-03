@@ -105,6 +105,11 @@ public final class FlightRecorder: Sendable {
 
     public var isAvailable: Bool { state.withLock { $0.available } }
 
+    /// Fixed capacities, exposed for the bounded-state test (no unbounded growth on the
+    /// record path). Not part of the public API contract.
+    var storageCapacity: Int { state.withLock { $0.slotData.count } }
+    var pendingCapacity: Int { state.withLock { $0.pending.count } }
+
     /// Appends one pre-rendered JSON line to the ring and the pending mirror buffer.
     /// No allocation: fixed-size copies into preallocated storage only.
     public func record(line bytes: [UInt8]) {
