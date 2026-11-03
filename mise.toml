@@ -1,2 +1,59 @@
 [tools]
 xcodegen = "2.45.4"
+
+[tasks.gen]
+description = "Generate Mackit.xcodeproj from project.yml"
+run = "xcodegen generate --quiet"
+
+[tasks.build]
+description = "Debug build of the app into .build/xc"
+depends = ["gen"]
+run = "xcodebuild -project Mackit.xcodeproj -scheme Mackit -configuration Debug -derivedDataPath .build/xc -quiet build"
+
+[tasks.dev]
+description = "Build and launch the debug app"
+depends = ["build"]
+run = [
+  "pkill -x Mackit || true",
+  "open .build/xc/Build/Products/Debug/Mackit.app",
+]
+
+[tasks.test]
+description = "Run MackitCore tests (pass a filter: mise run test -- --filter Cleaner)"
+run = "swift test --package-path MackitCore"
+
+[tasks.release]
+description = "Release build, arm64 check, zipped to dist/Mackit.zip"
+depends = ["gen"]
+run = [
+  "xcodebuild -project Mackit.xcodeproj -scheme Mackit -configuration Release -derivedDataPath .build/xc -quiet build",
+  "test \"$(lipo -archs .build/xc/Build/Products/Release/Mackit.app/Contents/MacOS/Mackit)\" = arm64",
+  "mkdir -p dist && rm -f dist/Mackit.zip && ditto -c -k --keepParent .build/xc/Build/Products/Release/Mackit.app dist/Mackit.zip",
+  "echo dist/Mackit.zip",
+]
+
+[tasks.check]
+description = "Tests, debug build, and arm64-only binary check"
+depends = ["test", "build"]
+run = "test \"$(lipo -archs .build/xc/Build/Products/Debug/Mackit.app/Contents/MacOS/Mackit)\" = arm64 && echo arm64 ok"
+
+[tasks.fmt]
+description = "Format all Swift sources in place"
+run = "swift format --in-place --recursive Mackit MackitCore/Sources MackitCore/Tests MackitCore/Package.swift"
+
+[tasks.lint]
+description = "Check Swift formatting without changing files"
+run = "swift format lint --recursive Mackit MackitCore/Sources MackitCore/Tests MackitCore/Package.swift"
+
+[tasks.xcode]
+description = "Open the generated project in Xcode"
+depends = ["gen"]
+run = "xed Mackit.xcodeproj"
+
+[tasks.log]
+description = "Follow the clean audit log"
+run = "tail -f ~/Library/Logs/Mackit/clean.log"
+
+[tasks.clean]
+description = "Remove build output, generated project and dist/"
+run = "rm -rf .build MackitCore/.build Mackit.xcodeproj dist"
