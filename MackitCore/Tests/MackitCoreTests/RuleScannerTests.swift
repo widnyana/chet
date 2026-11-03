@@ -1,0 +1,96 @@
+import Foundation
+import Testing
+
+@testable import MackitCore
+
+struct RuleScannerTests {
+    private func rule(_ id: String) throws -> Rule {
+        try #require(Rule.catalog.first { $0.id == id })
+    }
+
+    private func setMTime(_ url: URL, daysAgo: Double) throws {
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date().addingTimeInterval(-daysAgo * 86_400)], ofItemAtPath: url.path)
+    }
+
+    @Test func catalogIDsAreUnique() {
+        #expect(Set(Rule.catalog.map(\.id)).count == Rule.catalog.count)
+    }
+
+    @Test func cacheChildrenBecomeItems() throws {
+        let dir = try TempDir()
+        try dir.file("Library/Caches/a/x", bytes: 5_000_000)
+        try dir.file("Library/Caches/b/y", bytes: 3_000_000)
+        let result = try RuleScanner(home: dir.url).scan(try rule("caches"))
+        #expect(Set(result.items.map(\.url.lastPathComponent)) == ["a", "b"])
+        #expect(result.items.allSatisfy { $0.risk == .safe && $0.mode == .permanent })
+        #expect(result.totalBytes > 7_900_000 && result.totalBytes < 8_200_000)
+    }
+
+    @Test func missingRootIsEmptyNotError() throws {
+        let dir = try TempDir()
+        let result = try RuleScanner(home: dir.url).scan(try rule("package-caches"))
+        #expect(result.items.isEmpty)
+        #expect(!result.needsFullDiskAccess)
+    }
+
+    @Test func unreadableRootNeedsFullDiskAccess() throws {
+        let dir = try TempDir()
+        try dir.file("Library/Caches/a/x", bytes: 10)
+        let caches = dir.url.appendingPathComponent("Library/Caches")
+        #expect(chmod(caches.path, 0o000) == 0)
+        defer { chmod(caches.path, 0o755) }
+        let result = try RuleScanner(home: dir.url).scan(try rule("caches"))
+        #expect(result.needsFullDiskAccess)
+        #expect(result.items.isEmpty)
+    }
+
+    @Test func installersNeedAgeAndExtension() throws {
+        let dir = try TempDir()
+        let old = try dir.file("Downloads/old.dmg", bytes: 1000)
+        let recent = try dir.file("Downloads/new.dmg", bytes: 1000)
+        let notes = try dir.file("Downloads/notes.txt", bytes: 1000)
+        try setMTime(old, daysAgo: 40)
+        try setMTime(recent, daysAgo: 10)
+        try setMTime(notes, daysAgo: 40)
+        let result = try RuleScanner(home: dir.url).scan(try rule("installers"))
+        #expect(result.items.map(\.url.lastPathComponent) == ["old.dmg"])
+        #expect(result.items.first?.mode == .trash)
+    }
+
+    @Test func logsSkipMackitOwnLog() throws {
+        let dir = try TempDir()
+        try dir.file("Library/Logs/Mackit/clean.log", bytes: 100)
+        try dir.file("Library/Logs/other/x.log", bytes: 100)
+        let result = try RuleScanner(home: dir.url).scan(try rule("logs"))
+        #expect(result.items.map(\.url.lastPathComponent) == ["other"])
+    }
+
+    @Test func parentRuleSkipsFoldersClaimedByOtherRules() throws {
+        let dir = try TempDir()
+        try dir.file("Library/Caches/Google/Chrome/data", bytes: 100)
+        try dir.file("Library/Caches/Homebrew/downloads/pkg", bytes: 100)
+        try dir.file("Library/Caches/foo/x", bytes: 100)
+        let scanner = RuleScanner(home: dir.url)
+        #expect(try scanner.scan(try rule("caches")).items.map(\.url.lastPathComponent) == ["foo"])
+        #expect(try scanner.scan(try rule("browser-chrome")).items.map(\.url.lastPathComponent) == ["data"])
+        #expect(try scanner.scan(try rule("package-caches")).items.map(\.url.lastPathComponent) == ["downloads"])
+    }
+
+    @Test func keepNewestKeepsLatestDeviceSupport() throws {
+        let dir = try TempDir()
+        try dir.file("Library/Developer/Xcode/iOS DeviceSupport/17.0/x", bytes: 100)
+        try dir.file("Library/Developer/Xcode/iOS DeviceSupport/18.0/x", bytes: 100)
+        try setMTime(dir.url.appendingPathComponent("Library/Developer/Xcode/iOS DeviceSupport/17.0"), daysAgo: 100)
+        let result = try RuleScanner(home: dir.url).scan(try rule("xcode-device-support"))
+        #expect(result.items.map(\.url.lastPathComponent) == ["17.0"])
+    }
+
+    @Test func scanAllYieldsOneResultPerRule() async throws {
+        let dir = try TempDir()
+        try dir.file("Library/Caches/a/x", bytes: 100)
+        var ids: [String] = []
+        for await result in RuleScanner(home: dir.url).scanAll() { ids.append(result.ruleID) }
+        #expect(Set(ids) == Set(Rule.catalog.map(\.id)))
+    }
+}
