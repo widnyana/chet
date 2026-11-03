@@ -52,7 +52,8 @@ public struct SimilarPhotos: Sendable {
             for entry in entries[start..<min(start + batchSize, entries.count)] {
                 if let image = PerceptualHash.bitmap(entry.url) { decoded.append((entry, image.rgba, image.pixels)) }
             }
-            let features = try gpu.map { try PerceptualHash.gpu(decoded.map(\.1), context: $0) }
+            let features =
+                try gpu.map { try PerceptualHash.gpu(decoded.map(\.1), context: $0) }
                 ?? decoded.map { PerceptualHash.cpu($0.1) }
             for (item, feature) in zip(decoded, features) {
                 photos.append(PhotoInfo(entry: item.0, pixels: item.2, features: feature))

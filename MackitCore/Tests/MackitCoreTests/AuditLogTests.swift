@@ -13,7 +13,8 @@ struct AuditLogTests {
         let b = try dir.file("cache/b", bytes: 200)
         let items = try [a, b].map { url in
             let stamp = try #require(FileStamp.read(url))
-            return ScanItem(url: url, categoryID: "test", risk: .safe, mode: .permanent, reclaimableBytes: stamp.size, stamp: stamp)
+            return ScanItem(
+                url: url, categoryID: "test", risk: .safe, mode: .permanent, reclaimableBytes: stamp.size, stamp: stamp)
         }
         _ = cleaner.clean(items)
         let lines = try String(contentsOf: logURL, encoding: .utf8).split(separator: "\n")

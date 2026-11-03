@@ -47,7 +47,8 @@ public struct SimilarVideos: Sendable {
             guard let sampled = await Self.frames(entry.url) else { continue }
             let bitmaps = sampled.images.compactMap(PerceptualHash.bitmap)
             guard bitmaps.count == Self.fractions.count else { continue }
-            let features = try gpu.map { try PerceptualHash.gpu(bitmaps, context: $0) } ?? bitmaps.map(PerceptualHash.cpu)
+            let features =
+                try gpu.map { try PerceptualHash.gpu(bitmaps, context: $0) } ?? bitmaps.map(PerceptualHash.cpu)
             videos.append(
                 VideoInfo(
                     entry: entry, duration: sampled.duration, pixels: sampled.pixels,

@@ -73,11 +73,16 @@ public struct LeftoverScanner: Sendable {
             if app.pathExtension == "app", let id = Bundle(url: app)?.bundleIdentifier { ids.insert(id) }
         }
         for folder in folders {
-            for item in (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? [] {
+            for item in (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil))
+                ?? []
+            {
                 if item.pathExtension == "app" {
                     add(item)
                 } else {
-                    for nested in (try? FileManager.default.contentsOfDirectory(at: item, includingPropertiesForKeys: nil)) ?? [] {
+                    for nested
+                        in (try? FileManager.default.contentsOfDirectory(at: item, includingPropertiesForKeys: nil))
+                        ?? []
+                    {
                         add(nested)
                     }
                 }

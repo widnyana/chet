@@ -181,7 +181,9 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
         if ["/Developer", "/node_modules", "/DerivedData", "/.build"].contains(where: { path.contains($0) }) {
             return SIMD4(0.55, 0.45, 0.85, 1)
         }
-        if ["/Pictures", "/Movies", "/Music"].contains(where: { path.contains($0) }) { return SIMD4(0.3, 0.7, 0.45, 1) }
+        if ["/Pictures", "/Movies", "/Music"].contains(where: { path.contains($0) }) {
+            return SIMD4(0.3, 0.7, 0.45, 1)
+        }
         return SIMD4(0.35, 0.55, 0.85, 1)
     }
 }

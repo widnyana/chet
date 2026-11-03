@@ -57,7 +57,9 @@ public struct GPUHasher: Sendable {
             var start = 0
             while start < bytes.count {
                 let length = min(blockSize, bytes.count - start)
-                blocks.append(blockHash(UnsafeRawBufferPointer(rebasing: bytes[start..<(start + length)]), index: UInt64(blocks.count)))
+                blocks.append(
+                    blockHash(
+                        UnsafeRawBufferPointer(rebasing: bytes[start..<(start + length)]), index: UInt64(blocks.count)))
                 start += length
             }
         }

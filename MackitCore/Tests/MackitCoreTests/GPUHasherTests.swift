@@ -45,7 +45,8 @@ struct GPUHasherTests {
         let data = noise(2_000_000, seed: 3)
         for folder in ["a", "b", "c"] {
             let url = dir.url.appendingPathComponent("\(folder)/x")
-            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             try data.write(to: url)
         }
         var different = data

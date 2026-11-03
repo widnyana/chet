@@ -47,7 +47,7 @@ run = "swift format --in-place --recursive Mackit MackitCore/Sources MackitCore/
 
 [tasks.lint]
 description = "Check Swift formatting without changing files"
-run = "swift format lint --recursive Mackit MackitCore/Sources MackitCore/Tests MackitCore/Package.swift"
+run = "swift format lint --strict --recursive Mackit MackitCore/Sources MackitCore/Tests MackitCore/Package.swift"
 
 [tasks.xcode]
 description = "Open the generated project in Xcode"

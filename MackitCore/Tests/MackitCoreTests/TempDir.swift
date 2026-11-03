@@ -16,9 +16,10 @@ struct TempDir {
         // The directory must exist before realpath(3) can resolve it.
         try FileManager.default.createDirectory(
             at: candidate, withIntermediateDirectories: true)
-        let canonical = candidate.path.withCString { realpath($0, nil) }.map {
-            String(cString: $0)
-        } ?? candidate.path
+        let canonical =
+            candidate.path.withCString { realpath($0, nil) }.map {
+                String(cString: $0)
+            } ?? candidate.path
         url = URL(fileURLWithPath: canonical)
     }
 

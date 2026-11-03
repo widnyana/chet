@@ -18,9 +18,11 @@ struct ConfirmSheet: View {
                     "\(model.selectedSnapshots.count) Time Machine local snapshots deleted",
                     systemImage: "clock.arrow.circlepath")
             }
-            Text("Each item is checked again right before it is removed. Items that changed since the scan are left alone.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Text(
+                "Each item is checked again right before it is removed. Items that changed since the scan are left alone."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
             HStack {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }

@@ -7,7 +7,8 @@ import Testing
 struct CleanerTests {
     private func item(_ url: URL, _ mode: DeleteMode = .permanent) throws -> ScanItem {
         let stamp = try #require(FileStamp.read(url))
-        return ScanItem(url: url, categoryID: "test", risk: .safe, mode: mode, reclaimableBytes: stamp.size, stamp: stamp)
+        return ScanItem(
+            url: url, categoryID: "test", risk: .safe, mode: mode, reclaimableBytes: stamp.size, stamp: stamp)
     }
 
     private func cleaner(_ dir: TempDir) -> Cleaner {
@@ -43,7 +44,8 @@ struct CleanerTests {
         let dir = try TempDir()
         let file = try dir.file("cache/x", bytes: 1000)
         let scanned = try item(file)
-        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-60)], ofItemAtPath: file.path)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date().addingTimeInterval(-60)], ofItemAtPath: file.path)
         #expect(cleaner(dir).clean([scanned]).results.first?.outcome == .skipped(.changed))
         #expect(FileManager.default.fileExists(atPath: file.path))
     }

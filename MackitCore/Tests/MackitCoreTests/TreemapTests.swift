@@ -39,7 +39,9 @@ struct TreemapTests {
 
     @Test func hitTestFindsRectAtItsCenter() {
         for item in Treemap.layout(sizes, in: bounds) {
-            #expect(Treemap.hitTest(Treemap.layout(sizes, in: bounds), CGPoint(x: item.rect.midX, y: item.rect.midY)) == item.index)
+            #expect(
+                Treemap.hitTest(Treemap.layout(sizes, in: bounds), CGPoint(x: item.rect.midX, y: item.rect.midY))
+                    == item.index)
         }
         #expect(Treemap.hitTest([], CGPoint(x: 1, y: 1)) == nil)
     }
