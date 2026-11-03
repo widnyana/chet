@@ -18,6 +18,14 @@ public struct DuplicateFinder: Sendable {
     public var minSize: Int64 = 1_000_000
     /// A copy inside one of these folders is preferred as the keeper.
     public var keepFolders: [URL] = []
+    /// Full-content hash used before the byte-for-byte confirmation.
+    public var hasher: Hasher = .sha256
+    /// Test hook: replaces the full-content hash.
+    var fullHashOverride: (@Sendable (URL) throws -> String)? = nil
+
+    public enum Hasher: Sendable {
+        case sha256, gpu
+    }
 
     public init(policy: SafetyPolicy) {
         self.policy = policy
@@ -38,12 +46,15 @@ public struct DuplicateFinder: Sendable {
         var groups: [DuplicateGroup] = []
         for (size, sameSize) in bySize where sameSize.count > 1 {
             for sameEdges in try grouped(sameSize, by: Self.edgeHash).values where sameEdges.count > 1 {
-                for (digest, same) in try grouped(sameEdges, by: Self.fullHash) where same.count > 1 {
-                    let keeper = pickKeeper(same)
-                    // APFS clones share blocks with the keeper: deleting them frees almost nothing.
-                    let duplicates = same.filter { $0.url != keeper.url && $0.reclaimableBytes >= size / 2 }
-                    guard !duplicates.isEmpty else { continue }
-                    groups.append(DuplicateGroup(digest: digest, size: size, keeper: keeper, duplicates: duplicates))
+                for (digest, sameHash) in try grouped(sameEdges, by: fullHasher()) where sameHash.count > 1 {
+                    for same in try confirmed(sameHash) where same.count > 1 {
+                        let keeper = pickKeeper(same)
+                        // APFS clones share blocks with the keeper: deleting them frees almost nothing.
+                        let duplicates = same.filter { $0.url != keeper.url && $0.reclaimableBytes >= size / 2 }
+                        guard !duplicates.isEmpty else { continue }
+                        groups.append(
+                            DuplicateGroup(digest: digest, size: size, keeper: keeper, duplicates: duplicates))
+                    }
                 }
             }
         }
@@ -73,6 +84,46 @@ public struct DuplicateFinder: Sendable {
             return kept
         }
         return entries.min { ($0.stamp.modified, $0.url.path) < ($1.stamp.modified, $1.url.path) } ?? entries[0]
+    }
+
+    func fullHasher() -> (URL) throws -> String {
+        if let fullHashOverride { return fullHashOverride }
+        if hasher == .gpu, let context = GPUContext.shared {
+            let gpu = GPUHasher(context: context)
+            return { try gpu.digest($0) }
+        }
+        return Self.fullHash
+    }
+
+    /// Splits same-hash entries into groups whose bytes are really identical, so a hash collision
+    /// (or a GPU bug) can never mark a different file as a duplicate.
+    func confirmed(_ entries: [WalkEntry]) throws -> [[WalkEntry]] {
+        var groups: [[WalkEntry]] = []
+        for entry in entries {
+            if let index = try groups.firstIndex(where: { try Self.sameBytes($0[0].url, entry.url) }) {
+                groups[index].append(entry)
+            } else {
+                groups.append([entry])
+            }
+        }
+        return groups
+    }
+
+    static func sameBytes(_ a: URL, _ b: URL) throws -> Bool {
+        guard let left = try? FileHandle(forReadingFrom: a), let right = try? FileHandle(forReadingFrom: b) else {
+            return false
+        }
+        defer {
+            try? left.close()
+            try? right.close()
+        }
+        while true {
+            try Task.checkCancellation()
+            let x = (try? left.read(upToCount: 1 << 20)) ?? Data()
+            let y = (try? right.read(upToCount: 1 << 20)) ?? Data()
+            if x != y { return false }
+            if x.isEmpty { return true }
+        }
     }
 
     static func edgeHash(_ url: URL) throws -> String {

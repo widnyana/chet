@@ -37,6 +37,10 @@ description = "Tests, debug build, and arm64-only binary check"
 depends = ["test", "build"]
 run = "test \"$(lipo -archs .build/xc/Build/Products/Debug/Mackit.app/Contents/MacOS/Mackit)\" = arm64 && echo arm64 ok"
 
+[tasks.bench]
+description = "Benchmark GPU vs SHA-256 duplicate hashing (writes 1 GB of temp files)"
+run = "MACKIT_BENCH=1 swift test --package-path MackitCore --filter hashingBenchmark"
+
 [tasks.fmt]
 description = "Format all Swift sources in place"
 run = "swift format --in-place --recursive Mackit MackitCore/Sources MackitCore/Tests MackitCore/Package.swift"
