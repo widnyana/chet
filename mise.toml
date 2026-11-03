@@ -61,3 +61,7 @@ run = "tail -f ~/Library/Logs/Mackit/clean.log"
 [tasks.clean]
 description = "Remove build output, generated project and dist/"
 run = "rm -rf .build MackitCore/.build Mackit.xcodeproj dist"
+
+[tasks.scan-bench]
+description = "Read-only scan benchmark (pass a folder: mise run scan-bench -- /path)"
+run = "swift run --package-path MackitCore mackit-scan"
