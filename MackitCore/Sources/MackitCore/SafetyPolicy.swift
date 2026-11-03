@@ -1,0 +1,62 @@
+import Darwin
+import Foundation
+
+public enum Verdict: Equatable, Sendable {
+    case allowed
+    case denied(String)
+}
+
+/// The one gate every scanner and the cleaner pass a path through.
+public struct SafetyPolicy: Sendable {
+    public let home: String
+
+    static let protectedInHome = ["Library/Keychains", "Library/Mobile Documents", "Library/Messages", "Library/Mail"]
+    static let containerRoots: Set<String> = [
+        "", "Library", "Library/Caches", "Library/Logs", "Library/Application Support", "Library/Preferences",
+        "Library/Containers", "Library/Group Containers", "Library/Developer", "Documents", "Desktop",
+        "Downloads", "Pictures", "Movies", "Music", "Applications", ".Trash",
+    ]
+
+    public init(home: URL = FileManager.default.homeDirectoryForCurrentUser) {
+        self.home = home.resolvingSymlinksInPath().path
+    }
+
+    public func isDeletable(_ url: URL) -> Verdict {
+        let standard = url.standardizedFileURL
+        let path = standard.deletingLastPathComponent().resolvingSymlinksInPath()
+            .appendingPathComponent(standard.lastPathComponent).path
+        let parts = path.split(separator: "/").map(String.init)
+        let inVolumeTrash = parts.count > 4 && parts[0] == "Volumes" && parts[2] == ".Trashes"
+        let rel = relative(path)
+
+        if rel == nil && !inVolumeTrash { return .denied("outside home") }
+        if let rel {
+            if Self.containerRoots.contains(rel) { return .denied("container folder") }
+            if Self.protectedInHome.contains(where: { rel == $0 || rel.hasPrefix($0 + "/") }) {
+                return .denied("protected folder")
+            }
+        }
+        let inTrash = inVolumeTrash || rel?.hasPrefix(".Trash/") == true
+        if !inTrash {
+            if parts.contains(".git") { return .denied("git repository") }
+            if parts.contains(where: { $0.hasSuffix(".app") }) { return .denied("app bundle") }
+            if parts.contains(where: { $0.hasSuffix(".photoslibrary") }) { return .denied("Photos library") }
+        }
+
+        var st = stat()
+        var parent = stat()
+        if lstat(path, &st) == 0 {
+            if (st.st_mode & S_IFMT) == S_IFLNK { return .denied("symlink") }
+            if lstat((path as NSString).deletingLastPathComponent, &parent) == 0, st.st_dev != parent.st_dev {
+                return .denied("mount point")
+            }
+        }
+        return .allowed
+    }
+
+    private func relative(_ path: String) -> String? {
+        if path == home { return "" }
+        guard path.hasPrefix(home + "/") else { return nil }
+        return String(path.dropFirst(home.count + 1))
+    }
+}
