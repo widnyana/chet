@@ -88,16 +88,18 @@ kernel void photo_features(device const uchar *rgba [[buffer(0)]],
     lap[img * 2 + 1] = squares;
 }
 
-// One thread per (i, j). Appends pairs i < j whose hashes differ in at most maxDistance bits.
+// One thread per (i, j) inside one tile starting at origin (x = column j, y = row i).
+// Appends pairs i < j whose hashes differ in at most maxDistance bits.
 kernel void hamming_pairs(device const ulong *hashes [[buffer(0)]],
                           constant uint &count [[buffer(1)]],
                           constant uint &maxDistance [[buffer(2)]],
                           device atomic_uint *found [[buffer(3)]],
                           device uint2 *pairs [[buffer(4)]],
                           constant uint &capacity [[buffer(5)]],
+                          constant uint2 &origin [[buffer(6)]],
                           uint2 pos [[thread_position_in_grid]]) {
-    uint i = pos.y;
-    uint j = pos.x;
+    uint i = origin.y + pos.y;
+    uint j = origin.x + pos.x;
     if (i >= count || j >= count || j <= i) {
         return;
     }

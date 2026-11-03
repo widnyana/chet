@@ -29,7 +29,8 @@ public struct SimilarPhotos: Sendable {
     /// Laplacian variance below this counts as blurry. Tune on real photo sets.
     public var blurThreshold = 60.0
     public var useGPU = true
-    public var batchSize = 256
+    /// Images per GPU command buffer. Small, so one submission stays well under 50 ms.
+    public var batchSize = 32
 
     public init(policy: SafetyPolicy) {
         self.policy = policy

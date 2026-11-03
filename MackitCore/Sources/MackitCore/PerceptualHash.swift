@@ -148,6 +148,9 @@ public enum PerceptualHash {
         return pairs
     }
 
+    /// Largest side of one pair-search tile: 2048 x 2048 threads per command buffer.
+    static let pairTile = 2048
+
     public static func gpuPairs(
         _ hashes: [UInt64], maxDistance: Int, context: GPUContext, capacity: Int = 1 << 20
     ) throws -> [(Int, Int)] {
@@ -163,13 +166,23 @@ public enum PerceptualHash {
         var count32 = UInt32(count)
         var distance32 = UInt32(maxDistance)
         var capacity32 = UInt32(capacity)
-        try context.run("hamming_pairs", grid: MTLSize(width: count, height: count, depth: 1)) { encoder in
-            encoder.setBuffer(hashBuffer, offset: 0, index: 0)
-            encoder.setBytes(&count32, length: 4, index: 1)
-            encoder.setBytes(&distance32, length: 4, index: 2)
-            encoder.setBuffer(found, offset: 0, index: 3)
-            encoder.setBuffer(pairs, offset: 0, index: 4)
-            encoder.setBytes(&capacity32, length: 4, index: 5)
+        // One command buffer per tile keeps each GPU submission short (see GPUContext timing).
+        for rowStart in stride(from: 0, to: count, by: pairTile) {
+            for columnStart in stride(from: rowStart, to: count, by: pairTile) {
+                try Task.checkCancellation()
+                var origin = SIMD2<UInt32>(UInt32(columnStart), UInt32(rowStart))
+                let grid = MTLSize(
+                    width: min(pairTile, count - columnStart), height: min(pairTile, count - rowStart), depth: 1)
+                try context.run("hamming_pairs", grid: grid) { encoder in
+                    encoder.setBuffer(hashBuffer, offset: 0, index: 0)
+                    encoder.setBytes(&count32, length: 4, index: 1)
+                    encoder.setBytes(&distance32, length: 4, index: 2)
+                    encoder.setBuffer(found, offset: 0, index: 3)
+                    encoder.setBuffer(pairs, offset: 0, index: 4)
+                    encoder.setBytes(&capacity32, length: 4, index: 5)
+                    encoder.setBytes(&origin, length: MemoryLayout<SIMD2<UInt32>>.stride, index: 6)
+                }
+            }
         }
         let total = Int(found.contents().load(as: UInt32.self))
         guard total <= capacity else { throw GPUError.commandFailed("too many similar pairs: \(total)") }

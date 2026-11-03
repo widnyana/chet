@@ -18,6 +18,20 @@ public final class GPUContext: @unchecked Sendable {
     private let library: MTLLibrary
     private let lock = NSLock()
     private var pipelines: [String: MTLComputePipelineState] = [:]
+    private var lastSeconds: Double = 0
+    private var maxSeconds: Double = 0
+
+    /// GPU time of the most recent command buffer, and the longest one since the last reset.
+    /// Long command buffers starve WindowServer, so tests and the scan benchmark watch these.
+    public var lastGPUSeconds: Double { lock.withLock { lastSeconds } }
+    public var maxGPUSeconds: Double { lock.withLock { maxSeconds } }
+
+    public func resetGPUTiming() {
+        lock.withLock {
+            lastSeconds = 0
+            maxSeconds = 0
+        }
+    }
 
     public init() throws {
         guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
@@ -80,6 +94,11 @@ public final class GPUContext: @unchecked Sendable {
         encoder.endEncoding()
         buffer.commit()
         buffer.waitUntilCompleted()
+        let seconds = max(0, buffer.gpuEndTime - buffer.gpuStartTime)
+        lock.withLock {
+            lastSeconds = seconds
+            maxSeconds = max(maxSeconds, seconds)
+        }
         if let error = buffer.error { throw GPUError.commandFailed(error.localizedDescription) }
     }
 }
