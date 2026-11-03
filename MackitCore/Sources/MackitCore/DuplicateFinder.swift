@@ -33,15 +33,22 @@ public struct DuplicateFinder: Sendable {
 
     // ponytail: hashes sequentially; the stage is disk-bound. Parallelize per size bucket if it measures slow.
     public func find(in roots: [URL]) throws -> [DuplicateGroup] {
-        var bySize: [Int64: [WalkEntry]] = [:]
-        var seenInodes = Set<UInt64>()
+        var entries: [WalkEntry] = []
         let walker = FileWalker(policy: policy)
         for root in roots {
-            try walker.walk(root) { entry in
-                // Hard links share an inode: deleting one frees nothing.
-                guard entry.stamp.size >= minSize, seenInodes.insert(entry.stamp.inode).inserted else { return }
-                bySize[entry.stamp.size, default: []].append(entry)
-            }
+            try walker.walk(root) { entries.append($0) }
+        }
+        return try find(entries: entries)
+    }
+
+    /// Groups files that were already walked, for example `FileIndex.candidates`.
+    public func find(entries: [WalkEntry]) throws -> [DuplicateGroup] {
+        var bySize: [Int64: [WalkEntry]] = [:]
+        var seenInodes = Set<UInt64>()
+        for entry in entries {
+            // Hard links share an inode: deleting one frees nothing.
+            guard entry.stamp.size >= minSize, seenInodes.insert(entry.stamp.inode).inserted else { continue }
+            bySize[entry.stamp.size, default: []].append(entry)
         }
         var groups: [DuplicateGroup] = []
         for (size, sameSize) in bySize where sameSize.count > 1 {

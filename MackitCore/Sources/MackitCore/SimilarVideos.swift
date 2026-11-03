@@ -36,10 +36,14 @@ public struct SimilarVideos: Sendable {
         var entries: [WalkEntry] = []
         let walker = FileWalker(policy: policy)
         for root in roots {
-            try walker.walk(root) { entry in
-                if Self.extensions.contains(entry.url.pathExtension.lowercased()) { entries.append(entry) }
-            }
+            try walker.walk(root) { entries.append($0) }
         }
+        return try await scan(entries: entries)
+    }
+
+    /// Finds similar videos among files that were already walked (non-videos are ignored).
+    public func scan(entries all: [WalkEntry]) async throws -> [VideoCluster] {
+        let entries = all.filter { Self.extensions.contains($0.url.pathExtension.lowercased()) }
         let gpu = useGPU ? GPUContext.shared : nil
         var videos: [VideoInfo] = []
         for entry in entries {

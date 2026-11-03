@@ -30,6 +30,20 @@ struct DuplicateFinderTests {
         #expect((groups.first?.reclaimableBytes ?? 0) >= Int64(2 * size))
     }
 
+    @Test func findOnWalkedEntriesMatchesFindOnRoots() throws {
+        let dir = try TempDir()
+        for folder in ["a", "b", "c"] { try dir.file("\(folder)/same", bytes: size, fill: 4) }
+        try dir.file("other", bytes: size, fill: 5)
+        let finder = DuplicateFinder(policy: dir.policy)
+        var walked: [WalkEntry] = []
+        try FileWalker(policy: dir.policy).walk(dir.url) { walked.append($0) }
+        let fromEntries = try finder.find(entries: walked)
+        let fromRoots = try finder.find(in: [dir.url])
+        #expect(fromEntries.count == 1)
+        #expect(fromEntries.map(\.digest) == fromRoots.map(\.digest))
+        #expect(fromEntries.first?.duplicates.count == 2)
+    }
+
     @Test func differentLastByteIsNotDuplicate() throws {
         let dir = try TempDir()
         var data = Data(repeating: 7, count: size)

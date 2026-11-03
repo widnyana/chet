@@ -40,10 +40,14 @@ public struct SimilarPhotos: Sendable {
         var entries: [WalkEntry] = []
         let walker = FileWalker(policy: policy)
         for root in roots {
-            try walker.walk(root) { entry in
-                if Self.extensions.contains(entry.url.pathExtension.lowercased()) { entries.append(entry) }
-            }
+            try walker.walk(root) { entries.append($0) }
         }
+        return try scan(entries: entries)
+    }
+
+    /// Finds similar and blurry photos among files that were already walked (non-images are ignored).
+    public func scan(entries all: [WalkEntry]) throws -> PhotoScanResult {
+        let entries = all.filter { Self.extensions.contains($0.url.pathExtension.lowercased()) }
         let gpu = useGPU ? GPUContext.shared : nil
         var photos: [PhotoInfo] = []
         for start in stride(from: 0, to: entries.count, by: batchSize) {

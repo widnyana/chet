@@ -12,19 +12,26 @@ public struct LargeFileScanner: Sendable {
     }
 
     public func scan(_ roots: [URL], now: Date = Date()) throws -> [ScanItem] {
-        var items: [ScanItem] = []
+        var entries: [WalkEntry] = []
         let walker = FileWalker(policy: policy)
         for root in roots {
-            try walker.walk(root) { entry in
-                let old = now.timeIntervalSince(entry.stamp.modified) >= oldAge && entry.stamp.size >= minOldSize
-                guard entry.stamp.size >= minSize || old else { return }
-                items.append(
-                    ScanItem(
-                        url: entry.url, categoryID: "large-files", risk: .review, mode: .trash,
-                        reclaimableBytes: entry.reclaimableBytes, stamp: entry.stamp))
-            }
+            try walker.walk(root) { entries.append($0) }
         }
-        return items.sorted { $0.reclaimableBytes > $1.reclaimableBytes }
+        return select(from: entries, now: now)
+    }
+
+    /// Picks large and old files from files that were already walked.
+    public func select(from entries: [WalkEntry], now: Date = Date()) -> [ScanItem] {
+        entries.filter { entry in
+            let old = now.timeIntervalSince(entry.stamp.modified) >= oldAge && entry.stamp.size >= minOldSize
+            return entry.stamp.size >= minSize || old
+        }
+        .map { entry in
+            ScanItem(
+                url: entry.url, categoryID: "large-files", risk: .review, mode: .trash,
+                reclaimableBytes: entry.reclaimableBytes, stamp: entry.stamp)
+        }
+        .sorted { $0.reclaimableBytes > $1.reclaimableBytes }
     }
 }
 

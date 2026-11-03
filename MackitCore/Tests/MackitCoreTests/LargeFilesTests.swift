@@ -24,6 +24,18 @@ struct LargeFilesTests {
         #expect(items.allSatisfy { $0.risk == .review && $0.mode == .trash })
     }
 
+    @Test func selectOnWalkedEntriesMatchesScan() throws {
+        let dir = try TempDir()
+        try dir.file("big.bin", bytes: 600_000)
+        try dir.file("mid.bin", bytes: 400_000)
+        var scanner = LargeFileScanner(policy: dir.policy)
+        scanner.minSize = 500_000
+        var walked: [WalkEntry] = []
+        try FileWalker(policy: dir.policy).walk(dir.url) { walked.append($0) }
+        #expect(scanner.select(from: walked).map(\.url) == (try scanner.scan([dir.url])).map(\.url))
+        #expect(scanner.select(from: walked).map(\.url.lastPathComponent) == ["big.bin"])
+    }
+
     @Test func folderTreeSumsAndSorts() throws {
         let dir = try TempDir()
         try dir.file("a/x", bytes: 1_000_000)
