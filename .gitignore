@@ -4,3 +4,10 @@
 !*/
 
 !.gitignore
+!project.yml
+!mise.toml
+!Mackit/**
+!MackitCore/**
+MackitCore/.build/
+MackitCore/.swiftpm/
+.DS_Store

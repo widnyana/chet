@@ -1,0 +1,32 @@
+name: Mackit
+options:
+  bundleIdPrefix: id.web.widnyana
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+packages:
+  MackitCore:
+    path: MackitCore
+settings:
+  base:
+    ARCHS: arm64
+    ONLY_ACTIVE_ARCH: YES
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    ENABLE_HARDENED_RUNTIME: YES
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGN_STYLE: Manual
+    DEVELOPMENT_TEAM: ""
+targets:
+  Mackit:
+    type: application
+    platform: macOS
+    sources: [Mackit]
+    dependencies:
+      - package: MackitCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: id.web.widnyana.mackit
+        INFOPLIST_FILE: Mackit/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Mackit/Mackit.entitlements
+        GENERATE_INFOPLIST_FILE: NO
