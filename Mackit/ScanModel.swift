@@ -11,6 +11,23 @@ struct CategoryState: Identifiable {
     var bytes: Int64 { items.reduce(0) { $0 + $1.reclaimableBytes } }
 }
 
+/// One phase of a scan, listed on the overview while it runs.
+struct ScanStep: Identifiable {
+    let id: String
+    let title: String
+    var done = false
+
+    static let all = [
+        ScanStep(id: "rules", title: "Caches, logs and junk folders"),
+        ScanStep(id: "duplicates", title: "Duplicate files"),
+        ScanStep(id: "large-files", title: "Large and old files"),
+        ScanStep(id: "leftovers", title: "Leftovers of deleted apps"),
+        ScanStep(id: "photos", title: "Similar and blurry photos"),
+        ScanStep(id: "videos", title: "Similar videos"),
+        ScanStep(id: "snapshots", title: "Time Machine snapshots"),
+    ]
+}
+
 /// Items that belong together: one keeper that stays, and copies that may go.
 struct ItemGroup: Identifiable {
     var id: URL { keeper }
@@ -34,6 +51,9 @@ final class ScanModel {
     var selectedSnapshots: Set<LocalSnapshot> = []
     var report: CleanReport?
     var snapshotErrors: [String] = []
+    /// Phases of the current or last scan.
+    var steps: [ScanStep] = []
+    var lastScan: Date?
     private var scanTask: Task<Void, Never>?
 
     static let titles: [String: String] = [
@@ -53,6 +73,14 @@ final class ScanModel {
 
     var selectedBytes: Int64 { selectedItems.reduce(0) { $0 + $1.reclaimableBytes } }
 
+    /// Everything found, each file counted once.
+    var totalBytes: Int64 {
+        var seen = Set<URL>()
+        return categories.flatMap(\.items).filter { seen.insert($0.url).inserted }.reduce(0) {
+            $0 + $1.reclaimableBytes
+        }
+    }
+
     func refreshAccess() {
         access = FullDiskAccess.status()
     }
@@ -66,10 +94,12 @@ final class ScanModel {
         selectedSnapshots = []
         report = nil
         isScanning = true
+        steps = ScanStep.all
         scanTask = Task {
             for await result in RuleScanner().scanAll() {
                 merge(result)
             }
+            markDone("rules")
             let home = FileManager.default.homeDirectoryForCurrentUser
             let roots = Self.userRoots(home)
             let media = ["Pictures", "Movies", "Desktop", "Downloads"].map { home.appendingPathComponent($0) }
@@ -85,8 +115,11 @@ final class ScanModel {
                 groups: await duplicates.map { group in
                     ItemGroup(keeper: group.keeper.url, items: group.duplicates.map { Self.item($0, "duplicates") })
                 })
+            markDone("duplicates")
             add("large-files", items: await large)
+            markDone("large-files")
             add("leftovers", items: await leftovers)
+            markDone("leftovers")
             let photoResult = await photos
             add(
                 "similar-photos",
@@ -96,6 +129,7 @@ final class ScanModel {
                         items: cluster.others.map { Self.item($0.entry, "similar-photos") })
                 })
             add("blurry-photos", items: (photoResult?.blurry ?? []).map { Self.item($0.entry, "blurry-photos") })
+            markDone("photos")
             add(
                 "similar-videos",
                 groups: await videos.map { cluster in
@@ -103,7 +137,10 @@ final class ScanModel {
                         keeper: cluster.keeper.entry.url,
                         items: cluster.others.map { Self.item($0.entry, "similar-videos") })
                 })
+            markDone("videos")
             snapshots = await localSnapshots
+            markDone("snapshots")
+            lastScan = Date()
             if !snapshots.isEmpty {
                 categories.append(CategoryState(id: "snapshots", title: Self.titles["snapshots"] ?? "Snapshots"))
             }
@@ -154,7 +191,13 @@ final class ScanModel {
         }
     }
 
+    private func markDone(_ id: String) {
+        if let index = steps.firstIndex(where: { $0.id == id }) { steps[index].done = true }
+    }
+
     private func merge(_ result: CategoryResult) {
+        // Empty categories are noise; keep them only to show that Full Disk Access is missing.
+        guard !result.items.isEmpty || result.needsFullDiskAccess else { return }
         if !categories.contains(where: { $0.id == result.category }) {
             categories.append(
                 CategoryState(id: result.category, title: Self.titles[result.category] ?? result.category))

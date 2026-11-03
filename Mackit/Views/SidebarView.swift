@@ -4,56 +4,51 @@ import SwiftUI
 struct SidebarView: View {
     @Environment(ScanModel.self) private var model
     @Binding var selection: String?
-    @Binding var confirming: Bool
 
     var body: some View {
         List(selection: $selection) {
-            Section("Reclaimable") {
-                ForEach(model.categories) { category in
-                    HStack {
-                        Text(category.title)
-                        if category.needsFullDiskAccess {
-                            Image(systemName: "lock.fill")
-                                .foregroundStyle(.secondary)
-                                .help("Some folders need Full Disk Access")
-                        }
-                        Spacer()
-                        Text(
-                            category.id == "snapshots"
-                                ? "\(model.snapshots.count)" : category.bytes.formatted(.byteCount(style: .file))
-                        )
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
+            row("overview", "Overview")
+            if !model.categories.isEmpty {
+                Section("Reclaimable") {
+                    ForEach(model.categories) { category in
+                        row(
+                            category.id, category.title,
+                            trailing: category.id == "snapshots"
+                                ? "\(model.snapshots.count)" : category.bytes.formatted(.byteCount(style: .file)),
+                            locked: category.needsFullDiskAccess)
                     }
-                    .tag(category.id)
                 }
             }
             Section("Inspect") {
-                Label("Disk map", systemImage: "square.grid.3x3.fill")
-                    .tag("disk-map")
+                row("disk-map", "Disk map")
             }
         }
-        .safeAreaInset(edge: .bottom) {
-            VStack(spacing: 8) {
-                Text("Selected: \(model.selectedBytes.formatted(.byteCount(style: .file)))")
-                    .font(.caption)
-                    .monospacedDigit()
-                if model.isScanning {
-                    ProgressView().controlSize(.small)
-                    Button("Stop") { model.cancel() }
-                } else if model.isCleaning {
-                    ProgressView("Cleaning").controlSize(.small)
-                } else {
-                    HStack {
-                        Button(model.categories.isEmpty ? "Scan" : "Scan again") { model.scan() }
-                        Button("Clean") { confirming = true }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(model.selectedItems.isEmpty && model.selectedSnapshots.isEmpty)
-                    }
+        .navigationSplitViewColumnWidth(min: 240, ideal: 280)
+    }
+
+    private func row(_ id: String, _ title: String, trailing: String? = nil, locked: Bool = false) -> some View {
+        let style = CategoryStyle.of(id)
+        return Label {
+            HStack {
+                Text(title).lineLimit(1)
+                if locked {
+                    Image(systemName: "lock.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .help("Some folders need Full Disk Access")
+                }
+                Spacer()
+                if let trailing {
+                    Text(trailing)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
                 }
             }
-            .padding()
+        } icon: {
+            Image(systemName: style.symbol)
+                .foregroundStyle(style.color)
         }
-        .navigationSplitViewColumnWidth(min: 260, ideal: 300)
+        .tag(id)
     }
 }

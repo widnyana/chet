@@ -4,7 +4,7 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(ScanModel.self) private var model
-    @State private var selection: String?
+    @State private var selection: String? = "overview"
     @State private var confirming = false
 
     var body: some View {
@@ -13,9 +13,10 @@ struct ContentView: View {
                 OnboardingView()
             } else {
                 NavigationSplitView {
-                    SidebarView(selection: $selection, confirming: $confirming)
+                    SidebarView(selection: $selection)
                 } detail: {
                     detail
+                        .toolbar { scanButton }
                 }
             }
         }
@@ -42,9 +43,22 @@ struct ContentView: View {
         } else if let id = selection, let category = model.categories.first(where: { $0.id == id }) {
             CategoryDetailView(category: category, onClean: { confirming = true })
         } else {
-            ContentUnavailableView(
-                "Pick a category", systemImage: "sidebar.left",
-                description: Text("Run a scan, then pick a category to see its items."))
+            OverviewView(selection: $selection)
+        }
+    }
+
+    @ToolbarContentBuilder private var scanButton: some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) {
+            if model.isScanning {
+                Button("Stop", systemImage: "stop.fill") { model.cancel() }
+                    .help("Stop the scan (Command-R)")
+            } else {
+                Button(model.lastScan == nil ? "Scan" : "Scan Again", systemImage: "magnifyingglass") {
+                    model.scan()
+                }
+                .buttonStyle(.glassProminent)
+                .help("Scan this Mac for junk (Command-R)")
+            }
         }
     }
 }
