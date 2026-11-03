@@ -1,0 +1,61 @@
+import Foundation
+
+/// Files that are very large, or large and untouched for a long time.
+public struct LargeFileScanner: Sendable {
+    public let policy: SafetyPolicy
+    public var minSize: Int64 = 500_000_000
+    public var oldAge: TimeInterval = 365 * 86_400
+    public var minOldSize: Int64 = 50_000_000
+
+    public init(policy: SafetyPolicy) {
+        self.policy = policy
+    }
+
+    public func scan(_ roots: [URL], now: Date = Date()) throws -> [ScanItem] {
+        var items: [ScanItem] = []
+        let walker = FileWalker(policy: policy)
+        for root in roots {
+            try walker.walk(root) { entry in
+                let old = now.timeIntervalSince(entry.stamp.modified) >= oldAge && entry.stamp.size >= minOldSize
+                guard entry.stamp.size >= minSize || old else { return }
+                items.append(
+                    ScanItem(
+                        url: entry.url, categoryID: "large-files", risk: .review, mode: .trash,
+                        reclaimableBytes: entry.reclaimableBytes, stamp: entry.stamp))
+            }
+        }
+        return items.sorted { $0.reclaimableBytes > $1.reclaimableBytes }
+    }
+}
+
+public struct FolderNode: Sendable, Identifiable {
+    public var id: URL { url }
+    public let url: URL
+    public let size: Int64
+    /// Largest first.
+    public let children: [FolderNode]
+}
+
+public enum FolderTree {
+    /// Size tree of `root`, `maxDepth` levels deep. Files deeper than that count toward their ancestor.
+    public static func build(_ root: URL, policy: SafetyPolicy, maxDepth: Int = 4) throws -> FolderNode {
+        var sizes: [[String]: Int64] = [[]: 0]
+        var children: [[String]: [[String]]] = [:]
+        let base = root.standardizedFileURL.pathComponents.count
+        try FileWalker(policy: policy).walk(root) { entry in
+            let parts = Array(entry.url.standardizedFileURL.pathComponents.dropFirst(base).prefix(maxDepth))
+            sizes[[], default: 0] += entry.reclaimableBytes
+            for depth in parts.indices {
+                let key = Array(parts[...depth])
+                if sizes[key] == nil { children[Array(parts[..<depth]), default: []].append(key) }
+                sizes[key, default: 0] += entry.reclaimableBytes
+            }
+        }
+        func node(_ key: [String]) -> FolderNode {
+            let url = key.reduce(root) { $0.appendingPathComponent($1) }
+            let kids = (children[key] ?? []).map(node).sorted { $0.size > $1.size }
+            return FolderNode(url: url, size: sizes[key] ?? 0, children: kids)
+        }
+        return node([])
+    }
+}
