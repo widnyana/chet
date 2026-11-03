@@ -59,9 +59,50 @@ struct FileIndexTests {
             #expect(entry.links == UInt16(st.st_nlink))
             #expect(entry.modified == FileStamp.read(url)?.modified)
             #expect(entry.device == st.st_dev)
+            // APFS reports private size in the bulk record; an un-cloned file owns all its blocks.
+            #expect(entry.hasPrivateSize)
+            #expect(entry.privateSize == entry.allocatedSize)
         }
         #expect(found["sub"]?.kind == .directory)
         #expect(found["link"]?.links == 2)
+    }
+
+    /// Clone semantics in the bulk record (verified empirically on APFS): a persisting `clonefile`
+    /// pair reports private size 0 for both members, a partially modified clone holds only its
+    /// unshared blocks, and the survivor of a deleted twin owns its full allocation again.
+    @Test func bulkPrivateSizeMatchesCloneSemantics() throws {
+        let dir = try TempDir()
+        let orig = try dir.file("orig", bytes: 1_000_000)
+        let clone = dir.url.appendingPathComponent("clone")
+        let cloned = clone.withUnsafeFileSystemRepresentation { dst in
+            orig.withUnsafeFileSystemRepresentation { src in
+                // clonefile(); ENOTSUP on volumes without clone support.
+                clonefile(src, dst, 0) == 0
+            }
+        }
+        let pair = try entries(in: dir.url)
+        let origEntry = try #require(pair["orig"])
+        #expect(origEntry.hasPrivateSize)
+        if cloned {
+            let cloneEntry = try #require(pair["clone"])
+            #expect(cloneEntry.hasPrivateSize)
+            #expect(origEntry.privateSize == 0)
+            #expect(cloneEntry.privateSize == 0)
+            // Partially modify the clone: only the rewritten blocks become private.
+            let fh = try FileHandle(forWritingTo: clone)
+            try fh.seek(toOffset: 4096)
+            try fh.write(Data(repeating: 0xFF, count: 4096))
+            try fh.close()
+            let partial = try #require(try entries(in: dir.url)["clone"])
+            #expect(partial.privateSize > 0)
+            #expect(partial.privateSize < partial.allocatedSize)
+            // Deleting the twin gives the survivor its full allocation back.
+            try FileManager.default.removeItem(at: orig)
+            let survivor = try #require(try entries(in: dir.url)["clone"])
+            #expect(survivor.privateSize == survivor.allocatedSize)
+        } else {
+            #expect(origEntry.privateSize == origEntry.allocatedSize)
+        }
     }
 
     @Test func candidatesSkipPackagesGitAndTaggedCaches() throws {

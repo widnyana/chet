@@ -142,7 +142,9 @@ public struct FileIndexBuilder: Sendable {
                 index.candidates.append(
                     WalkEntry(
                         url: fileURL, stamp: stamp,
-                        reclaimableBytes: SizeProbe.reclaimableBytes(fileURL) ?? entry.allocatedSize))
+                        reclaimableBytes: entry.hasPrivateSize
+                            ? entry.privateSize
+                            : (SizeProbe.reclaimableBytes(fileURL) ?? entry.allocatedSize)))
             case .other:
                 return
             }
@@ -174,13 +176,18 @@ public struct FileIndexBuilder: Sendable {
         let links: UInt16
         let size: Int64
         let allocatedSize: Int64
+        /// APFS private size (blocks not shared with clones); 0 is valid data for one member
+        /// of a full clone pair. Only meaningful when `hasPrivateSize`.
+        let privateSize: Int64
+        let hasPrivateSize: Bool
         var isDataless: Bool { FileStamp.isDataless(flags: flags) }
     }
 
     /// Reads a folder in batches with `getattrlistbulk`. With FSOPT_PACK_INVAL_ATTRS every requested
     /// attribute is present in each record, so the layout is fixed:
     /// length, returned attribute_set_t (20 bytes), error, name attrreference, devid, objtype,
-    /// modtime timespec, flags, fileid, then file attributes linkcount, totalsize, allocsize.
+    /// modtime timespec, flags, fileid, then file attributes linkcount, totalsize, allocsize,
+    /// and — with FSOPT_ATTR_CMN_EXTENDED, required for fork attributes — the privatesize.
     static func forEachEntry(_ fd: Int32, _ body: (Entry) throws -> Void) throws {
         var request = attrlist()
         request.bitmapcount = u_short(ATTR_BIT_MAP_COUNT)
@@ -190,16 +197,20 @@ public struct FileIndexBuilder: Sendable {
             | 0x0004_0000 | 0x0200_0000
         // LINKCOUNT | TOTALSIZE | ALLOCSIZE
         request.fileattr = 0x1 | 0x2 | 0x4
+        // ATTR_CMNEXT_PRIVATESIZE — a fork attribute, only carried with FSOPT_ATTR_CMN_EXTENDED.
+        request.forkattr = 0x0000_0008
         let capacity = 64 * 1024
         let buffer = UnsafeMutableRawPointer.allocate(byteCount: capacity, alignment: 8)
         defer { buffer.deallocate() }
         while true {
             try Task.checkCancellation()
-            let count = getattrlistbulk(fd, &request, buffer, capacity, 0x8)  // FSOPT_PACK_INVAL_ATTRS
+            // FSOPT_PACK_INVAL_ATTRS | FSOPT_ATTR_CMN_EXTENDED
+            let count = getattrlistbulk(fd, &request, buffer, capacity, 0x8 | 0x20)
             if count <= 0 { return }  // 0: done, -1: unreadable folder, stop here
             var record = UnsafeRawPointer(buffer)
             for _ in 0..<count {
                 let length = Int(record.loadUnaligned(as: UInt32.self))
+                let hasPrivateSize = (record + 4 + 16).loadUnaligned(as: UInt32.self) & 0x0000_0008 != 0
                 var cursor = record + 4 + 20
                 let error = cursor.loadUnaligned(as: UInt32.self)
                 cursor += 4
@@ -222,6 +233,8 @@ public struct FileIndexBuilder: Sendable {
                 let size = cursor.loadUnaligned(as: Int64.self)
                 cursor += 8
                 let allocated = cursor.loadUnaligned(as: Int64.self)
+                cursor += 8
+                let privateSize = cursor.loadUnaligned(as: Int64.self)
                 let name = String(cString: (nameReference + nameOffset).assumingMemoryBound(to: CChar.self))
                 record += length
                 guard error == 0 else { continue }
@@ -233,7 +246,7 @@ public struct FileIndexBuilder: Sendable {
                         modified: Date(
                             timeIntervalSince1970: TimeInterval(seconds) + TimeInterval(nanoseconds) / 1e9),
                         flags: flags, inode: inode, links: UInt16(clamping: links), size: size,
-                        allocatedSize: allocated))
+                        allocatedSize: allocated, privateSize: privateSize, hasPrivateSize: hasPrivateSize))
             }
         }
     }
