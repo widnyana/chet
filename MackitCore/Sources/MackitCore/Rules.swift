@@ -1,7 +1,7 @@
 import Foundation
 
 /// A data-driven junk category: which folders to look in and how to clean them.
-/// Each direct child of an existing root folder becomes one ScanItem.
+/// Each direct child of an existing root folder becomes one ScanItem (or the root itself, see `wholeRoots`).
 public struct Rule: Sendable, Identifiable {
     public let id: String
     /// Rules with the same category are shown together.
@@ -21,11 +21,13 @@ public struct Rule: Sendable, Identifiable {
     public let excluded: Set<String>
     /// Keep the most recently modified child of each root (for example the newest device support files).
     public let keepNewest: Bool
+    /// Each root folder becomes one item instead of its children (for tool caches full of hash-named folders).
+    public let wholeRoots: Bool
 
     public init(
         id: String, category: String? = nil, title: String, roots: [String], risk: Risk, mode: DeleteMode,
         owningBundleID: String? = nil, minAge: TimeInterval? = nil, extensions: Set<String>? = nil,
-        excluded: Set<String> = [], keepNewest: Bool = false
+        excluded: Set<String> = [], keepNewest: Bool = false, wholeRoots: Bool = false
     ) {
         self.id = id
         self.category = category ?? id
@@ -38,6 +40,7 @@ public struct Rule: Sendable, Identifiable {
         self.extensions = extensions
         self.excluded = excluded
         self.keepNewest = keepNewest
+        self.wholeRoots = wholeRoots
     }
 }
 
@@ -69,7 +72,7 @@ extension Rule {
                 "Library/Caches/Homebrew", "Library/Caches/pip", "Library/Caches/org.swift.swiftpm",
                 "Library/Caches/CocoaPods", "Library/Caches/go-build", "Library/Caches/Yarn", "Library/Caches/pnpm",
                 ".npm/_cacache", ".cargo/registry/cache", ".gradle/caches", ".cache/uv",
-            ], risk: .safe, mode: .permanent),
+            ], risk: .safe, mode: .permanent, wholeRoots: true),
         Rule(
             id: "browser-safari", category: "browser", title: "Safari cache",
             roots: ["Library/Caches/com.apple.Safari"], risk: .safe, mode: .permanent,

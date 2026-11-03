@@ -211,13 +211,8 @@ final class ScanModel {
     }
 
     @concurrent nonisolated static func runClean(_ items: [ScanItem]) async -> CleanReport {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
         var cleaner = Cleaner(policy: SafetyPolicy())
-        cleaner.owner = { item in
-            Rule.catalog.first { rule in
-                rule.owningBundleID != nil && rule.roots.contains { item.url.path.hasPrefix(home + "/" + $0 + "/") }
-            }?.owningBundleID
-        }
+        cleaner.owner = { $0.ownerBundleID }
         return cleaner.clean(items)
     }
 

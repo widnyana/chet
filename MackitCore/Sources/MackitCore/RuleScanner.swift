@@ -26,10 +26,11 @@ public struct RuleScanner: Sendable {
         // Roots of other rules are scanned by those rules, so a parent rule skips them.
         let claimed = rules.filter { $0.id != rule.id }.flatMap(\.roots)
         for root in rule.roots {
+            let rootURL = home.appendingPathComponent(root)
             let children: [URL]
             do {
-                children = try FileManager.default.contentsOfDirectory(
-                    at: home.appendingPathComponent(root), includingPropertiesForKeys: nil)
+                let listed = try FileManager.default.contentsOfDirectory(at: rootURL, includingPropertiesForKeys: nil)
+                children = rule.wholeRoots ? [rootURL] : listed
             } catch CocoaError.fileReadNoPermission {
                 result.needsFullDiskAccess = true
                 continue
@@ -40,7 +41,7 @@ public struct RuleScanner: Sendable {
             for child in children {
                 try Task.checkCancellation()
                 let name = child.lastPathComponent
-                let rel = root + "/" + name
+                let rel = rule.wholeRoots ? root : root + "/" + name
                 if rule.excluded.contains(name) { continue }
                 if claimed.contains(where: { $0 == rel || $0.hasPrefix(rel + "/") }) { continue }
                 if let extensions = rule.extensions, !extensions.contains(child.pathExtension.lowercased()) { continue }
@@ -51,7 +52,7 @@ public struct RuleScanner: Sendable {
                 found.append(
                     ScanItem(
                         url: child, categoryID: rule.category, risk: rule.risk, mode: rule.mode,
-                        reclaimableBytes: bytes, stamp: stamp))
+                        reclaimableBytes: bytes, stamp: stamp, ownerBundleID: rule.owningBundleID))
             }
             if rule.keepNewest, let newest = found.max(by: { $0.stamp.modified < $1.stamp.modified }) {
                 found.removeAll { $0.url == newest.url }

@@ -74,7 +74,25 @@ struct RuleScannerTests {
         let scanner = RuleScanner(home: dir.url)
         #expect(try scanner.scan(try rule("caches")).items.map(\.url.lastPathComponent) == ["foo"])
         #expect(try scanner.scan(try rule("browser-chrome")).items.map(\.url.lastPathComponent) == ["data"])
-        #expect(try scanner.scan(try rule("package-caches")).items.map(\.url.lastPathComponent) == ["downloads"])
+        #expect(try scanner.scan(try rule("package-caches")).items.map(\.url.lastPathComponent) == ["Homebrew"])
+    }
+
+    @Test func packageCachesAreOneItemPerTool() throws {
+        let dir = try TempDir()
+        try dir.file("Library/Caches/go-build/8f/x", bytes: 100)
+        try dir.file("Library/Caches/go-build/8a/y", bytes: 100)
+        try dir.file("Library/Caches/Homebrew/downloads/z", bytes: 100)
+        let items = try RuleScanner(home: dir.url).scan(try rule("package-caches")).items
+        #expect(Set(items.map(\.url.lastPathComponent)) == ["go-build", "Homebrew"])
+        #expect(items.allSatisfy { dir.policy.isDeletable($0.url) == .allowed })
+    }
+
+    @Test func browserItemsCarryTheirOwnerApp() throws {
+        let dir = try TempDir()
+        try dir.file("Library/Caches/Google/Chrome/Profile 4/data", bytes: 100)
+        let items = try RuleScanner(home: dir.url).scan(try rule("browser-chrome")).items
+        #expect(items.map(\.url.lastPathComponent) == ["Profile 4"])
+        #expect(items.first?.ownerBundleID == "com.google.Chrome")
     }
 
     @Test func keepNewestKeepsLatestDeviceSupport() throws {

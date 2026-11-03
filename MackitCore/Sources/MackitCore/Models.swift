@@ -46,13 +46,19 @@ public struct ScanItem: Identifiable, Hashable, Sendable {
     public let mode: DeleteMode
     public let reclaimableBytes: Int64
     public let stamp: FileStamp
+    /// App that owns the data, for example a browser. Cleaning is skipped while it runs.
+    public let ownerBundleID: String?
 
-    public init(url: URL, categoryID: String, risk: Risk, mode: DeleteMode, reclaimableBytes: Int64, stamp: FileStamp) {
+    public init(
+        url: URL, categoryID: String, risk: Risk, mode: DeleteMode, reclaimableBytes: Int64, stamp: FileStamp,
+        ownerBundleID: String? = nil
+    ) {
         self.url = url
         self.categoryID = categoryID
         self.risk = risk
         self.mode = mode
         self.reclaimableBytes = reclaimableBytes
         self.stamp = stamp
+        self.ownerBundleID = ownerBundleID
     }
 }
