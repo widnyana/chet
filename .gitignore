@@ -6,6 +6,7 @@
 !.gitignore
 !project.yml
 !mise.toml
+!README.md
 !Mackit/**
 !MackitCore/**
 MackitCore/.build/
