@@ -103,12 +103,15 @@ final class ScanModel {
             let home = FileManager.default.homeDirectoryForCurrentUser
             let roots = Self.userRoots(home)
             let media = ["Pictures", "Movies", "Desktop", "Downloads"].map { home.appendingPathComponent($0) }
-            async let duplicates = Self.findDuplicates(roots)
-            async let large = Self.findLargeFiles(roots)
+            // One metadata-only walk feeds both scanners; no second pass over the home folder.
+            async let index = Self.buildIndex(roots)
             async let leftovers = Self.findLeftovers()
             async let photos = Self.findPhotos(media)
             async let videos = Self.findVideos(media)
             async let localSnapshots = Self.findSnapshots()
+            let candidates = await index
+            async let duplicates = Self.findDuplicates(candidates)
+            async let large = Self.findLargeFiles(candidates)
 
             add(
                 "duplicates",
@@ -229,12 +232,16 @@ final class ScanModel {
         return children.filter { !$0.lastPathComponent.hasPrefix(".") && $0.lastPathComponent != "Library" }
     }
 
-    @concurrent nonisolated static func findDuplicates(_ roots: [URL]) async -> [DuplicateGroup] {
-        (try? DuplicateFinder(policy: SafetyPolicy()).find(in: roots)) ?? []
+    @concurrent nonisolated static func buildIndex(_ roots: [URL]) async -> [WalkEntry] {
+        (try? FileIndexBuilder(policy: SafetyPolicy()).build(roots: roots))?.candidates ?? []
     }
 
-    @concurrent nonisolated static func findLargeFiles(_ roots: [URL]) async -> [ScanItem] {
-        (try? LargeFileScanner(policy: SafetyPolicy()).scan(roots)) ?? []
+    @concurrent nonisolated static func findDuplicates(_ entries: [WalkEntry]) async -> [DuplicateGroup] {
+        (try? DuplicateFinder(policy: SafetyPolicy()).find(entries: entries)) ?? []
+    }
+
+    @concurrent nonisolated static func findLargeFiles(_ entries: [WalkEntry]) async -> [ScanItem] {
+        LargeFileScanner(policy: SafetyPolicy()).select(from: entries)
     }
 
     @concurrent nonisolated static func findLeftovers() async -> [ScanItem] {
