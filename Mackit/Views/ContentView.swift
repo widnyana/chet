@@ -40,7 +40,7 @@ struct ContentView: View {
         } else if selection == "snapshots" {
             SnapshotsView()
         } else if let id = selection, let category = model.categories.first(where: { $0.id == id }) {
-            CategoryDetailView(category: category)
+            CategoryDetailView(category: category, onClean: { confirming = true })
         } else {
             ContentUnavailableView(
                 "Pick a category", systemImage: "sidebar.left",
