@@ -305,3 +305,52 @@ public final class FlightRecorder: Sendable {
         s.fileSize = 0
     }
 }
+
+// MARK: - ScanEvent summaries (pure and unit-testable; ScanModel forwards, see KTD8)
+
+extension FlightRecorder {
+    /// Pure mapping from a scan event to a (step, summary) pair. Every event maps to
+    /// something; the shape is deliberately step-level (counts, bytes, top paths) — never
+    /// raw payloads.
+    public static func summary(for event: ScanEvent) -> (step: String, summary: String) {
+        switch event {
+        case .started(let step): return (step.rawValue, "started")
+        case .finished(let step): return (step.rawValue, "finished")
+        case .done: return ("scan", "complete")
+        case .rules(let result):
+            return (
+                result.category,
+                "\(result.items.count) items, \(result.totalBytes) bytes\(result.needsFullDiskAccess ? ", FDA missing" : "")"
+            )
+        case .taggedCaches(let items): return ("tagged-caches", itemsSummary(items))
+        case .largeFiles(let items): return ("large-files", itemsSummary(items))
+        case .leftovers(let items): return ("leftovers", itemsSummary(items))
+        case .duplicates(let groups):
+            let bytes = groups.reduce(Int64(0)) { $0 + $1.reclaimableBytes }
+            return ("duplicates", "\(groups.count) groups, \(bytes) bytes reclaimable")
+        case .photos(let result):
+            return ("photos", "\(result.clusters.count) clusters, \(result.blurry.count) blurry")
+        case .videos(let clusters):
+            let bytes = clusters.reduce(Int64(0)) { $0 + $1.reclaimableBytes }
+            return ("videos", "\(clusters.count) clusters, \(bytes) bytes reclaimable")
+        case .snapshots(let snapshots):
+            return ("snapshots", "\(snapshots.count) local snapshots")
+        case .folderTrees(let trees):
+            return ("index", "\(trees.count) root trees measured")
+        }
+    }
+
+    /// "N items, X bytes; top: name (bytes), ..." — at most 5 paths, largest first.
+    static func itemsSummary(_ items: [ScanItem]) -> String {
+        let bytes = items.reduce(Int64(0)) { $0 + $1.reclaimableBytes }
+        let top = items.sorted { $0.reclaimableBytes > $1.reclaimableBytes }.prefix(5)
+            .map { "\($0.url.lastPathComponent) (\($0.reclaimableBytes))" }
+        return "\(items.count) items, \(bytes) bytes" + (top.isEmpty ? "" : "; top: " + top.joined(separator: ", "))
+    }
+
+    /// Records a scan event as one step summary.
+    public func record(_ event: ScanEvent) {
+        let s = Self.summary(for: event)
+        record(step: s.step, s.summary)
+    }
+}

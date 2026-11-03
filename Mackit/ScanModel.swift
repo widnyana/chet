@@ -59,6 +59,9 @@ final class ScanModel {
     /// Bumped on every scan start and stop; events from stale sessions are dropped.
     private var generation = 0
     private var scanTask: Task<Void, Never>?
+    /// Samples ScanProgress into the flight recorder while a scan runs, so a mid-walk death
+    /// names the folder in flight (the index walk emits no per-path events).
+    private var heartbeat: Task<Void, Never>?
 
     static let titles: [String: String] = [
         "trash": "Trash", "caches": "User caches", "logs": "Logs and crash reports", "xcode": "Xcode build data",
@@ -111,6 +114,7 @@ final class ScanModel {
         scanTask = Task {
             for await event in session.events() {
                 guard gen == generation else { break }
+                FlightRecorder.shared?.record(event)
                 apply(event)
             }
             guard gen == generation else { return }
@@ -118,11 +122,24 @@ final class ScanModel {
             currentStep = nil
             isScanning = false
         }
+        heartbeat?.cancel()
+        heartbeat = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(5))
+                guard !Task.isCancelled else { break }
+                guard let self, self.isScanning, let p = self.progress else { continue }
+                FlightRecorder.shared?.record(
+                    step: self.currentStep?.rawValue ?? "scan",
+                    "progress: \(p.files) files, \(p.bytes) bytes, in \(p.currentFolder)")
+            }
+        }
     }
 
     func cancel() {
         generation += 1
         scanTask?.cancel()
+        heartbeat?.cancel()
+        FlightRecorder.shared?.record(step: "scan", "cancelled")
         isScanning = false
         currentStep = nil
         progress = nil

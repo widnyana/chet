@@ -44,6 +44,8 @@ public struct CleanReport: Sendable {
 public struct Cleaner: Sendable {
     public let policy: SafetyPolicy
     public let log: AuditLog
+    /// When set, receives one batch summary per clean run (per-file rows go only to `log`).
+    public let recorder: FlightRecorder?
     /// Bundle ID of the app that owns an item, if any.
     public var owner: @Sendable (ScanItem) -> String? = { _ in nil }
     public var isRunning: @Sendable (String) -> Bool = { id in
@@ -53,9 +55,10 @@ public struct Cleaner: Sendable {
         try FileManager.default.trashItem(at: url, resultingItemURL: nil)
     }
 
-    public init(policy: SafetyPolicy, log: AuditLog = AuditLog()) {
+    public init(policy: SafetyPolicy, log: AuditLog = AuditLog(), recorder: FlightRecorder? = nil) {
         self.policy = policy
         self.log = log
+        self.recorder = recorder
     }
 
     public func clean(_ items: [ScanItem]) -> CleanReport {
@@ -64,6 +67,11 @@ public struct Cleaner: Sendable {
             let outcome = clean(item)
             log.append(item, outcome)
             report.results.append(CleanResult(item: item, outcome: outcome))
+        }
+        if let recorder {
+            recorder.record(
+                step: "clean",
+                "\(report.results.count) checked, \(report.freedBytes) bytes freed")
         }
         return report
     }
