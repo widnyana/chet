@@ -110,7 +110,7 @@ public struct DuplicateFinder: Sendable {
     }
 
     static func sameBytes(_ a: URL, _ b: URL) throws -> Bool {
-        guard let left = try? FileHandle(forReadingFrom: a), let right = try? FileHandle(forReadingFrom: b) else {
+        guard let left = try? FileHandle.uncached(a), let right = try? FileHandle.uncached(b) else {
             return false
         }
         defer {
@@ -127,7 +127,7 @@ public struct DuplicateFinder: Sendable {
     }
 
     static func edgeHash(_ url: URL) throws -> String {
-        let handle = try FileHandle(forReadingFrom: url)
+        let handle = try FileHandle.uncached(url)
         defer { try? handle.close() }
         var hasher = SHA256()
         if let head = try handle.read(upToCount: 16_384) { hasher.update(data: head) }
@@ -140,7 +140,7 @@ public struct DuplicateFinder: Sendable {
     }
 
     static func fullHash(_ url: URL) throws -> String {
-        let handle = try FileHandle(forReadingFrom: url)
+        let handle = try FileHandle.uncached(url)
         defer { try? handle.close() }
         var hasher = SHA256()
         while let chunk = try handle.read(upToCount: 1 << 20), !chunk.isEmpty {

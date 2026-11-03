@@ -21,6 +21,13 @@ public struct FileStamp: Hashable, Sendable {
     public let links: UInt16
     public let isSymlink: Bool
     public let isRegularFile: Bool
+    /// An iCloud / File Provider placeholder: no local data, and reading it would download it.
+    public let isDataless: Bool
+
+    /// `SF_DATALESS` in `st_flags` (sys/stat.h).
+    static func isDataless(flags: UInt32) -> Bool {
+        flags & 0x4000_0000 != 0
+    }
 
     public static func read(_ url: URL) -> FileStamp? {
         var st = stat()
@@ -32,7 +39,8 @@ public struct FileStamp: Hashable, Sendable {
             modified: Date(timeIntervalSince1970: mtime),
             links: UInt16(st.st_nlink),
             isSymlink: (st.st_mode & S_IFMT) == S_IFLNK,
-            isRegularFile: (st.st_mode & S_IFMT) == S_IFREG
+            isRegularFile: (st.st_mode & S_IFMT) == S_IFREG,
+            isDataless: isDataless(flags: st.st_flags)
         )
     }
 }

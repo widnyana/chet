@@ -80,6 +80,13 @@ public struct SimilarVideos: Sendable {
         return clusters.sorted { $0.reclaimableBytes > $1.reclaimableBytes }
     }
 
+    /// Width x height, or nil for zero, NaN or infinite sizes (`Int(_:)` would trap on those).
+    static func pixelCount(_ size: CGSize) -> Int? {
+        let area = abs(size.width * size.height)
+        guard area.isFinite, area >= 1, area < 1e12 else { return nil }
+        return Int(area)
+    }
+
     func matches(_ a: VideoInfo, _ b: VideoInfo) -> Bool {
         let longest = max(a.duration, b.duration)
         guard longest > 0, abs(a.duration - b.duration) / longest < 0.02 else { return false }
@@ -96,7 +103,7 @@ public struct SimilarVideos: Sendable {
         else {
             return nil
         }
-        let pixels = Int(abs(size.width * size.height))
+        guard let pixels = Self.pixelCount(size) else { return nil }
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
         generator.requestedTimeToleranceBefore = .zero

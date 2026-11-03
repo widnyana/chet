@@ -6,7 +6,7 @@
 !.gitignore
 !project.yml
 !mise.toml
-!README.md
+!/README.md
 !.swift-format
 !Mackit/**
 !MackitCore/**
@@ -14,3 +14,4 @@ MackitCore/.build/
 MackitCore/.swiftpm/
 .DS_Store
 .worktrees/
+ref/

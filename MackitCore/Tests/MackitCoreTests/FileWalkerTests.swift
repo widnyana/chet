@@ -39,6 +39,19 @@ struct FileWalkerTests {
         await #expect(throws: CancellationError.self) { try await task.value }
     }
 
+    @Test func datalessFlagIsRead() {
+        #expect(FileStamp.isDataless(flags: 0x4000_0000))
+        #expect(FileStamp.isDataless(flags: 0x4000_0000 | 0x20))
+        #expect(!FileStamp.isDataless(flags: 0))
+        #expect(!FileStamp.isDataless(flags: 0x20))
+    }
+
+    @Test func localFilesAreNotDataless() throws {
+        let dir = try TempDir()
+        let file = try dir.file("a", bytes: 10)
+        #expect(FileStamp.read(file)?.isDataless == false)
+    }
+
     @Test func hardLinksCountOnce() throws {
         let dir = try TempDir()
         let a = try dir.file("a", bytes: 1_000_000)

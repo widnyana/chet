@@ -18,7 +18,7 @@ public struct FileWalker: Sendable {
     /// skips package contents and other volumes, skips files the policy denies.
     /// Throws CancellationError when the current task is cancelled.
     public func walk(_ root: URL, _ visit: (WalkEntry) throws -> Void) throws {
-        if let stamp = FileStamp.read(root), stamp.isRegularFile {
+        if let stamp = FileStamp.read(root), stamp.isRegularFile, !stamp.isDataless {
             try emit(root, stamp, visit)
             return
         }
@@ -37,7 +37,7 @@ public struct FileWalker: Sendable {
                 enumerator.skipDescendants()
                 continue
             }
-            guard values.isRegularFile == true, let stamp = FileStamp.read(url) else { continue }
+            guard values.isRegularFile == true, let stamp = FileStamp.read(url), !stamp.isDataless else { continue }
             try emit(url, stamp, visit)
         }
     }

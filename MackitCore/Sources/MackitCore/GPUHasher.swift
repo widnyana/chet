@@ -18,7 +18,7 @@ public struct GPUHasher: Sendable {
     }
 
     public func digest(_ url: URL) throws -> String {
-        let handle = try FileHandle(forReadingFrom: url)
+        let handle = try FileHandle.uncached(url)
         defer { try? handle.close() }
         let blocksPerChunk = chunkBytes / Self.blockSize
         guard let buffer = context.device.makeBuffer(length: chunkBytes + 8, options: .storageModeShared),

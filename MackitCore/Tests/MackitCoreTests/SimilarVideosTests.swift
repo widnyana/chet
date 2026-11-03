@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Testing
 
@@ -28,6 +29,14 @@ struct SimilarVideosTests {
         try await VideoFixtures.write(to: dir.url.appendingPathComponent("a.mov"), base: 1, seconds: 10, fps: 2)
         try await VideoFixtures.write(to: dir.url.appendingPathComponent("b.mov"), base: 1, seconds: 12, fps: 2)
         #expect(try await SimilarVideos(policy: dir.policy).scan([dir.url]).isEmpty)
+    }
+
+    @Test func badVideoSizesGiveNoPixelCount() {
+        #expect(SimilarVideos.pixelCount(CGSize(width: CGFloat.nan, height: 10)) == nil)
+        #expect(SimilarVideos.pixelCount(CGSize(width: CGFloat.infinity, height: 10)) == nil)
+        #expect(SimilarVideos.pixelCount(CGSize(width: 0, height: 1080)) == nil)
+        #expect(SimilarVideos.pixelCount(CGSize(width: 1920, height: -1080)) == 2_073_600)
+        #expect(SimilarVideos.pixelCount(CGSize(width: 1920, height: 1080)) == 2_073_600)
     }
 
     @Test func unreadableVideoIsSkipped() async throws {
