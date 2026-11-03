@@ -10,6 +10,7 @@
 !.swift-format
 !Mackit/**
 !MackitCore/**
+!docs/findings.md
 MackitCore/.build/
 MackitCore/.swiftpm/
 .DS_Store
