@@ -28,11 +28,25 @@ struct SafetyPolicyTests {
         "/Users/test/Library/Caches/com.foo/bar",
         "/Users/test/.Trash/file",
         "/Users/test/.Trash/Old.app",
+        "/Users/test/Library/Caches/com.example.app/blob",
+        "/Users/test/Library/Caches/com.example.app",
         "/Volumes/Ext/.Trashes/501/file",
         "/Users/test/Library/Containers/com.apple.mail/Data/Library/Mail Downloads/a.pdf",
     ])
     func allows(_ path: String) {
         #expect(verdict(path) == .allowed)
+    }
+
+    @Test func deniesRealAppBundleOnDisk() throws {
+        let dir = try TempDir()
+        try dir.file("Apps/Real.app/Contents/Info.plist", bytes: 10)
+        try dir.file("Apps/Real.app/Contents/MacOS/Real", bytes: 10)
+        try dir.file("Library/Caches/com.example.app/blob", bytes: 10)
+        #expect(dir.policy.isDeletable(dir.url.appendingPathComponent("Apps/Real.app")) == .denied("app bundle"))
+        #expect(
+            dir.policy.isDeletable(dir.url.appendingPathComponent("Apps/Real.app/Contents/MacOS/Real"))
+                == .denied("app bundle"))
+        #expect(dir.policy.isDeletable(dir.url.appendingPathComponent("Library/Caches/com.example.app")) == .allowed)
     }
 
     @Test func deniesSymlink() throws {

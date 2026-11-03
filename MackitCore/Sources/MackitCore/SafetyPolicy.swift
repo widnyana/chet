@@ -39,7 +39,7 @@ public struct SafetyPolicy: Sendable {
         let inTrash = inVolumeTrash || rel?.hasPrefix(".Trash/") == true
         if !inTrash {
             if parts.contains(".git") { return .denied("git repository") }
-            if parts.contains(where: { $0.hasSuffix(".app") }) { return .denied("app bundle") }
+            if Self.containsAppBundle(parts) { return .denied("app bundle") }
             if parts.contains(where: { $0.hasSuffix(".photoslibrary") }) { return .denied("Photos library") }
         }
 
@@ -52,6 +52,18 @@ public struct SafetyPolicy: Sendable {
             }
         }
         return .allowed
+    }
+
+    /// A component ending in `.app` is an app bundle when it holds `Contents`: the path goes into
+    /// `Contents`, or the folder on disk has `Contents/Info.plist`. Cache folders named after bundle IDs,
+    /// like `com.example.app`, are not bundles.
+    static func containsAppBundle(_ parts: [String]) -> Bool {
+        for (index, part) in parts.enumerated() where part.hasSuffix(".app") {
+            if index + 1 < parts.count, parts[index + 1] == "Contents" { return true }
+            let bundle = "/" + parts[...index].joined(separator: "/")
+            if FileManager.default.fileExists(atPath: bundle + "/Contents/Info.plist") { return true }
+        }
+        return false
     }
 
     private func relative(_ path: String) -> String? {
