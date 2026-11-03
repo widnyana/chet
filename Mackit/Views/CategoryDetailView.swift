@@ -11,7 +11,8 @@ struct CategoryDetailView: View {
     @State private var preview: URL?
 
     private var urls: [URL] { category.items.map(\.url) }
-    private var selectedCount: Int { category.items.filter { model.selected.contains($0.url) }.count }
+    private var categorySelected: [ScanItem] { category.items.filter { model.selected.contains($0.url) } }
+    private var selectedCount: Int { categorySelected.count }
     private var allSafe: Bool { category.items.allSatisfy { $0.risk == .safe } }
 
     var body: some View {
@@ -23,7 +24,12 @@ struct CategoryDetailView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            ActionBar(onClean: onClean)
+            ActionBar(
+                items: categorySelected,
+                onClean: {
+                    model.beginClean(categorySelected)
+                    onClean()
+                })
         }
         .navigationTitle(category.title)
         .navigationSubtitle(

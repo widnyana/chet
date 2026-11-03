@@ -12,20 +12,11 @@ struct CategoryState: Identifiable {
 }
 
 /// One phase of a scan, listed on the overview while it runs.
-struct ScanStep: Identifiable {
-    let id: String
-    let title: String
+struct ScanStepState: Identifiable {
+    let id: MackitCore.ScanStep
     var done = false
-
-    static let all = [
-        ScanStep(id: "rules", title: "Caches, logs and junk folders"),
-        ScanStep(id: "duplicates", title: "Duplicate files"),
-        ScanStep(id: "large-files", title: "Large and old files"),
-        ScanStep(id: "leftovers", title: "Leftovers of deleted apps"),
-        ScanStep(id: "photos", title: "Similar and blurry photos"),
-        ScanStep(id: "videos", title: "Similar videos"),
-        ScanStep(id: "snapshots", title: "Time Machine snapshots"),
-    ]
+    var title: String { id.title }
+    static let all = MackitCore.ScanStep.allCases.map { ScanStepState(id: $0) }
 }
 
 /// Items that belong together: one keeper that stays, and copies that may go.
@@ -52,8 +43,19 @@ final class ScanModel {
     var report: CleanReport?
     var snapshotErrors: [String] = []
     /// Phases of the current or last scan.
-    var steps: [ScanStep] = []
+    var steps: [ScanStepState] = []
+    /// Folder size trees of the last scan, for the disk map.
+    var folderTrees: [FolderNode] = []
+    /// Live counters of the running scan.
+    var progress: ScanProgress?
+    /// Step currently running, while a scan is active.
+    var currentStep: MackitCore.ScanStep?
+    /// Items staged for the confirm sheet: a category's selection, or all selected items.
+    var confirmItems: [ScanItem] = []
+    var confirmSnapshots: [LocalSnapshot] = []
     var lastScan: Date?
+    /// Bumped on every scan start and stop; events from stale sessions are dropped.
+    private var generation = 0
     private var scanTask: Task<Void, Never>?
 
     static let titles: [String: String] = [
@@ -62,7 +64,8 @@ final class ScanModel {
         "browser": "Browser caches", "mail-downloads": "Mail downloads", "installers": "Old installers",
         "ios-backups": "iOS device backups", "duplicates": "Duplicates", "large-files": "Large and old files",
         "leftovers": "App leftovers", "similar-photos": "Similar photos", "blurry-photos": "Blurry photos",
-        "similar-videos": "Similar videos", "snapshots": "Time Machine local snapshots",
+        "similar-videos": "Similar videos", "tagged-caches": "Tagged cache folders",
+        "snapshots": "Time Machine local snapshots",
     ]
 
     /// Selected items, each URL once (a file can show up in more than one category).
@@ -87,78 +90,51 @@ final class ScanModel {
 
     func scan() {
         scanTask?.cancel()
+        generation += 1
+        let gen = generation
         categories = []
         groups = [:]
         snapshots = []
         selected = []
         selectedSnapshots = []
+        folderTrees = []
+        confirmItems = []
+        confirmSnapshots = []
         report = nil
         isScanning = true
-        steps = ScanStep.all
+        steps = ScanStepState.all
+        let session = ScanSession()
+        progress = session.progress
         scanTask = Task {
-            for await result in RuleScanner().scanAll() {
-                merge(result)
+            for await event in session.events() {
+                guard gen == generation else { break }
+                apply(event)
             }
-            markDone("rules")
-            let home = FileManager.default.homeDirectoryForCurrentUser
-            let roots = Self.userRoots(home)
-            let media = ["Pictures", "Movies", "Desktop", "Downloads"].map { home.appendingPathComponent($0) }
-            // One metadata-only walk feeds both scanners; no second pass over the home folder.
-            async let index = Self.buildIndex(roots)
-            async let leftovers = Self.findLeftovers()
-            async let photos = Self.findPhotos(media)
-            async let videos = Self.findVideos(media)
-            async let localSnapshots = Self.findSnapshots()
-            let candidates = await index
-            async let duplicates = Self.findDuplicates(candidates)
-            async let large = Self.findLargeFiles(candidates)
-
-            add(
-                "duplicates",
-                groups: await duplicates.map { group in
-                    ItemGroup(keeper: group.keeper.url, items: group.duplicates.map { Self.item($0, "duplicates") })
-                })
-            markDone("duplicates")
-            add("large-files", items: await large)
-            markDone("large-files")
-            add("leftovers", items: await leftovers)
-            markDone("leftovers")
-            let photoResult = await photos
-            add(
-                "similar-photos",
-                groups: (photoResult?.clusters ?? []).map { cluster in
-                    ItemGroup(
-                        keeper: cluster.keeper.entry.url,
-                        items: cluster.others.map { Self.item($0.entry, "similar-photos") })
-                })
-            add("blurry-photos", items: (photoResult?.blurry ?? []).map { Self.item($0.entry, "blurry-photos") })
-            markDone("photos")
-            add(
-                "similar-videos",
-                groups: await videos.map { cluster in
-                    ItemGroup(
-                        keeper: cluster.keeper.entry.url,
-                        items: cluster.others.map { Self.item($0.entry, "similar-videos") })
-                })
-            markDone("videos")
-            snapshots = await localSnapshots
-            markDone("snapshots")
-            lastScan = Date()
-            if !snapshots.isEmpty {
-                categories.append(CategoryState(id: "snapshots", title: Self.titles["snapshots"] ?? "Snapshots"))
-            }
+            guard gen == generation else { return }
+            progress = nil
+            currentStep = nil
             isScanning = false
         }
     }
 
     func cancel() {
+        generation += 1
         scanTask?.cancel()
         isScanning = false
+        currentStep = nil
+        progress = nil
+    }
+
+    /// Stage what the confirm sheet will clean. No argument: all selected items,
+    /// or the selected snapshots when no items are selected (snapshots page).
+    func beginClean(_ items: [ScanItem]? = nil) {
+        confirmItems = items ?? selectedItems
+        confirmSnapshots = confirmItems.isEmpty ? Array(selectedSnapshots) : []
     }
 
     func clean() {
-        let items = selectedItems
-        let chosenSnapshots = Array(selectedSnapshots)
+        let items = confirmItems
+        let chosenSnapshots = confirmSnapshots
         isCleaning = true
         Task {
             let result = await Self.runClean(items)
@@ -190,12 +166,56 @@ final class ScanModel {
             selectedSnapshots.subtract(deleted)
             snapshotErrors = errors
             report = result
+            confirmItems = []
+            confirmSnapshots = []
             isCleaning = false
         }
     }
 
-    private func markDone(_ id: String) {
+    private func markDone(_ id: MackitCore.ScanStep) {
         if let index = steps.firstIndex(where: { $0.id == id }) { steps[index].done = true }
+    }
+
+    private func apply(_ event: ScanEvent) {
+        switch event {
+        case .started(let step): currentStep = step
+        case .rules(let result): merge(result)
+        case .folderTrees(let trees): folderTrees = trees
+        case .taggedCaches(let items): add("tagged-caches", items: items)
+        case .largeFiles(let items): add("large-files", items: items)
+        case .duplicates(let found):
+            add(
+                "duplicates",
+                groups: found.map { group in
+                    ItemGroup(keeper: group.keeper.url, items: group.duplicates.map { Self.item($0, "duplicates") })
+                })
+        case .leftovers(let items): add("leftovers", items: items)
+        case .photos(let result):
+            add(
+                "similar-photos",
+                groups: result.clusters.map { cluster in
+                    ItemGroup(
+                        keeper: cluster.keeper.entry.url,
+                        items: cluster.others.map { Self.item($0.entry, "similar-photos") })
+                })
+            add("blurry-photos", items: result.blurry.map { Self.item($0.entry, "blurry-photos") })
+        case .videos(let clusters):
+            add(
+                "similar-videos",
+                groups: clusters.map { cluster in
+                    ItemGroup(
+                        keeper: cluster.keeper.entry.url,
+                        items: cluster.others.map { Self.item($0.entry, "similar-videos") })
+                })
+        case .snapshots(let found): snapshots = found
+        case .finished(let step):
+            markDone(step)
+        case .done:
+            lastScan = Date()
+            if !snapshots.isEmpty {
+                categories.append(CategoryState(id: "snapshots", title: Self.titles["snapshots"] ?? "Snapshots"))
+            }
+        }
     }
 
     private func merge(_ result: CategoryResult) {
@@ -224,40 +244,6 @@ final class ScanModel {
         ScanItem(
             url: entry.url, categoryID: category, risk: .review, mode: .trash,
             reclaimableBytes: entry.reclaimableBytes, stamp: entry.stamp)
-    }
-
-    /// Top-level folders of the home folder, without Library and hidden folders.
-    nonisolated static func userRoots(_ home: URL) -> [URL] {
-        let children = (try? FileManager.default.contentsOfDirectory(at: home, includingPropertiesForKeys: nil)) ?? []
-        return children.filter { !$0.lastPathComponent.hasPrefix(".") && $0.lastPathComponent != "Library" }
-    }
-
-    @concurrent nonisolated static func buildIndex(_ roots: [URL]) async -> [WalkEntry] {
-        (try? FileIndexBuilder(policy: SafetyPolicy()).build(roots: roots))?.candidates ?? []
-    }
-
-    @concurrent nonisolated static func findDuplicates(_ entries: [WalkEntry]) async -> [DuplicateGroup] {
-        (try? DuplicateFinder(policy: SafetyPolicy()).find(entries: entries)) ?? []
-    }
-
-    @concurrent nonisolated static func findLargeFiles(_ entries: [WalkEntry]) async -> [ScanItem] {
-        LargeFileScanner(policy: SafetyPolicy()).select(from: entries)
-    }
-
-    @concurrent nonisolated static func findLeftovers() async -> [ScanItem] {
-        (try? LeftoverScanner().scan()) ?? []
-    }
-
-    @concurrent nonisolated static func findPhotos(_ roots: [URL]) async -> PhotoScanResult? {
-        try? SimilarPhotos(policy: SafetyPolicy()).scan(roots)
-    }
-
-    @concurrent nonisolated static func findVideos(_ roots: [URL]) async -> [VideoCluster] {
-        (try? await SimilarVideos(policy: SafetyPolicy()).scan(roots)) ?? []
-    }
-
-    @concurrent nonisolated static func findSnapshots() async -> [LocalSnapshot] {
-        (try? Snapshots.list()) ?? []
     }
 
     @concurrent nonisolated static func runClean(_ items: [ScanItem]) async -> CleanReport {

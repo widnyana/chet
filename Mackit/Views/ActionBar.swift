@@ -4,13 +4,14 @@ import SwiftUI
 /// Floating glass bar at the bottom of a category: what is selected, and the Clean button.
 struct ActionBar: View {
     @Environment(ScanModel.self) private var model
+    let items: [ScanItem]
     let onClean: () -> Void
 
     var body: some View {
-        let count = model.selectedItems.count
+        let count = items.count
         HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 0) {
-                Text(model.selectedBytes.formatted(.byteCount(style: .file)))
+                Text(items.reduce(0) { $0 + $1.reclaimableBytes }.formatted(.byteCount(style: .file)))
                     .font(.headline)
                     .monospacedDigit()
                 Text(count == 1 ? "1 item selected" : "\(count) items selected")

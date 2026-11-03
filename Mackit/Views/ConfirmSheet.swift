@@ -6,7 +6,7 @@ struct ConfirmSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        let items = model.selectedItems
+        let items = model.confirmItems
         let rows = Dictionary(grouping: items, by: \.categoryID)
             .map { (id: $0.key, bytes: $0.value.reduce(0) { $0 + $1.reclaimableBytes }) }
             .sorted { $0.bytes > $1.bytes }
@@ -39,10 +39,10 @@ struct ConfirmSheet: View {
                         }
                         .padding(.vertical, 6)
                     }
-                    if !model.selectedSnapshots.isEmpty {
+                    if !model.confirmSnapshots.isEmpty {
                         HStack {
                             Image(systemName: "clock.arrow.circlepath").frame(width: 22)
-                            Text("\(model.selectedSnapshots.count) Time Machine local snapshots")
+                            Text("\(model.confirmSnapshots.count) Time Machine local snapshots")
                             Spacer()
                         }
                         .padding(.vertical, 6)

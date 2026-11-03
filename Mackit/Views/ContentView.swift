@@ -39,11 +39,14 @@ struct ContentView: View {
         if selection == "disk-map" {
             DiskMapView()
         } else if selection == "snapshots" {
-            SnapshotsView()
+            SnapshotsView(onClean: {
+                model.beginClean(nil)
+                confirming = true
+            })
         } else if let id = selection, let category = model.categories.first(where: { $0.id == id }) {
             CategoryDetailView(category: category, onClean: { confirming = true })
         } else {
-            OverviewView(selection: $selection)
+            OverviewView(selection: $selection, onClean: { confirming = true })
         }
     }
 

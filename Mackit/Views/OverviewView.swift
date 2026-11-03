@@ -6,6 +6,7 @@ import SwiftUI
 struct OverviewView: View {
     @Environment(ScanModel.self) private var model
     @Binding var selection: String?
+    let onClean: () -> Void
     @State private var pickedTitle: String?
 
     var body: some View {
@@ -80,8 +81,19 @@ struct OverviewView: View {
                 Text(model.totalBytes.formatted(.byteCount(style: .file)))
                     .font(.system(size: 44, weight: .bold, design: .rounded))
                     .monospacedDigit()
-                Text("can be cleaned. \(model.selectedBytes.formatted(.byteCount(style: .file))) is selected.")
+                Text("can be cleaned.")
                     .foregroundStyle(.secondary)
+            }
+            HStack {
+                Text("\(model.selectedBytes.formatted(.byteCount(style: .file))) is selected.")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Clean All Selected") {
+                    model.beginClean()
+                    onClean()
+                }
+                .buttonStyle(.glassProminent)
+                .disabled(model.selectedBytes == 0 || model.isCleaning)
             }
             if rows.isEmpty {
                 Label("Nothing to clean. This Mac is tidy.", systemImage: "checkmark.seal.fill")

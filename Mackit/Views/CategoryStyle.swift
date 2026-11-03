@@ -21,6 +21,7 @@ struct CategoryStyle {
         "mail-downloads": CategoryStyle(symbol: "envelope", color: .blue),
         "installers": CategoryStyle(symbol: "opticaldiscdrive", color: .teal),
         "ios-backups": CategoryStyle(symbol: "iphone", color: .gray),
+        "tagged-caches": CategoryStyle(symbol: "tag", color: .teal),
         "duplicates": CategoryStyle(symbol: "doc.on.doc", color: .pink),
         "large-files": CategoryStyle(symbol: "externaldrive", color: .red),
         "leftovers": CategoryStyle(symbol: "puzzlepiece.extension", color: .mint),

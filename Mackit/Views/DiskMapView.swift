@@ -5,6 +5,7 @@ import SwiftUI
 
 /// Deep inspection: a Metal-rendered treemap of the home folder. Click a folder to zoom in.
 struct DiskMapView: View {
+    @Environment(ScanModel.self) private var model
     @State private var stack: [FolderNode] = []
     @State private var hovered: FolderNode?
     @State private var loading = false
@@ -87,6 +88,16 @@ struct DiskMapView: View {
 
     private func load() async {
         loading = true
+        if !model.folderTrees.isEmpty {
+            let kids = model.folderTrees.sorted { $0.size > $1.size }
+            stack = [
+                FolderNode(
+                    url: FileManager.default.homeDirectoryForCurrentUser, size: kids.reduce(0) { $0 + $1.size },
+                    children: kids)
+            ]
+            loading = false
+            return
+        }
         if let root = await Self.build(FileManager.default.homeDirectoryForCurrentUser) { stack = [root] }
         loading = false
     }

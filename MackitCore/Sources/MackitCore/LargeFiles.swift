@@ -41,6 +41,12 @@ public struct FolderNode: Sendable, Identifiable {
     public let size: Int64
     /// Largest first.
     public let children: [FolderNode]
+
+    public init(url: URL, size: Int64, children: [FolderNode]) {
+        self.url = url
+        self.size = size
+        self.children = children
+    }
 }
 
 public enum FolderTree {
