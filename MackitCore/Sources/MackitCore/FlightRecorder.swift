@@ -29,7 +29,6 @@ public final class FlightRecorder: Sendable {
     private let flushAfter: TimeInterval
     private let maxBytes: Int64
     private let kept: Int
-    private let slotSize: Int
 
     /// Injectable clock (seconds since 1970), so tests can move time.
     public let now: @Sendable () -> TimeInterval
@@ -94,12 +93,11 @@ public final class FlightRecorder: Sendable {
         self.flushAfter = flushAfter
         self.maxBytes = maxFileBytes
         self.kept = rotatedKept
-        self.slotSize = Self.slotBytes
         self.now = now
         let initial = now()
         self.state = Mutex(
-            State(slotBytes: slotSize, ringSlots: ringSlotsLimit, pendingSlots: min(max(flushEvery, 1), 64) + 2))
-        self.mirror = TailMirror(capacity: tailEvents * slotSize)
+            State(slotBytes: Self.slotBytes, ringSlots: ringSlotsLimit, pendingSlots: min(max(flushEvery, 1), 64) + 2))
+        self.mirror = TailMirror(capacity: tailEvents * Self.slotBytes)
         state.withLock { $0.lastFlush = initial }
         openMirrorFile()
     }
@@ -116,8 +114,8 @@ public final class FlightRecorder: Sendable {
     public func record(line bytes: [UInt8]) {
         state.withLock { s in
             guard s.available else { return }
-            let n = min(bytes.count, slotSize - 1)
-            let offset = s.writeIndex * slotSize
+            let n = min(bytes.count, Self.slotBytes - 1)
+            let offset = s.writeIndex * Self.slotBytes
             for i in 0..<n { s.slotData[offset + i] = bytes[i] }
             s.slotData[offset + n] = 0x0A
             s.slotLen[s.writeIndex] = n + 1
@@ -125,11 +123,7 @@ public final class FlightRecorder: Sendable {
             s.filled = min(s.filled + 1, ringSlotsLimit)
             rebuildTail(s, lastCount: min(tailEventsLimit, s.filled))
             s.pendingEvents += 1
-            var i = bytes.startIndex
-            for _ in 0..<n {
-                appendPendingByte(s, bytes[i])
-                i = bytes.index(after: i)
-            }
+            for byte in bytes[0..<n] { appendPendingByte(s, byte) }
             appendPendingByte(s, 0x0A)
             let t = now()
             if s.pendingEvents >= flushEvery || t - s.lastFlush >= flushAfter { flushLocked(s) }
@@ -143,7 +137,7 @@ public final class FlightRecorder: Sendable {
 
     /// The newest events, for tests and diagnostics (allocates; never called from the handler).
     public func tailData() -> Data {
-        var buffer = [UInt8](repeating: 0, count: tailEventsLimit * slotSize)
+        var buffer = [UInt8](repeating: 0, count: tailEventsLimit * Self.slotBytes)
         let n = buffer.withUnsafeMutableBytes { ptr in
             tail(into: ptr.baseAddress!, capacity: ptr.count)
         }
@@ -209,7 +203,19 @@ public final class FlightRecorder: Sendable {
         let suffix = "\"}"
         let budget = Self.slotBytes - 1 - line.utf8.count - suffix.utf8.count
         var body = escaped(summary)
-        while body.utf8.count > max(budget, 1) { body.removeLast() }
+        // Single pass over characters, budget in bytes; equivalent to repeated removeLast
+        // (longest character prefix whose UTF-8 length fits) without the O(n²) recount.
+        if body.utf8.count > max(budget, 1) {
+            var cut = body.startIndex
+            var bytes = 0
+            for i in body.indices {
+                let w = body[i].utf8.count
+                guard bytes + w <= max(budget, 1) else { break }
+                bytes += w
+                cut = body.index(after: i)
+            }
+            body = String(body[..<cut])
+        }
         line += body
         return Array((line + suffix).utf8)
     }
@@ -230,7 +236,7 @@ public final class FlightRecorder: Sendable {
         for k in 0..<lastCount {
             let index = (s.writeIndex - 1 - k + ringSlotsLimit * 2) % ringSlotsLimit
             let len = s.slotLen[index]
-            _ = memcpy(target + offset, UnsafeRawPointer(s.slotData) + index * slotSize, len)
+            _ = memcpy(target + offset, UnsafeRawPointer(s.slotData) + index * Self.slotBytes, len)
             offset += len
         }
         if inactive == 0 {
@@ -241,32 +247,39 @@ public final class FlightRecorder: Sendable {
         mirror.active.store(inactive, ordering: .releasing)
     }
 
+    /// Opens `path` for append and takes its flock; -1 (with the fd closed) on any failure.
+    private func openLocked(_ path: String) -> Int32 {
+        let fd = open(path, O_WRONLY | O_CREAT | O_APPEND, 0o644)
+        guard fd >= 0 else { return -1 }
+        if flock(fd, LOCK_EX | LOCK_NB) != 0 {
+            _ = close(fd)
+            return -1
+        }
+        return fd
+    }
+
     private func openMirrorFile() {
         state.withLock { s in
             if (try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)) == nil {
                 s.available = false
                 return
             }
-            let current = directory.appendingPathComponent("flight.current").path
-            let fd = open(current, O_WRONLY | O_CREAT | O_APPEND, 0o644)
-            guard fd >= 0 else {
+            let fd = openLocked(directory.appendingPathComponent("flight.current").path)
+            if fd >= 0 {
+                s.fd = fd
+                s.fileSize = Int64(lseek(fd, 0, SEEK_END))
+                return
+            }
+            // Lock held elsewhere: the per-PID fallback file needs no flock (PID-exclusive name).
+            let ffd = open(
+                directory.appendingPathComponent("flight-\(getpid()).log").path,
+                O_WRONLY | O_CREAT | O_APPEND, 0o644)
+            guard ffd >= 0 else {
                 s.available = false
                 return
             }
-            if flock(fd, LOCK_EX | LOCK_NB) != 0 {
-                _ = close(fd)
-                let fallback = directory.appendingPathComponent("flight-\(getpid()).log").path
-                let ffd = open(fallback, O_WRONLY | O_CREAT | O_APPEND, 0o644)
-                guard ffd >= 0 else {
-                    s.available = false
-                    return
-                }
-                s.fd = ffd
-                s.fileSize = 0
-            } else {
-                s.fd = fd
-                s.fileSize = Int64(lseek(fd, 0, SEEK_END))
-            }
+            s.fd = ffd
+            s.fileSize = 0
         }
     }
 
@@ -299,20 +312,16 @@ public final class FlightRecorder: Sendable {
             for i in stride(from: kept - 1, through: 1, by: -1) {
                 let from = base("flight.\(i).jsonl").path
                 let to = base("flight.\(i + 1).jsonl").path
-                if FileManager.default.fileExists(atPath: from) { _ = rename(from, to) }
+                // Missing source just fails the rename; no existence pre-check (TOCTOU).
+                _ = rename(from, to)
             }
             _ = rename(base("flight.current").path, base("flight.1.jsonl").path)
         } else {
             try? FileManager.default.removeItem(at: base("flight.current"))
         }
-        let fd = open(base("flight.current").path, O_WRONLY | O_CREAT | O_APPEND, 0o644)
+        let fd = openLocked(base("flight.current").path)
         guard fd >= 0 else {
             s.available = false
-            return
-        }
-        if flock(fd, LOCK_EX | LOCK_NB) != 0 {
-            s.available = false
-            _ = close(fd)
             return
         }
         s.fd = fd

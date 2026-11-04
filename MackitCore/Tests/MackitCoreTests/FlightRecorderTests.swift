@@ -6,7 +6,6 @@ import Testing
 @testable import MackitCore
 
 struct FlightRecorderTests {
-    /// Mutable test clock; FlightRecorder reads it through the injected closure.
     private final class Clock: @unchecked Sendable {
         let seconds = Mutex<Double>(0)
         var now: Double { seconds.withLock { $0 } }
@@ -152,7 +151,6 @@ struct FlightRecorderTests {
         let bytes = Array("{\"time\":\"t\",\"session\":\"s\",\"step\":\"s\",\"summary\":\"x\"}\n".utf8)
         let (slotsBefore, pendingBefore) = (recorder.storageCapacity, recorder.pendingCapacity)
         for _ in 0..<100_000 { recorder.record(line: bytes) }
-        // No unbounded growth on the record path: the fixed ring and pending buffer never resize.
         #expect(recorder.storageCapacity == slotsBefore)
         #expect(recorder.pendingCapacity == pendingBefore)
     }

@@ -118,6 +118,7 @@ final class ScanModel {
                 apply(event)
             }
             guard gen == generation else { return }
+            heartbeat?.cancel()
             progress = nil
             currentStep = nil
             isScanning = false
@@ -268,7 +269,7 @@ final class ScanModel {
     }
 
     @concurrent nonisolated static func runClean(_ items: [ScanItem]) async -> CleanReport {
-        var cleaner = Cleaner(policy: SafetyPolicy())
+        var cleaner = Cleaner(policy: SafetyPolicy(), recorder: FlightRecorder.shared)
         cleaner.owner = { $0.ownerBundleID }
         return cleaner.clean(items)
     }

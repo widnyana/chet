@@ -14,11 +14,10 @@ public enum LogMaintenance {
         in directory: URL, now: @escaping () -> TimeInterval = { Date().timeIntervalSince1970 }
     ) -> Bool {
         let crash = directory.appendingPathComponent("crash.txt")
-        guard FileManager.default.fileExists(atPath: crash.path) else { return false }
         let stamp = String(format: "%.0f", now())
         let rotated = directory.appendingPathComponent("crash-\(stamp).txt")
-        guard rename(crash.path, rotated.path) == 0 else { return false }
-        return true
+        // Rename directly: ENOENT and any other failure both map to "no stale report rotated".
+        return rename(crash.path, rotated.path) == 0
     }
 
     /// Keeps the newest `kept` `crash-<timestamp>.txt` files, deletes older ones.

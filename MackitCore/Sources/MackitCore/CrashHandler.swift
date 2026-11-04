@@ -24,22 +24,24 @@ public enum CrashHandler {
                 offset += 1
             }
         }
+        // Digit count via division (max 20 digits for UInt); divisor peaks at 10^19, no overflow.
         func emitNumber(_ value: UInt) {
-            var digits = [UInt8](repeating: 0, count: 24)
-            var n = digits.count
-            var v = value
-            repeat {
-                n -= 1
-                digits[n] = UInt8(0x30 + v % 10)
-                v /= 10
-            } while v > 0 && n > 0
-            for i in n..<digits.count where offset < capacity {
-                (out + offset).storeBytes(of: digits[i], as: UInt8.self)
+            var len = 1
+            var scaled = value / 10
+            while scaled > 0 {
+                len += 1
+                scaled /= 10
+            }
+            var divisor: UInt = 1
+            for _ in 1..<len { divisor *= 10 }
+            while divisor > 0 {
+                guard offset < capacity else { break }
+                (out + offset).storeBytes(of: UInt8(0x30 + (value / divisor) % 10), as: UInt8.self)
                 offset += 1
+                divisor /= 10
             }
         }
         func emitHex(_ value: UInt) {
-            let hex = Array("0123456789abcdef".utf8)
             emit("0x")
             var shift = UInt.bitWidth - 4
             var started = false
@@ -48,7 +50,8 @@ public enum CrashHandler {
                 if nibble != 0 || started || shift == 0 {
                     started = true
                     if offset < capacity {
-                        (out + offset).storeBytes(of: hex[nibble], as: UInt8.self)
+                        let digit = UInt8(nibble < 10 ? 0x30 + nibble : 0x61 + nibble - 10)
+                        (out + offset).storeBytes(of: digit, as: UInt8.self)
                         offset += 1
                     }
                 }
@@ -97,7 +100,7 @@ public enum CrashHandler {
         let fd: Int32
         let buffer: UnsafeMutableRawPointer
         let bufferSize = 32_768
-        var sessionID: [UInt8]? = nil
+        let sessionID: [UInt8]?
         var previous: [Int32: sigaction] = [:]
         var oldStack: stack_t = stack_t()
         let stack: UnsafeMutableRawPointer
@@ -114,7 +117,6 @@ public enum CrashHandler {
 
     private nonisolated(unsafe) static var active: Active?
 
-    /// True once install() has run in this process (tests inspect this).
     static var isInstalled: Bool { active != nil }
 
     /// Installs the handler for all fatal signals. Pre-opens `crash.txt` for append (the fd
@@ -163,10 +165,10 @@ public enum CrashHandler {
         Int(bitPattern: unsafeBitCast(handler, to: UnsafeRawPointer.self))
     }()
 
-    /// The handler body: async-signal-safe calls only — write(2), memcpy via the pure record,
-    /// backtrace_symbols_fd, sigaction, raise. No malloc beyond what libunwind already holds.
     private nonisolated(unsafe) static var inHandler = false
 
+    /// The handler body: async-signal-safe calls only — write(2), memcpy via the pure record,
+    /// backtrace_symbols_fd, sigaction, raise. No malloc beyond what libunwind already holds.
     private static func handle(_ sig: Int32, _ info: UnsafeMutablePointer<siginfo_t>?) {
         guard let state = active else { return }
         if inHandler {
