@@ -55,7 +55,7 @@ public struct RuleScanner: Sendable {
                 if rule.excluded.contains(name) { continue }
                 if claimed.contains(where: { $0 == rel || $0.hasPrefix(rel + "/") }) { continue }
                 if let extensions = rule.extensions, !extensions.contains(child.pathExtension.lowercased()) { continue }
-                guard policy.isDeletable(child) == .allowed, let stamp = FileStamp.read(child) else { continue }
+                guard (rule.listOnly || policy.isDeletable(child) == .allowed), let stamp = FileStamp.read(child) else { continue }
                 if let minAge = rule.minAge, now.timeIntervalSince(stamp.modified) < minAge { continue }
                 let bytes = await FileIndexBuilder.allocatedSize(of: child)
                 guard bytes > 0 else { continue }

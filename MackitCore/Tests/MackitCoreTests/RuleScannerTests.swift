@@ -171,8 +171,9 @@ struct RuleScannerTests {
         let nix = Rule.catalog.first { $0.id == "nix" }
         #expect(nix != nil)
         #expect(nix?.roots.first?.hasPrefix("/") == true)
-        #expect(nix?.risk == .review)
+        #expect(nix?.risk == .informational)
         #expect(nix?.wholeRoots == true)
+        #expect(nix?.listOnly == true)
     }
 
     @Test func absoluteRootMissingIsEmptyNotError() async throws {

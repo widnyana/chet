@@ -16,6 +16,7 @@ struct CategoryDetailView: View {
     private var urls: [URL] { category.items.map(\.url) }
     private var categorySelected: [ScanItem] { category.items.filter { model.selected.contains($0.url) } }
     private var allSafe: Bool { category.items.allSatisfy { $0.risk == .safe } }
+    private var isInformational: Bool { category.items.first?.risk == .informational }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -48,6 +49,9 @@ struct CategoryDetailView: View {
     }
 
     private var riskSentence: String {
+        if isInformational {
+            return "Managed by Nix. Run nix-store --gc to reclaim space."
+        }
         if allSafe {
             return "Apps rebuild this data. Removed items are deleted."
         }
@@ -55,7 +59,10 @@ struct CategoryDetailView: View {
     }
 
     private var commandBar: some View {
-        CommandBar(
+        if isInformational {
+            return AnyView(EmptyView())
+        }
+        return AnyView(CommandBar(
             metric: categorySelected.reduce(0) { $0 + $1.reclaimableBytes }
                 .formatted(.byteCount(style: .file)),
             detail: categorySelected.count == 1
@@ -68,15 +75,22 @@ struct CategoryDetailView: View {
                 model.beginClean(categorySelected)
                 onClean()
             })
+        )
     }
 
     private var table: some View {
         Table(category.items.sorted(using: sortOrder), selection: $rows, sortOrder: $sortOrder) {
             TableColumn("") { item in
-                Toggle("Clean", isOn: model.isSelected(item.url))
-                    .toggleStyle(.checkbox)
-                    .labelsHidden()
-                    .accessibilityLabel("Select \(item.url.lastPathComponent)")
+                if item.risk == .informational {
+                    Image(systemName: "info.circle")
+                        .foregroundStyle(Theme.inkSecondary)
+                        .help("Managed by Nix")
+                } else {
+                    Toggle("Clean", isOn: model.isSelected(item.url))
+                        .toggleStyle(.checkbox)
+                        .labelsHidden()
+                        .accessibilityLabel("Select \(item.url.lastPathComponent)")
+                }
             }
             .width(24)
             TableColumn("Name", value: \.url.lastPathComponent) { item in
@@ -98,7 +112,13 @@ struct CategoryDetailView: View {
             }
             .width(min: 90, ideal: 120, max: 160)
             TableColumn("Status") { item in
-                if item.risk == .review {
+                if item.risk == .informational {
+                    StatusLabel(
+                        text: "Read-only",
+                        systemImage: "info.circle",
+                        tone: .neutral,
+                        help: "Mackit cannot delete this. Run nix-store --gc in Terminal.")
+                } else if item.risk == .review {
                     StatusLabel(
                         text: "Review",
                         systemImage: "exclamationmark.circle",

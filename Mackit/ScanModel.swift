@@ -119,7 +119,7 @@ final class ScanModel {
         "leftovers": "App leftovers", "similar-photos": "Similar photos", "blurry-photos": "Blurry photos",
         "similar-videos": "Similar videos", "tagged-caches": "Tagged cache folders",
         "snapshots": "Time Machine local snapshots", "dev-garbage": "Project build dirs",
-        "nix": "Nix store profiles",
+        "nix": "Nix",
     ]
 
     /// Selected items, each URL once (a file can show up in more than one category).

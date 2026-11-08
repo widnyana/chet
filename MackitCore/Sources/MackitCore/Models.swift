@@ -6,7 +6,7 @@ public enum Mackit {
 }
 
 public enum Risk: String, Sendable, Codable {
-    case safe, review
+    case safe, review, informational
 }
 
 public enum DeleteMode: String, Sendable, Codable {

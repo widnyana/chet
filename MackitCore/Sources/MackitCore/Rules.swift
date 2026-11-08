@@ -8,7 +8,7 @@ public struct Rule: Sendable, Identifiable {
     /// Rules with the same category are shown together.
     public let category: String
     public let title: String
-    /// Folders relative to the home folder.
+    /// Relative to home, or absolute when starting with "/".
     public let roots: [String]
     public let risk: Risk
     public let mode: DeleteMode
@@ -28,12 +28,14 @@ public struct Rule: Sendable, Identifiable {
     /// whose name is in this set becomes one item: regenerable project build dirs such as
     /// Rust's `target/` or Node's `node_modules/`. A matched dir is never descended into.
     public let recursiveNames: Set<String>?
+    /// When true, items are listed for size visibility only and the cleaner will never delete them.
+    public let listOnly: Bool
 
     public init(
         id: String, category: String? = nil, title: String, roots: [String], risk: Risk, mode: DeleteMode,
         owningBundleID: String? = nil, minAge: TimeInterval? = nil, extensions: Set<String>? = nil,
         excluded: Set<String> = [], keepNewest: Bool = false, wholeRoots: Bool = false,
-        recursiveNames: Set<String>? = nil
+        recursiveNames: Set<String>? = nil, listOnly: Bool = false
     ) {
         self.id = id
         self.category = category ?? id
@@ -48,6 +50,7 @@ public struct Rule: Sendable, Identifiable {
         self.keepNewest = keepNewest
         self.wholeRoots = wholeRoots
         self.recursiveNames = recursiveNames
+        self.listOnly = listOnly
     }
 }
 
@@ -117,7 +120,8 @@ extension Rule {
             roots: ["Development", "Projects", "Documents", "Desktop"], risk: .review, mode: .trash,
             recursiveNames: DuplicateScope.regenerableNames),
         Rule(
-            id: "nix", title: "Nix store profiles",
-            roots: ["/nix/var/nix/profiles"], risk: .review, mode: .trash, wholeRoots: true),
+            id: "nix", title: "Nix",
+            roots: ["/nix/store", "/nix/var/nix/profiles"], risk: .informational, mode: .trash,
+            wholeRoots: true, listOnly: true),
     ]
 }

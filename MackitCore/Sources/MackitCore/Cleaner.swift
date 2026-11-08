@@ -183,6 +183,7 @@ public struct Cleaner: Sendable {
     }
 
     func clean(_ item: ScanItem) -> CleanOutcome {
+        guard item.risk != .informational else { return .skipped(.policy) }
         guard let current = FileStamp.read(item.url) else { return .skipped(.missing) }
         guard !current.isSymlink, current.inode == item.stamp.inode, current.size == item.stamp.size,
             current.modified == item.stamp.modified
