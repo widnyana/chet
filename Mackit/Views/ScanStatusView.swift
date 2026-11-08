@@ -37,6 +37,11 @@ struct ScanStatusView: View {
                 .frame(width: 26, height: 26)
                 .contentShape(.circle)
             }
+            // The capsule used to carry these insets; without them the toolbar gives the
+            // ring none and the window's rounded corner clips it.
+            .padding(.leading, 4)
+            .padding(.trailing, 8)
+            .padding(.vertical, 6)
             .buttonStyle(.plain)
             .accessibilityLabel(model.isPaused ? "Resume scan" : "Pause scan")
             .help(phaseDescription)
