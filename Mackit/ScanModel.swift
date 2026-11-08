@@ -42,10 +42,9 @@ struct ScanActivity {
 @Observable
 final class ScanModel {
     var access = FullDiskAccess.status()
-    /// Persists across relaunches in an fsync'd marker file, not UserDefaults: macOS
-    /// SIGKILLs the app when a Full Disk Access grant is toggled, before preferences flush.
-    /// Once set, the blocking onboarding never returns — the non-blocking banner takes over.
-    var hasAttemptedGrant = AccessAttempt.hasAttempted()
+    /// Session-only: the user chose "Continue without Full Disk Access", so this launch
+    /// shows the app instead of the onboarding screen. Next launch asks again.
+    var accessSkipped = false
     /// How many times the user has been sent to Settings; the second attempt unlocks the
     /// "Mackit may be listed twice" hint.
     var grantAttempts = UserDefaults.standard.integer(forKey: "grantAttempts")
@@ -64,6 +63,9 @@ final class ScanModel {
     var steps: [ScanStepState] = []
     /// Folder size trees of the last scan, for the disk map.
     var folderTrees: [FolderNode] = []
+    /// Live home tree while the index walk runs, merged from directory rollups. The disk map
+    /// renders this as a nested treemap that grows into its final shape during the scan.
+    var liveTree: FolderNode?
     /// Top-level roots measured so far in the running scan, for the disk map's partial render.
     var partialTrees: [FolderNode] = []
     /// Live copy of the walk's counters while the index step runs.
@@ -131,21 +133,18 @@ final class ScanModel {
         }
     }
 
-    /// Records that the user is being sent to grant access, before leaving the app, so the
-    /// macOS-driven relaunch does not show the blocking onboarding again.
+    /// Records that the user is being sent to grant access, before leaving the app.
     func recordGrantAttempt() {
-        // Written and fsync'd before the caller opens Settings: the app may be killed
-        // before any in-memory state survives.
         AccessAttempt.record()
-        hasAttemptedGrant = true
         grantAttempts += 1
         UserDefaults.standard.set(grantAttempts, forKey: "grantAttempts")
         UserDefaults.standard.synchronize()
     }
 
-    /// True when the app should show the non-blocking access banner.
+    /// True when the app should show the non-blocking access banner: Full Disk Access is
+    /// denied and the user moved on with "Continue without Full Disk Access".
     var showsAccessBanner: Bool {
-        access == .denied && hasAttemptedGrant && !bannerDismissed
+        access == .denied && accessSkipped && !bannerDismissed
     }
 
     var bannerDismissed = false
@@ -164,6 +163,7 @@ final class ScanModel {
         confirmSnapshots = []
         report = nil
         folderTrees = []
+        liveTree = nil
         partialTrees = []
         rootsProgress = nil
         didFinishScan = false
@@ -218,6 +218,7 @@ final class ScanModel {
         currentStep = nil
         progress = nil
         rootsProgress = nil
+        liveTree = nil
         partialTrees = []
         recentFolders = []
         activity = nil
@@ -278,6 +279,31 @@ final class ScanModel {
         }
     }
 
+    private static let home = FileManager.default.homeDirectoryForCurrentUser
+
+    /// Fold a directory rollup into the live home tree (V1: subtree replace by URL). A rollup
+    /// whose parent chain isn't measured yet is dropped — its own parent rollup carries it later.
+    private func mergeRollup(_ node: FolderNode) {
+        guard node.url != Self.home else {
+            liveTree = node
+            return
+        }
+        let home = liveTree ?? FolderNode(url: Self.home, size: 0, children: [])
+        if node.url.deletingLastPathComponent() == Self.home, node.children.isEmpty {
+            // In-flight root snapshot from the progress tick: replace or append as a child.
+            liveTree = home.merging(node)
+        } else {
+            liveTree = home.inserting(node)
+        }
+    }
+
+    /// Give the in-flight root a live-growing block from the walk's byte counters (V2),
+    /// so the map renders from the first progress tick instead of the first rollup.
+    private func growInFlightRoot(_ snap: ProgressSnapshot) {
+        guard let url = snap.runningRootURL else { return }
+        mergeRollup(FolderNode(url: url, size: snap.runningRootBytes, children: []))
+    }
+
     /// Updates the activity value, appending the label to the trail when it changes.
     private func pushActivity(_ step: MackitCore.ScanStep, done: Int, total: Int, label: String) {
         var next = activity ?? ScanActivity(phase: step, done: done, total: total, label: label)
@@ -308,8 +334,10 @@ final class ScanModel {
         case .rules(let result): merge(result)
         case .folderTrees(let trees):
             folderTrees = trees
+            liveTree = nil
             partialTrees = []
             rootsProgress = nil
+        case .treeUpdate(let node): mergeRollup(node)
         case .rootMeasured(let node): partialTrees.append(node)
         case .progress(let snapshot):
             if let previous = rootsProgress, snapshot.files >= previous.files {
@@ -320,6 +348,7 @@ final class ScanModel {
                 if recentFolders.count > 6 { recentFolders.removeLast(recentFolders.count - 6) }
             }
             rootsProgress = snapshot
+            growInFlightRoot(snapshot)
             pushActivity(.index, done: snapshot.rootsDone, total: snapshot.rootsTotal, label: snapshot.currentFolder)
         case .taggedCaches(let items): add("tagged-caches", items: items)
         case .largeFiles(let items): add("large-files", items: items)

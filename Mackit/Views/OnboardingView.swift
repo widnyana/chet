@@ -6,30 +6,44 @@ struct OnboardingView: View {
     @Environment(ScanModel.self) private var model
 
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "lock.shield")
-                .font(.system(size: 48))
+        VStack(spacing: 22) {
+            Image(systemName: "lock.shield.fill")
+                .font(.system(size: 52))
+                .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(.tint)
-            Text("Mackit needs Full Disk Access")
-                .font(.title2.bold())
-            Text(
-                "macOS protects caches, Mail downloads and browser data. Without Full Disk Access Mackit cannot see them, so some categories stay empty."
-            )
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: 420)
-            .foregroundStyle(.secondary)
-            Button("Open Privacy Settings") {
-                // Persist before leaving: macOS relaunches the app when the grant
-                // applies, and that relaunch must not show this screen again.
+            VStack(spacing: 6) {
+                Text("Give Mackit Full Disk Access")
+                    .font(.title.bold())
+                Text(
+                    "macOS hides caches, Mail downloads and browser data from apps. Mackit needs access to measure and clean them. Nothing leaves your Mac."
+                )
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: 440)
+            }
+            VStack(alignment: .leading, spacing: 14) {
+                step(1, "Open Privacy & Security settings")
+                step(2, "Turn on Mackit under Full Disk Access")
+                step(3, "Come back here. Mackit notices by itself")
+            }
+            .padding(20)
+            .frame(maxWidth: 440, alignment: .leading)
+            .glassEffect(.regular, in: .rect(cornerRadius: 20))
+            Button("Open Settings", systemImage: "gearshape") {
+                // Persist before leaving: macOS relaunches the app when the grant applies,
+                // and that relaunch must not lose the grantAttempts count.
                 model.recordGrantAttempt()
                 NSWorkspace.shared.open(FullDiskAccess.settingsURL)
             }
             .buttonStyle(.glassProminent)
-            .controlSize(.large)
-            Text("Turn on Mackit in the list, then come back here. This window updates by itself.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Button("Continue without Full Disk Access") { model.recordGrantAttempt() }
+            .controlSize(.extraLarge)
+            HStack(spacing: 6) {
+                Circle().fill(.orange).frame(width: 8, height: 8)
+                Text("Waiting for access")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Button("Continue Without Access") { model.accessSkipped = true }
                 .buttonStyle(.link)
         }
         .padding(40)
@@ -37,10 +51,20 @@ struct OnboardingView: View {
         .task {
             // The probe is the only truth about what this process can read; poll it so
             // the screen dismisses itself the moment access works, no restart needed.
-            while model.access == .denied && !model.hasAttemptedGrant {
+            while model.access == .denied && !model.accessSkipped {
                 try? await Task.sleep(for: .seconds(1))
                 model.refreshAccess()
             }
+        }
+    }
+
+    private func step(_ number: Int, _ text: String) -> some View {
+        HStack(spacing: 12) {
+            Text("\(number)")
+                .font(.headline)
+                .frame(width: 28, height: 28)
+                .background(.tint.opacity(0.15), in: Circle())
+            Text(text)
         }
     }
 }

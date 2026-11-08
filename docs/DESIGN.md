@@ -84,8 +84,11 @@ How it draws:
 
 - Scanning: per-row spinners + dimmed pending rows in the sidebar, a phase-titled status
   pill in the toolbar, and a toast (`ScanFinishedToast`, top center) when done.
-- Access: a dismissible orange banner (`AccessBanner`) above the detail pane when Full Disk
-  Access is limited; onboarding screen takes over before first grant.
+- Access: when Full Disk Access is denied the onboarding screen takes over the window until
+  the grant lands or the user picks "Continue without Full Disk Access" for this launch;
+  a dismissible orange banner (`AccessBanner`) above the detail pane explains limited access
+  after that choice. Onboarding: shield icon, bold title, a three-step glass card, a
+  prominent glass button, and an orange "Waiting for access" dot.
 - Debug: an orange "DRY RUN ENGAGED" capsule floats bottom-left — compile-time
   `#if DEBUG` plus runtime `DryRun.enabled`, so release builds can't show it.
 

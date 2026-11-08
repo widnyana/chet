@@ -9,7 +9,7 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if model.access == .denied && !model.hasAttemptedGrant {
+            if model.access == .denied && !model.accessSkipped {
                 OnboardingView()
             } else {
                 NavigationSplitView {
