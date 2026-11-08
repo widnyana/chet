@@ -85,7 +85,7 @@ struct AppUninstallConfirmSheet: View {
             }
         }
         .padding(Spacing.s6)
-        .frame(width: 500)
+        .frame(width: 520)
         .background(Theme.paper)
     }
 
@@ -192,7 +192,7 @@ struct UninstallSummaryView: View {
             }
         }
         .padding(Spacing.s6)
-        .frame(width: 480)
+        .frame(width: 520)
         .background(Theme.paper)
     }
 
@@ -296,7 +296,7 @@ struct BulkUninstallConfirmSheet: View {
             }
         }
         .padding(Spacing.s6)
-        .frame(width: 500)
+        .frame(width: 520)
         .background(Theme.paper)
     }
 
@@ -379,7 +379,7 @@ struct BulkUninstallSummaryView: View {
             }
         }
         .padding(Spacing.s6)
-        .frame(width: 480)
+        .frame(width: 520)
         .background(Theme.paper)
     }
 
