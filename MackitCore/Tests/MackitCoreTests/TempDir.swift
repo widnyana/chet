@@ -33,4 +33,13 @@ struct TempDir {
         try Data(repeating: fill, count: bytes).write(to: target)
         return target
     }
+
+    @discardableResult
+    func text(_ relative: String, _ contents: String) throws -> URL {
+        let target = url.appendingPathComponent(relative)
+        try FileManager.default.createDirectory(
+            at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(contents.utf8).write(to: target)
+        return target
+    }
 }

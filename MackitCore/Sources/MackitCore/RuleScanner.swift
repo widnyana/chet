@@ -10,8 +10,10 @@ public struct CategoryResult: Sendable {
 }
 
 public struct RuleScanner: Sendable {
-    /// Deepest recursion for `recursiveNames` walks; project build dirs sit near the root.
-    static let maxScanDepth = 6
+    /// Deepest recursion for `recursiveNames` walks. Terragrunt caches nest up to nine
+    /// components below a scanned root (`.terragrunt-stack/<unit>/.terragrunt-cache`).
+    /// The walk lists directories only and prunes heavy names, so the bound stays cheap.
+    static let maxScanDepth = 12
 
     public let home: URL
     public let rules: [Rule]
@@ -28,12 +30,12 @@ public struct RuleScanner: Sendable {
         var result = CategoryResult(ruleID: rule.id, category: rule.category, items: [], needsFullDiskAccess: false)
         // Roots of other rules are scanned by those rules, so a parent rule skips them.
         let claimed = rules.filter { $0.id != rule.id }.flatMap(\.roots)
-        for root in rule.roots {
+        for root in rule.roots + discoveryRoots(for: rule) {
             let rootURL: URL = root.hasPrefix("/") ? URL(fileURLWithPath: root) : home.appendingPathComponent(root)
             let isAbsolute = root.hasPrefix("/")
             var candidates: [URL]
             if let names = rule.recursiveNames {
-                candidates = try recursiveMatches(rootURL, names)
+                candidates = try recursiveMatches(rootURL, names, pruning: rule.prunedNames)
             } else {
                 do {
                     let listed = try FileManager.default.contentsOfDirectory(
@@ -73,9 +75,12 @@ public struct RuleScanner: Sendable {
     }
 
     /// Depth-first search under `root` for directories whose name is in `names`. A matched
-    /// directory becomes one item and is never descended into; `.git` is never entered.
+    /// directory becomes one item and is never descended into; `.git` is never entered, and
+    /// `pruning` names are neither matched nor entered when another rule owns them.
     /// Depth is capped so a pathological tree cannot make the scan unbounded.
-    private func recursiveMatches(_ root: URL, _ names: Set<String>, depth: Int = 0) throws -> [URL] {
+    private func recursiveMatches(
+        _ root: URL, _ names: Set<String>, pruning: Set<String> = [], depth: Int = 0
+    ) throws -> [URL] {
         guard depth <= Self.maxScanDepth else { return [] }
         let children = (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
         var found: [URL] = []
@@ -89,11 +94,20 @@ public struct RuleScanner: Sendable {
             if name == ".git" { continue }
             if names.contains(name) {
                 found.append(child)
-            } else {
-                found += try recursiveMatches(child, names, depth: depth + 1)
+            } else if !pruning.contains(name) {
+                found += try recursiveMatches(child, names, pruning: pruning, depth: depth + 1)
             }
         }
         return found
+    }
+
+    /// Absolute roots a rule learns only at scan time (tool registries, custom install paths).
+    private func discoveryRoots(for rule: Rule) -> [String] {
+        guard let discovery = rule.discovery else { return [] }
+        switch discovery {
+        case .virtualBoxMachines:
+            return VirtualBoxMachines.folders(home: home).map(\.path)
+        }
     }
 
     /// Scans every rule in parallel and yields each result as soon as it is ready.

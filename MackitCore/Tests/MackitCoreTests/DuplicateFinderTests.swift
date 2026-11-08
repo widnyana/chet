@@ -153,6 +153,16 @@ struct DuplicateFinderTests {
         #expect(standard.count == walked.count)
     }
 
+    @Test func scopeSkipsToolStateDirs() throws {
+        let dir = try TempDir()
+        try dir.file("Development/app/.terraform/providers/x", bytes: size)
+        try dir.file("Development/app/.terragrunt-cache/hash/main.tf", bytes: size)
+        var walked: [WalkEntry] = []
+        try FileWalker(policy: dir.policy).walk(dir.url) { walked.append($0) }
+        #expect(!walked.isEmpty)
+        #expect(DuplicateScope.filter(walked, scope: .standard).isEmpty)
+    }
+
     @Test func buildDirRuleSharesTheRegenerableNames() {
         let rule = Rule.catalog.first { $0.id == "dev-garbage" }
         #expect(rule?.recursiveNames == DuplicateScope.regenerableNames)

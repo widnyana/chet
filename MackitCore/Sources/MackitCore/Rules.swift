@@ -28,14 +28,27 @@ public struct Rule: Sendable, Identifiable {
     /// whose name is in this set becomes one item: regenerable project build dirs such as
     /// Rust's `target/` or Node's `node_modules/`. A matched dir is never descended into.
     public let recursiveNames: Set<String>?
+    /// Directory names never descended into while walking `recursiveNames` roots
+    /// (`.git` is always skipped). Prevents double-counting under another rule's match.
+    public let prunedNames: Set<String>
+    /// Extra roots discovered from a tool registry at scan time.
+    public let discovery: Discovery?
     /// When true, items are listed for size visibility only and the cleaner will never delete them.
     public let listOnly: Bool
+
+    /// Root folders that need discovery at scan time instead of a fixed list.
+    public enum Discovery: Sendable, Equatable {
+        /// One root per VirtualBox machine folder listed in
+        /// `~/Library/VirtualBox/VirtualBox.xml`.
+        case virtualBoxMachines
+    }
 
     public init(
         id: String, category: String? = nil, title: String, roots: [String], risk: Risk, mode: DeleteMode,
         owningBundleID: String? = nil, minAge: TimeInterval? = nil, extensions: Set<String>? = nil,
         excluded: Set<String> = [], keepNewest: Bool = false, wholeRoots: Bool = false,
-        recursiveNames: Set<String>? = nil, listOnly: Bool = false
+        recursiveNames: Set<String>? = nil, prunedNames: Set<String> = [], discovery: Discovery? = nil,
+        listOnly: Bool = false
     ) {
         self.id = id
         self.category = category ?? id
@@ -50,6 +63,8 @@ public struct Rule: Sendable, Identifiable {
         self.keepNewest = keepNewest
         self.wholeRoots = wholeRoots
         self.recursiveNames = recursiveNames
+        self.prunedNames = prunedNames
+        self.discovery = discovery
         self.listOnly = listOnly
     }
 }
@@ -118,7 +133,25 @@ extension Rule {
         Rule(
             id: "dev-garbage", title: "Project build dirs",
             roots: ["Development", "Projects", "Documents", "Desktop"], risk: .review, mode: .trash,
-            recursiveNames: DuplicateScope.regenerableNames),
+            recursiveNames: DuplicateScope.regenerableNames,
+            prunedNames: [".terraform", ".terragrunt-cache"]),
+        Rule(
+            id: "terraform-build-dirs", category: "dev-garbage", title: "Terraform build dirs",
+            roots: ["Development", "Projects", "Documents", "Desktop"], risk: .safe, mode: .permanent,
+            recursiveNames: [".terraform"],
+            prunedNames: DuplicateScope.regenerableNames.union([".terragrunt-cache"])),
+        Rule(
+            id: "terraform-plugin-cache", category: "dev-garbage", title: "Terraform plugin cache",
+            roots: [".terraform.d/plugin-cache"], risk: .safe, mode: .permanent, wholeRoots: true),
+        Rule(
+            id: "terragrunt-cache", category: "dev-garbage", title: "Terragrunt cache",
+            roots: ["Development", "Projects", "Documents", "Desktop"], risk: .review, mode: .trash,
+            recursiveNames: [".terragrunt-cache"],
+            prunedNames: DuplicateScope.regenerableNames.union([".terraform"])),
+        Rule(
+            id: "virtualbox-machines", category: "dev-garbage", title: "VirtualBox machines",
+            roots: [], risk: .review, mode: .trash, owningBundleID: "org.virtualbox.app.VirtualBox",
+            wholeRoots: true, discovery: .virtualBoxMachines),
         Rule(
             id: "nix", title: "Nix",
             roots: ["/nix/store", "/nix/var/nix/profiles"], risk: .informational, mode: .trash,

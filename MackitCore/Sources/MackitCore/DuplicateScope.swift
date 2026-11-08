@@ -10,15 +10,23 @@ public enum DuplicateScope: Sendable, Equatable {
 
     /// Project build dir names, shared with the "Project build dirs" rule
     /// (`Rules.rules` uses the same set as its `recursiveNames`).
+    /// `.vite` and `.next` usually sit under `node_modules` or a project root, and `.turbo`
+    /// caches Turborepo task output; all three rebuild from source.
     public static let regenerableNames: Set<String> = [
-        "target", "node_modules", "vendor", ".build", ".gradle", "DerivedData", "Pods",
+        "target", "node_modules", "vendor", ".build", ".gradle", "DerivedData", "Pods", ".vite", ".next",
+        ".turbo",
     ]
 
     /// Well-known cache and temporary folder names found inside user folders.
     static let tempNames: Set<String> = ["Caches", ".cache", "tmp", "temp", ".tmp"]
 
+    /// Hidden per-project tool state dirs; regenerable, never worth hashing.
+    public static let toolStateNames: Set<String> = [".terraform", ".terragrunt-cache"]
+
     /// Path components the standard scope never hashes duplicates in.
-    static var skippedComponents: Set<String> { regenerableNames.union(tempNames) }
+    static var skippedComponents: Set<String> {
+        regenerableNames.union(toolStateNames).union(tempNames)
+    }
 
     /// Drops candidates under skipped folders. `.everything` passes the list through
     /// untouched, so opting in is exactly yesterday's behavior.
