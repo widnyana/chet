@@ -105,6 +105,54 @@ struct FileIndexTests {
         }
     }
 
+    /// AE2: a hardlinked file is counted once and yields exactly one candidate, at the smallest
+    /// gate-passing path regardless of discovery order.
+    @Test func hardlinkCountsOnceAndEmitsOneCandidate() async throws {
+        let dir = try TempDir()
+        let first = try dir.file("Documents/a.bin", bytes: 1_500_000)
+        try FileManager.default.createDirectory(
+            at: dir.url.appendingPathComponent("Downloads"), withIntermediateDirectories: true)
+        #expect(link(first.path, dir.url.appendingPathComponent("Downloads/b.bin").path) == 0)
+        let index = try await FileIndexBuilder(policy: dir.policy).build(roots: [
+            dir.url.appendingPathComponent("Downloads"), dir.url.appendingPathComponent("Documents"),
+        ])
+        #expect(index.trees.reduce(0) { $0 + $1.size } == Int64(try lstatOf(first).st_blocks) * 512)
+        let candidates = index.candidates.filter {
+            $0.stamp.isRegularFile && $0.url.lastPathComponent.hasSuffix(".bin")
+        }
+        #expect(candidates.count == 1)
+        #expect(candidates.first?.url.path == dir.url.appendingPathComponent("Documents/a.bin").path)
+    }
+
+    /// A hardlink first discovered in a no-candidates folder (.git) still yields its eligible
+    /// sibling path.
+    @Test func hardlinkInExcludedFolderStillYieldsEligibleSibling() async throws {
+        let dir = try TempDir()
+        let hidden = try dir.file(".git/objects/blob", bytes: 1_500_000)
+        try FileManager.default.createDirectory(
+            at: dir.url.appendingPathComponent("Documents"), withIntermediateDirectories: true)
+        #expect(link(hidden.path, dir.url.appendingPathComponent("Documents/blob").path) == 0)
+        let index = try await FileIndexBuilder(policy: dir.policy).build(roots: [dir.url])
+        let candidates = index.candidates.filter { $0.url.lastPathComponent == "blob" }
+        #expect(candidates.count == 1)
+        #expect(candidates.first?.url.deletingLastPathComponent().lastPathComponent == "Documents")
+    }
+
+    /// A mode-000 subdirectory is recorded as a read error; totals reflect readable content only.
+    @Test func unreadableFoldersAreRecordedAndTotalsBestKnown() async throws {
+        let dir = try TempDir()
+        let ok = try dir.file("ok/x", bytes: 1_500_000)
+        let locked = dir.url.appendingPathComponent("locked")
+        try dir.file("locked/inner", bytes: 10)
+        #expect(chmod(locked.path, 0o000) == 0)
+        defer { chmod(locked.path, 0o755) }
+        let index = try await FileIndexBuilder(policy: dir.policy).build(roots: [dir.url])
+        #expect(index.readErrors.count == 1)
+        #expect(index.readErrors.first?.url.lastPathComponent == "locked")
+        #expect(index.readErrors.first?.errno == EACCES)
+        #expect(index.trees.first?.size == Int64(try lstatOf(ok).st_blocks) * 512)
+    }
+
     @Test func candidatesSkipPackagesGitAndTaggedCaches() async throws {
         let dir = try TempDir()
         try dir.file("big", bytes: 2_000_000)
@@ -131,7 +179,9 @@ struct FileIndexTests {
         try dir.file("tiny", bytes: 3)
         let a = try dir.file("hard", bytes: 1_000_000)
         #expect(link(a.path, dir.url.appendingPathComponent("a/hard2").path) == 0)
-        let tree = try #require(try await FileIndexBuilder(policy: dir.policy).build(roots: [dir.url]).trees.first)
+        let index = try await FileIndexBuilder(policy: dir.policy).build(roots: [dir.url])
+        #expect(index.treeSizeBasis == .allocated)
+        let tree = try #require(index.trees.first)
         #expect(tree.size == (try expectedAllocated(dir.url)))
         #expect(tree.children.first?.url.lastPathComponent == "a")
         #expect(tree.children.map(\.size) == tree.children.map(\.size).sorted(by: >))
@@ -140,6 +190,39 @@ struct FileIndexTests {
         #expect(
             await FileIndexBuilder.allocatedSize(of: dir.url.appendingPathComponent("z")) == Int64(
                 try lstatOf(dir.url.appendingPathComponent("z")).st_blocks) * 512)
+    }
+
+    /// Serial and threaded walks must produce byte-identical results (candidates, trees, totals).
+    @Test func threadedWalkMatchesSerial() async throws {
+        let dir = try TempDir()
+        // Wide enough to fill the 16-slot queue; nested enough to exercise roll-up.
+        for i in 0..<30 {
+            try dir.file("d\(i)/sub/f", bytes: 1_500_000)
+            try dir.file("d\(i)/small", bytes: 10)
+        }
+        let a = try dir.file("shared", bytes: 2_000_000)
+        try FileManager.default.createDirectory(
+            at: dir.url.appendingPathComponent("elsewhere"), withIntermediateDirectories: true)
+        #expect(link(a.path, dir.url.appendingPathComponent("elsewhere/twin").path) == 0)
+        try dir.file(".git/objects/blob", bytes: 500_000)
+        let serial = FileIndexBuilder(policy: dir.policy, threads: 1)
+        let threaded = FileIndexBuilder(policy: dir.policy, threads: 4)
+        let s = try await serial.build(roots: [dir.url])
+        let t = try await threaded.build(roots: [dir.url])
+        #expect(s.candidates.map { $0.url.path } == t.candidates.map { $0.url.path })
+        #expect(s.candidates.map(\.reclaimableBytes) == t.candidates.map(\.reclaimableBytes))
+        #expect(s.taggedCaches == t.taggedCaches)
+        #expect(s.readErrors == t.readErrors)
+        #expect(s.entriesSeen == t.entriesSeen)
+        if treeSignature(s.trees) != treeSignature(t.trees) {
+            Issue.record("SERIAL: \(treeSignature(s.trees))\nTHREADED: \(treeSignature(t.trees))")
+        }
+    }
+
+    private func treeSignature(_ trees: [FolderNode]) -> String {
+        trees.map { node in
+            "\(node.url.path):\(node.size)|(" + node.children.map { treeSignature([$0]) }.joined(separator: ",") + ")"
+        }.joined(separator: ";")
     }
 
     @Test func maxDepthLimitsTreeButNotTotals() async throws {
@@ -178,11 +261,44 @@ struct FileIndexTests {
     @Test func cancellationStopsTheWalk() async throws {
         let dir = try TempDir()
         for i in 0..<20 { try dir.file("f\(i)", bytes: 10) }
-        let builder = FileIndexBuilder(policy: dir.policy)
+        let builder = FileIndexBuilder(policy: dir.policy, threads: 1)
         let task = Task { () throws -> FileIndex in
             withUnsafeCurrentTask { $0?.cancel() }
             return try await builder.build(roots: [dir.url])
         }
         await #expect(throws: CancellationError.self) { try await task.value }
+    }
+
+    /// The threaded walk stops all workers and throws when its cancellation flag is set.
+    @Test func cancellationStopsTheThreadedWalk() async throws {
+        let dir = try TempDir()
+        for i in 0..<200 { for j in 0..<50 { try dir.file("d\(i)/f\(j)", bytes: 10) } }
+        let builder = FileIndexBuilder(policy: dir.policy, threads: 4)
+        let task = Task { () throws -> FileIndex in
+            try await withTaskCancellationHandler(
+                operation: {
+                    try await builder.build(roots: [dir.url])
+                }, onCancel: { builder.cancellation.cancel() })
+        }
+        try await Task.sleep(for: .milliseconds(20))
+        task.cancel()
+        await #expect(throws: CancellationError.self) { try await task.value }
+    }
+
+    /// Worker threads cannot await the gate, so a paused threaded walk must hold at a directory
+    /// boundary instead of reading ahead.
+    @Test func threadedWalkHonoursThePauseGate() async throws {
+        let dir = try TempDir()
+        for i in 0..<30 { try dir.file("d\(i)/f", bytes: 10) }
+        let gate = ScanPauseGate()
+        gate.setPaused(true)
+        var builder = FileIndexBuilder(policy: dir.policy, threads: 4)
+        builder.pauseGate = gate
+        let task = Task { try await builder.build(roots: [dir.url]) }
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(builder.progress.files == 0)
+        gate.setPaused(false)
+        _ = try await task.value
+        #expect(builder.progress.files > 0)
     }
 }

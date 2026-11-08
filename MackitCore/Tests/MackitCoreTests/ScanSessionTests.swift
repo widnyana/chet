@@ -120,7 +120,7 @@ struct ScanSessionTests {
             case .taggedCaches(let items): taggedNames = items.map(\.url.lastPathComponent)
             case .rules(let result) where result.category == "caches":
                 cacheNames += result.items.map(\.url.lastPathComponent)
-            case .folderTrees(let nodes): trees = nodes.count
+            case .folderTrees(let nodes, _): trees = nodes.count
             default: break
             }
         }

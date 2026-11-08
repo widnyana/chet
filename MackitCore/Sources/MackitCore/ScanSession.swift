@@ -18,6 +18,14 @@ public enum ScanStep: String, Sendable, CaseIterable {
     }
 }
 
+/// What a folder-size number measures. `.allocated` is the du-convention basis (blocks on disk,
+/// hard links once); blocks shared by APFS clones inside the same folder are counted for each
+/// clone, so folders full of clones can overstate what deleting them frees. Per-file
+/// `reclaimableBytes` carries the clone-aware number.
+public enum SizeBasis: Sendable, Equatable {
+    case allocated
+}
+
 public enum ScanEvent: Sendable {
     case started(ScanStep)
     case rootMeasured(FolderNode)
@@ -29,7 +37,9 @@ public enum ScanEvent: Sendable {
     /// Any step: how far through its own units it is, with a label naming the unit.
     case stepActivity(ScanStep, done: Int, total: Int, label: String)
     case rules(CategoryResult)
-    case folderTrees([FolderNode])
+    case folderTrees([FolderNode], SizeBasis)
+    /// Folders the walk could not read; sizes may be incomplete.
+    case readErrors([WalkError])
     case taggedCaches([ScanItem])
     case largeFiles([ScanItem])
     case duplicates([DuplicateGroup])
@@ -52,17 +62,20 @@ public final class ScanSession: Sendable {
     /// regenerable build dirs, caches, and temporary places; `.everything` includes them.
     public let scope: DuplicateScope
     let largeFileMinSize: Int64
+    /// Worker count for the disk-usage walk (ncdu's `-t`): 0 = CPU count, 1 = serial shape.
+    public let scanThreads: Int
     /// Rule folder scans running at once.
     let ruleConcurrency = 4
 
     public init(
         home: URL = FileManager.default.homeDirectoryForCurrentUser, largeFileMinSize: Int64 = 500_000_000,
-        gate: ScanPauseGate? = nil, scope: DuplicateScope = .standard
+        gate: ScanPauseGate? = nil, scope: DuplicateScope = .standard, scanThreads: Int = 0
     ) {
         self.home = home
         self.largeFileMinSize = largeFileMinSize
         self.gate = gate
         self.scope = scope
+        self.scanThreads = scanThreads
     }
 
     /// Top-level folders of the home folder, without Library and hidden folders.
@@ -118,15 +131,17 @@ public final class ScanSession: Sendable {
         // The index step is metadata-only and interactive when the disk map is open; the
         // throttle resumes for the hashing-heavy steps that follow.
         setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_PROCESS, IOPOL_IMPORTANT)
-        var builder = FileIndexBuilder(policy: policy, progress: progress)
+        var builder = FileIndexBuilder(policy: policy, progress: progress, threads: scanThreads)
         builder.onRootMeasured = { emit(.rootMeasured($0)) }
         builder.onProgress = { emit(.progress($0)) }
         builder.onRollup = { emit(.treeUpdate($0)) }
         builder.onPause = { await pause() }
+        builder.pauseGate = gate
         let index = try? await builder.build(roots: Self.userRoots(home))
         setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_PROCESS, IOPOL_THROTTLE)
         guard let index, !Task.isCancelled else { return }
-        emit(.folderTrees(index.trees))
+        emit(.folderTrees(index.trees, index.treeSizeBasis))
+        emit(.readErrors(index.readErrors))
         emit(
             .taggedCaches(
                 index.taggedCaches.compactMap { tagged in

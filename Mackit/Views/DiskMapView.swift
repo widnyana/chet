@@ -29,9 +29,19 @@ struct DiskMapView: View {
             DiskMapChrome(
                 pathNodes: pathNodes,
                 isDark: isDark,
+                sizeBasis: model.treeSizeBasis,
                 onSelect: { index in
                     stack.removeSubrange((index + 1)...)
                 })
+            if !model.readErrors.isEmpty {
+                Label(
+                    "Some folders couldn't be read; sizes may be incomplete.", systemImage: "exclamationmark.triangle"
+                )
+                .font(.caption)
+                .foregroundStyle(.yellow)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+            }
             // Top section: the diagram. It grows live while the scan runs.
             if let current = pathNodes.last {
                 TreemapCanvas(
@@ -269,6 +279,7 @@ struct DiskMapView: View {
 struct DiskMapChrome: View {
     let pathNodes: [FolderNode]
     let isDark: Bool
+    let sizeBasis: SizeBasis
     let onSelect: (Int) -> Void
 
     var body: some View {
@@ -310,6 +321,13 @@ struct DiskMapChrome: View {
             Text(isDark ? "Lighter means a larger share" : "Darker means a larger share")
                 .font(Typography.caption)
                 .foregroundStyle(Theme.inkSecondary)
+            if sizeBasis == .allocated {
+                Text("on-disk size")
+                    .padding(.leading, 8)
+                    .help(
+                        "Blocks on disk, hard links counted once. Blocks shared by APFS clones count for each clone; per-file reclaimable numbers account for clones."
+                    )
+            }
         }
     }
 

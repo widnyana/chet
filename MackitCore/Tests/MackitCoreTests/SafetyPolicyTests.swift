@@ -37,6 +37,47 @@ struct SafetyPolicyTests {
         #expect(verdict(path) == .allowed)
     }
 
+    /// No under-inclusion: everything the full policy allows, the scan gate allows too.
+    @Test(arguments: [
+        "/Users/test/Library/Caches/com.foo/bar",
+        "/Users/test/.Trash/file",
+        "/Users/test/.Trash/Old.app",
+        "/Users/test/Library/Caches/com.example.app/blob",
+        "/Users/test/Library/Caches/com.example.app",
+        "/Volumes/Ext/.Trashes/501/file",
+        "/Users/test/Library/Containers/com.apple.mail/Data/Library/Mail Downloads/a.pdf",
+    ])
+    func scanGateAllowsEverythingTheFullPolicyAllows(_ path: String) {
+        let url = URL(fileURLWithPath: path)
+        #expect(verdict(path) == .allowed)  // the fixture itself must hold, or the test lies
+        #expect(policy.scanGateAllows(url, isSymlink: false, device: 1, parentDevice: 1))
+    }
+
+    /// Same denials as the full policy's bulk-visible string rules. Paths are walk-canonical
+    /// (the gate's documented precondition); non-canonical forms are `isDeletable`'s to resolve.
+    @Test(arguments: [
+        "/System/x",
+        "/Users/test/Library/Keychains/login.keychain-db",
+        "/Users/test/Library/Mobile Documents/x",
+        "/Applications/Foo.app/Contents/x",
+        "/Users/test/code/.git/config",
+        "/Users/test",
+        "/Users/test/Pictures/Photos Library.photoslibrary/database",
+        "/Volumes/Ext/file",
+    ])
+    func scanGateDeniesWhatTheFullPolicyDenies(_ path: String) {
+        let url = URL(fileURLWithPath: path)
+        #expect(verdict(path) != .allowed)  // the fixture itself must hold, or the test lies
+        #expect(!policy.scanGateAllows(url, isSymlink: false, device: 1, parentDevice: 1))
+    }
+
+    @Test func scanGateDeniesSymlinksAndCrossDeviceEntries() {
+        let url = URL(fileURLWithPath: "/Users/test/x")
+        #expect(!policy.scanGateAllows(url, isSymlink: true, device: 1, parentDevice: 1))
+        #expect(!policy.scanGateAllows(url, isSymlink: false, device: 2, parentDevice: 1))
+        #expect(policy.scanGateAllows(url, isSymlink: false, device: 1, parentDevice: 1))
+    }
+
     @Test func deniesRealAppBundleOnDisk() throws {
         let dir = try TempDir()
         try dir.file("Apps/Real.app/Contents/Info.plist", bytes: 10)

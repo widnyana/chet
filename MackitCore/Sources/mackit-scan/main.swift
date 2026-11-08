@@ -12,7 +12,9 @@ func peakRSS() -> Int64 {
 
 let path = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : NSHomeDirectory()
 let home = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
-let session = ScanSession(home: home)
+// MACKIT_SCAN_THREADS: worker count for the walk (0 = CPU count, 1 = serial shape).
+let envThreads = Int(ProcessInfo.processInfo.environment["MACKIT_SCAN_THREADS"] ?? "0") ?? 0
+let session = ScanSession(home: home, scanThreads: envThreads)
 let start = Date()
 var stepStart = Date()
 var stepTimes: [(String, TimeInterval)] = []

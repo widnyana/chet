@@ -52,7 +52,7 @@ struct RecorderInstrumentationTests {
         ]
         #expect(summaryText(.taggedCaches(items)).hasPrefix("tagged-caches: 1 items, 10 bytes"))
         #expect(summaryText(.leftovers(items)).hasPrefix("leftovers: 1 items, 10 bytes"))
-        #expect(summaryText(.folderTrees([])) == "index: 0 root trees measured")
+        #expect(summaryText(.folderTrees([], .allocated)) == "index: 0 root trees measured (allocated)")
         #expect(summaryText(.snapshots([])) == "snapshots: 0 local snapshots")
         let ruleResult = CategoryResult(ruleID: "caches", category: "caches", items: items, needsFullDiskAccess: true)
         let rulesText = summaryText(.rules(ruleResult))

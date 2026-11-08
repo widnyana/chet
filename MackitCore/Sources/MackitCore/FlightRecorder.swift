@@ -403,8 +403,10 @@ extension FlightRecorder {
                 "index",
                 "progress: \(snapshot.files) files, \(snapshot.bytes) bytes, in \(snapshot.currentFolder)"
             )
-        case .folderTrees(let trees):
-            return ("index", "\(trees.count) root trees measured")
+        case .folderTrees(let trees, let basis):
+            return ("index", "\(trees.count) root trees measured (\(basis))")
+        case .readErrors(let errors):
+            return ("index", "\(errors.count) unreadable folders")
         }
     }
 

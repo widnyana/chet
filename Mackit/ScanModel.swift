@@ -48,6 +48,8 @@ final class ScanModel {
     /// How many times the user has been sent to Settings; the second attempt unlocks the
     /// "Mackit may be listed twice" hint.
     var grantAttempts = UserDefaults.standard.integer(forKey: "grantAttempts")
+    /// Worker count for the disk-usage walk (ncdu's `-t`): 0 = CPU count, 1 = serial shape.
+    var scanThreads = 0
     /// Duplicates opt-in: when true the duplicates step also hashes caches, project build
     /// dirs, and temporary places. Off by default; the Settings page is the only writer.
     var includeTempInDuplicates = UserDefaults.standard.bool(forKey: "includeTempInDuplicates") {
@@ -75,6 +77,10 @@ final class ScanModel {
     var steps: [ScanStepState] = []
     /// Folder size trees of the last scan, for the disk map.
     var folderTrees: [FolderNode] = []
+    /// What `folderTrees` measure; see `SizeBasis`.
+    var treeSizeBasis: SizeBasis = .allocated
+    /// Folders the scan could not read; sizes may be incomplete.
+    var readErrors: [WalkError] = []
     /// Live home tree while the index walk runs, merged from directory rollups. The disk map
     /// renders this as a nested treemap that grows into its final shape during the scan.
     var liveTree: FolderNode?
@@ -189,7 +195,7 @@ final class ScanModel {
         recentFolders = []
         rate = nil
         let session = ScanSession(
-            gate: gate, scope: includeTempInDuplicates ? .everything : .standard)
+            gate: gate, scope: includeTempInDuplicates ? .everything : .standard, scanThreads: scanThreads)
         progress = session.progress
         scanTask = Task {
             for await event in session.events() {
@@ -371,11 +377,13 @@ final class ScanModel {
             let human = step == .rules ? (Self.titles[label] ?? label) : label
             pushActivity(step, done: done, total: total, label: human)
         case .rules(let result): merge(result)
-        case .folderTrees(let trees):
+        case .folderTrees(let trees, let basis):
             folderTrees = trees
+            treeSizeBasis = basis
             liveTree = nil
             partialTrees = []
             rootsProgress = nil
+        case .readErrors(let errors): readErrors = errors
         case .treeUpdate(let node): mergeRollup(node)
         case .rootMeasured(let node): partialTrees.append(node)
         case .progress(let snapshot):
