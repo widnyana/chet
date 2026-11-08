@@ -268,7 +268,8 @@ struct DiskMapView: View {
     private var legend: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 12) {
-                // Frames carry category identity, so the swatches are outlines.
+                Text("Border = category").foregroundStyle(.tertiary)
+                // Each cell's frame is its category hue; the swatches echo that as outlines.
                 ForEach(
                     [("Caches and logs", Color.orange), ("Developer", .purple), ("Media", .green), ("Other", .blue)],
                     id: \.0
@@ -282,15 +283,15 @@ struct DiskMapView: View {
                 }
             }
             HStack(spacing: 8) {
-                Text("Fill = share of parent").foregroundStyle(.tertiary)
-                // Ramp preview in the "other" hue; in the map each block takes its own
-                // category's hue at the same weight. Values mirror `TreemapMTKView.shaded`.
+                Text("Fill = size").foregroundStyle(.tertiary)
+                // Heat ramp: cool for small blocks, red for the biggest. Values mirror
+                // `TreemapMTKView.heat`.
                 ForEach(
                     [
-                        (Color(red: 0.21, green: 0.23, blue: 0.26), "under 4%"),
-                        (Color(red: 0.24, green: 0.30, blue: 0.39), "4 to 11%"),
-                        (Color(red: 0.28, green: 0.39, blue: 0.56), "11 to 25%"),
-                        (Color(red: 0.35, green: 0.55, blue: 0.85), "over 25%"),
+                        (Color(red: 0.26, green: 0.29, blue: 0.34), "under 4%"),
+                        (Color(red: 0.24, green: 0.50, blue: 0.78), "4 to 20%"),
+                        (Color(red: 0.93, green: 0.62, blue: 0.23), "20 to 49%"),
+                        (Color(red: 0.88, green: 0.26, blue: 0.22), "over 49%"),
                     ],
                     id: \.1
                 ) { color, text in
@@ -339,6 +340,7 @@ struct TreemapCanvas: NSViewRepresentable {
 struct TreemapTile {
     let rect: CGRect
     let color: SIMD4<Float>
+    let border: SIMD4<Float>
     let node: FolderNode
 }
 
@@ -395,6 +397,7 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
                     Float(r.minX / bounds.width), Float(r.minY / bounds.height), Float(r.width / bounds.width),
                     Float(r.height / bounds.height)))
             data.append(tile.color)
+            data.append(tile.border)
         }
         instances =
             data.isEmpty ? nil : device.makeBuffer(bytes: data, length: data.count * MemoryLayout<SIMD4<Float>>.stride)
@@ -417,7 +420,7 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
                     rect: item.rect,
                     title: child.url.lastPathComponent,
                     subtitle: child.size.formatted(.byteCount(style: .file)),
-                    prominent: sqrt(share) > 0.45))
+                    prominent: sqrt(share) > 0.45 && sqrt(share) <= 0.7))
         }
         return out
     }
@@ -427,7 +430,9 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
     static func tiles(for node: FolderNode, in bounds: CGRect, level: Int = 0) -> [TreemapTile] {
         guard !node.children.isEmpty else { return [] }
         var out = [
-            TreemapTile(rect: bounds, color: Self.dimmed(Self.color(for: node.url)), node: node)
+            TreemapTile(
+                rect: bounds, color: SIMD4(0.16, 0.16, 0.18, 1),
+                border: Self.dimmed(Self.color(for: node.url)), node: node)
         ]
         let rects = Treemap.layout(node.children.map(\.size), in: bounds)
         let boundsArea = bounds.width * bounds.height
@@ -438,7 +443,8 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
             out.append(
                 TreemapTile(
                     rect: inner,
-                    color: Self.shaded(Self.color(for: child.url), share: share),
+                    color: Self.heat(share),
+                    border: Self.color(for: child.url),
                     node: child))
             if level < nestingLevels - 1, !child.children.isEmpty,
                 inner.width * inner.height >= boundsArea * minRecursionFraction
@@ -454,17 +460,16 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
         SIMD4(color.x * 0.72, color.y * 0.72, color.z * 0.72, 1)
     }
 
-    /// Fill color from the block's category hue and its share of the parent: four
-    /// quantized tiers on `sqrt(share)`. Lower tiers mix the hue toward neutral dark,
-    /// the top tier is the full category color, so bigger blocks read brighter and more
-    /// colorful while every block's hue still names its category. Quantized on purpose:
-    /// adjacent tiers must differ enough to rank at a glance.
-    static func shaded(_ color: SIMD4<Float>, share: CGFloat) -> SIMD4<Float> {
-        let tier = Float(min(1, sqrt(max(0, share))))
-        let weight: Float = tier > 0.7 ? 1 : tier > 0.45 ? 0.55 : tier > 0.2 ? 0.28 : 0.08
-        let gray = SIMD4<Float>(0.20, 0.20, 0.21, 1)
-        let mixed = color * weight + gray * (1 - weight)
-        return SIMD4(mixed.x, mixed.y, mixed.z, 1)
+    /// Heat fill from the block's share of its parent: cool for small, red for the biggest.
+    /// Category is carried by the cell border, not the fill. Quantized on purpose so adjacent
+    /// tiers differ enough to rank at a glance. Breakpoints on `sqrt(share)` (0.2/0.45/0.7)
+    /// map to raw share of about 4% / 20% / 49%.
+    static func heat(_ share: CGFloat) -> SIMD4<Float> {
+        let t = Float(min(1, sqrt(max(0, share))))
+        if t > 0.7 { return SIMD4(0.88, 0.26, 0.22, 1) }
+        if t > 0.45 { return SIMD4(0.93, 0.62, 0.23, 1) }
+        if t > 0.2 { return SIMD4(0.24, 0.50, 0.78, 1) }
+        return SIMD4(0.26, 0.29, 0.34, 1)
     }
 
     override func setFrameSize(_ newSize: NSSize) {
