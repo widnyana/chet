@@ -1,5 +1,6 @@
 import MackitCore
 import SwiftUI
+import os
 
 /// Installs the crash handler and flight recorder at launch, after rotating any stale crash
 /// report aside. Order matters: rotation must precede install (see LogMaintenance).
