@@ -43,10 +43,6 @@ struct DiskMapView: View {
                     },
                     onLabels: { labels = $0 }
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .padding(.horizontal, Spacing.s6)
-                .padding(.bottom, Spacing.s3)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .overlay {
                     // Direct labels on the top tier: the biggest folders read without
                     // hovering. Coordinates are the canvas layout's own, top-left origin.
@@ -73,6 +69,10 @@ struct DiskMapView: View {
                     }
                     .allowsHitTesting(false)
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .padding(.horizontal, Spacing.s6)
+                .padding(.bottom, Spacing.s3)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .overlay(alignment: .bottomLeading) {
                     if let hovered {
                         HStack(spacing: Spacing.s2) {
