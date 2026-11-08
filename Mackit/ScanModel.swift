@@ -30,7 +30,10 @@ struct ItemGroup: Identifiable {
 @Observable
 final class ScanModel {
     var access = FullDiskAccess.status()
-    var skipAccessCheck = false
+    /// Persists across relaunches: a rebuild voids the FDA grant (ad-hoc signing), so the
+    /// onboarding must not re-block the app every rebuild — the sidebar shows which
+    /// categories need access instead.
+    var skipAccessCheck = UserDefaults.standard.bool(forKey: "skipAccessCheck")
     var categories: [CategoryState] = []
     /// Category id -> groups, for duplicates and similar media.
     var groups: [String: [ItemGroup]] = [:]

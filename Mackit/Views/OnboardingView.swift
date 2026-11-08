@@ -45,7 +45,10 @@ struct OnboardingView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            Button("Continue Without Access") { model.skipAccessCheck = true }
+            Button("Continue Without Access") {
+                    model.skipAccessCheck = true
+                    UserDefaults.standard.set(true, forKey: "skipAccessCheck")
+                }
                 .buttonStyle(.link)
         }
         .padding(40)
