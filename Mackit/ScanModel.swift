@@ -106,7 +106,7 @@ final class ScanModel {
         "ios-backups": "iOS device backups", "duplicates": "Duplicates", "large-files": "Large and old files",
         "leftovers": "App leftovers", "similar-photos": "Similar photos", "blurry-photos": "Blurry photos",
         "similar-videos": "Similar videos", "tagged-caches": "Tagged cache folders",
-        "snapshots": "Time Machine local snapshots",
+        "snapshots": "Time Machine local snapshots", "dev-garbage": "Project build dirs",
     ]
 
     /// Selected items, each URL once (a file can show up in more than one category).

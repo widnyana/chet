@@ -23,11 +23,16 @@ public struct Rule: Sendable, Identifiable {
     public let keepNewest: Bool
     /// Each root folder becomes one item instead of its children (for tool caches full of hash-named folders).
     public let wholeRoots: Bool
+    /// When set, the scanner walks each root recursively (depth-capped) and every directory
+    /// whose name is in this set becomes one item: regenerable project build dirs such as
+    /// Rust's `target/` or Node's `node_modules/`. A matched dir is never descended into.
+    public let recursiveNames: Set<String>?
 
     public init(
         id: String, category: String? = nil, title: String, roots: [String], risk: Risk, mode: DeleteMode,
         owningBundleID: String? = nil, minAge: TimeInterval? = nil, extensions: Set<String>? = nil,
-        excluded: Set<String> = [], keepNewest: Bool = false, wholeRoots: Bool = false
+        excluded: Set<String> = [], keepNewest: Bool = false, wholeRoots: Bool = false,
+        recursiveNames: Set<String>? = nil
     ) {
         self.id = id
         self.category = category ?? id
@@ -41,6 +46,7 @@ public struct Rule: Sendable, Identifiable {
         self.excluded = excluded
         self.keepNewest = keepNewest
         self.wholeRoots = wholeRoots
+        self.recursiveNames = recursiveNames
     }
 }
 
@@ -105,5 +111,9 @@ extension Rule {
         Rule(
             id: "ios-backups", title: "iOS device backups", roots: ["Library/Application Support/MobileSync/Backup"],
             risk: .review, mode: .trash),
+        Rule(
+            id: "dev-garbage", title: "Project build dirs",
+            roots: ["Development", "Projects", "Documents", "Desktop"], risk: .review, mode: .trash,
+            recursiveNames: ["target", "node_modules", "vendor", ".build", ".gradle", "DerivedData", "Pods"]),
     ]
 }

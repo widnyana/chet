@@ -25,6 +25,7 @@ struct CategoryStyle {
         "duplicates": CategoryStyle(symbol: "doc.on.doc", color: .pink),
         "large-files": CategoryStyle(symbol: "externaldrive", color: .red),
         "leftovers": CategoryStyle(symbol: "puzzlepiece.extension", color: .mint),
+        "dev-garbage": CategoryStyle(symbol: "wrench.and.screwdriver", color: .purple),
         "similar-photos": CategoryStyle(symbol: "photo.on.rectangle", color: .green),
         "blurry-photos": CategoryStyle(symbol: "camera.metering.unknown", color: .yellow),
         "similar-videos": CategoryStyle(symbol: "film.stack", color: .green),

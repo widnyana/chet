@@ -35,6 +35,31 @@ struct RuleScannerTests {
         #expect(result.items.map(\.url.lastPathComponent) == ["blob"])
     }
 
+    @Test func devGarbageFindsProjectBuildDirsOnce() async throws {
+        let dir = try TempDir()
+        try dir.file("Development/repos/app/node_modules/express/index.js", bytes: 1_000_000)
+        // A match is a leaf: nested node_modules are never double-counted.
+        try dir.file("Development/repos/app/node_modules/left-pad/index.js", bytes: 100)
+        try dir.file("Development/repos/api/target/release/binary", bytes: 2_000_000)
+        try dir.file("Documents/site/vendor/autoload.php", bytes: 500_000)
+        // .git is never entered, so nothing inside it matches.
+        try dir.file("Development/repos/api/.git/node_modules/x", bytes: 100)
+        // Files are not matches, and shallow files are not either.
+        try dir.file("Development/repos/README.md", bytes: 100)
+        let result = try await RuleScanner(home: dir.url).scan(try rule("dev-garbage"))
+        let names = Set(result.items.map(\.url.lastPathComponent))
+        #expect(names == ["node_modules", "target", "vendor"])
+        #expect(result.items.allSatisfy { $0.risk == .review && $0.mode == .trash })
+        #expect(result.totalBytes > 3_400_000)
+    }
+
+    @Test func devGarbageWithoutProjectsIsEmpty() async throws {
+        let dir = try TempDir()
+        try dir.file("Development/notes.txt", bytes: 100)
+        let result = try await RuleScanner(home: dir.url).scan(try rule("dev-garbage"))
+        #expect(result.items.isEmpty)
+    }
+
     @Test func missingRootIsEmptyNotError() async throws {
         let dir = try TempDir()
         let result = try await RuleScanner(home: dir.url).scan(try rule("package-caches"))

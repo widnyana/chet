@@ -10,7 +10,13 @@ The sidebar is the app's spine. One `List` with three visual zones, top to botto
 
 1. **Overview** — a single root row (`gauge.with.dots.needle.67percent`, blue). Doubles as
    the scan progress indicator: a mini spinner replaces it while a scan runs.
-2. **Reclaimable** section — one row per cleanable category, each with:
+1. **Reclaimable** section — one row per cleanable category, each with:
+   - `Project build dirs` (`wrench.and.screwdriver`, purple): a recursive rule over
+     `Development`, `Projects`, `Documents` and `Desktop` that matches regenerable build
+     directories by name — `target/`, `node_modules/`, `vendor/`, `.build/`, `.gradle/`,
+     `DerivedData/`, `Pods/`. Matches are never preselected (risk `.review`, mode
+     `.trash`), a match is a leaf (no nested double-counts), `.git` is never entered, and
+     recursion is capped at 6 levels.
    - a tinted SF Symbol icon from `CategoryStyle` (the color *is* the category's identity —
      the same symbol+color pair is reused in the overview grid, detail headers, and sheets),
    - the category name (single line, truncating),

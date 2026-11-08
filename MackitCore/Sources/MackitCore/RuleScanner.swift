@@ -10,6 +10,9 @@ public struct CategoryResult: Sendable {
 }
 
 public struct RuleScanner: Sendable {
+    /// Deepest recursion for `recursiveNames` walks; project build dirs sit near the root.
+    static let maxScanDepth = 6
+
     public let home: URL
     public let rules: [Rule]
     public let policy: SafetyPolicy
@@ -26,22 +29,27 @@ public struct RuleScanner: Sendable {
         let claimed = rules.filter { $0.id != rule.id }.flatMap(\.roots)
         for root in rule.roots {
             let rootURL = home.appendingPathComponent(root)
-            let children: [URL]
-            do {
-                let listed = try FileManager.default.contentsOfDirectory(at: rootURL, includingPropertiesForKeys: nil)
-                children = rule.wholeRoots ? [rootURL] : listed
-            } catch CocoaError.fileReadNoPermission {
-                result.needsFullDiskAccess = true
-                continue
-            } catch {
-                continue
+            var candidates: [URL]
+            if let names = rule.recursiveNames {
+                candidates = try recursiveMatches(rootURL, names)
+            } else {
+                do {
+                    let listed = try FileManager.default.contentsOfDirectory(
+                        at: rootURL, includingPropertiesForKeys: nil)
+                    candidates = rule.wholeRoots ? [rootURL] : listed
+                } catch CocoaError.fileReadNoPermission {
+                    result.needsFullDiskAccess = true
+                    continue
+                } catch {
+                    continue
+                }
             }
             var found: [ScanItem] = []
-            for child in children {
+            for child in candidates {
                 try Task.checkCancellation()
                 if child.lastPathComponent == ".DS_Store" { continue }
                 let name = child.lastPathComponent
-                let rel = rule.wholeRoots ? root : root + "/" + name
+                let rel = rule.wholeRoots ? root : String(child.path.dropFirst(home.path.count + 1))
                 if rule.excluded.contains(name) { continue }
                 if claimed.contains(where: { $0 == rel || $0.hasPrefix(rel + "/") }) { continue }
                 if let extensions = rule.extensions, !extensions.contains(child.pathExtension.lowercased()) { continue }
@@ -60,6 +68,30 @@ public struct RuleScanner: Sendable {
             result.items += found
         }
         return result
+    }
+
+    /// Depth-first search under `root` for directories whose name is in `names`. A matched
+    /// directory becomes one item and is never descended into; `.git` is never entered.
+    /// Depth is capped so a pathological tree cannot make the scan unbounded.
+    private func recursiveMatches(_ root: URL, _ names: Set<String>, depth: Int = 0) throws -> [URL] {
+        guard depth <= Self.maxScanDepth else { return [] }
+        let children = (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
+        var found: [URL] = []
+        for child in children {
+            try Task.checkCancellation()
+            var isDirectory: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: child.path, isDirectory: &isDirectory),
+                isDirectory.boolValue
+            else { continue }
+            let name = child.lastPathComponent
+            if name == ".git" { continue }
+            if names.contains(name) {
+                found.append(child)
+            } else {
+                found += try recursiveMatches(child, names, depth: depth + 1)
+            }
+        }
+        return found
     }
 
     /// Scans every rule in parallel and yields each result as soon as it is ready.
