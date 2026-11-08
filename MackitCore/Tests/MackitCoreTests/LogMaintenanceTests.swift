@@ -17,9 +17,9 @@ struct LogMaintenanceTests {
         #expect(rotated)
         #expect(!FileManager.default.fileExists(atPath: dir.url.appendingPathComponent("crash.txt").path))
         #expect(
-            FileManager.default.fileExists(atPath: dir.url.appendingPathComponent("crash-1700000000.txt").path))
+            FileManager.default.fileExists(atPath: dir.url.appendingPathComponent("crash-1700000000000.txt").path))
         let text = try String(
-            contentsOf: dir.url.appendingPathComponent("crash-1700000000.txt"), encoding: .utf8)
+            contentsOf: dir.url.appendingPathComponent("crash-1700000000000.txt"), encoding: .utf8)
         #expect(text.contains("MACKIT CRASH"))
     }
 
@@ -37,8 +37,8 @@ struct LogMaintenanceTests {
         clock += 90
         #expect(LogMaintenance.rotateStaleCrashReport(in: dir.url, now: { clock }))
         let names = try FileManager.default.contentsOfDirectory(atPath: dir.url.path).sorted()
-        #expect(names.contains("crash-1700000000.txt"))
-        #expect(names.contains("crash-1700000090.txt"))
+        #expect(names.contains("crash-1700000000000.txt"))
+        #expect(names.contains("crash-1700000090000.txt"))
     }
 
     @Test func retentionKeepsNewestFive() throws {
@@ -47,7 +47,7 @@ struct LogMaintenanceTests {
         LogMaintenance.pruneCrashHistory(in: dir.url, kept: 5)
         let names = try FileManager.default.contentsOfDirectory(atPath: dir.url.path).sorted()
         #expect(names.count == 5)
-        #expect(!names.contains("crash-1700000000.txt"))
+        #expect(!names.contains("crash-1700000000000.txt"))
         #expect(!names.contains("crash-1700000001.txt"))
         #expect(names.contains("crash-1700000006.txt"))
     }

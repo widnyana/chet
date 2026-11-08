@@ -5,11 +5,14 @@ import SwiftUI
 /// report aside. Order matters: rotation must precede install (see LogMaintenance).
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let directory = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(
-            "Library/Logs/Mackit")
+        let directory = FlightRecorder.defaultDirectory
         let sawCrash = LogMaintenance.launchCheck(in: directory)
         let recorder = FlightRecorder(directory: directory)
-        if sawCrash { recorder.record(step: "launch", "previous crash detected") }
+        if sawCrash {
+            recorder.record(step: "launch", "previous crash detected")
+            Logger(subsystem: "id.web.widnyana.mackit", category: "launch").notice(
+                "previous crash detected; see ~/Library/Logs/Mackit/")
+        }
         FlightRecorder.shared = recorder
         CrashHandler.install(directory: directory, recorder: recorder)
     }

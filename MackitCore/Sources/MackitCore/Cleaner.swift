@@ -63,10 +63,13 @@ public struct Cleaner: Sendable {
 
     public func clean(_ items: [ScanItem]) -> CleanReport {
         var report = CleanReport()
-        for item in items {
+        for (index, item) in items.enumerated() {
             let outcome = clean(item)
             log.append(item, outcome)
             report.results.append(CleanResult(item: item, outcome: outcome))
+            if let recorder, (index + 1) % 16 == 0 {
+                recorder.record(step: "clean", "progress: \(index + 1)/\(items.count) items")
+            }
         }
         if let recorder {
             recorder.record(

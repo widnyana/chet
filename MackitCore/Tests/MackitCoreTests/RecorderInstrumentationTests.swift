@@ -42,6 +42,24 @@ struct RecorderInstrumentationTests {
         #expect(videos == "videos: 0 clusters, 0 bytes reclaimable")
     }
 
+    @Test func remainingEventCasesMapToTheirSteps() throws {
+        let dir = try TempDir()
+        let a = try dir.file("x", bytes: 10)
+        let stamp = try #require(FileStamp.read(a))
+        let items = [
+            ScanItem(
+                url: a, categoryID: "test", risk: .safe, mode: .permanent, reclaimableBytes: 10, stamp: stamp)
+        ]
+        #expect(summaryText(.taggedCaches(items)).hasPrefix("tagged-caches: 1 items, 10 bytes"))
+        #expect(summaryText(.leftovers(items)).hasPrefix("leftovers: 1 items, 10 bytes"))
+        #expect(summaryText(.folderTrees([])) == "index: 0 root trees measured")
+        #expect(summaryText(.snapshots([])) == "snapshots: 0 local snapshots")
+        let ruleResult = CategoryResult(ruleID: "caches", category: "caches", items: items, needsFullDiskAccess: true)
+        let rulesText = summaryText(.rules(ruleResult))
+        #expect(rulesText.contains("caches"))
+        #expect(rulesText.contains("FDA missing"))
+    }
+
     @Test func cleanRunWritesBatchSummaryToFlightLogAndRowsToCleanLog() throws {
         let dir = try TempDir()
         let recorder = FlightRecorder(directory: dir.url)

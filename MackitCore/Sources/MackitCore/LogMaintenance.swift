@@ -14,7 +14,8 @@ public enum LogMaintenance {
         in directory: URL, now: @escaping () -> TimeInterval = { Date().timeIntervalSince1970 }
     ) -> Bool {
         let crash = directory.appendingPathComponent("crash.txt")
-        let stamp = String(format: "%.0f", now())
+        // Millisecond precision: two rotations within one second must not collide.
+        let stamp = String(format: "%.0f", now() * 1_000)
         let rotated = directory.appendingPathComponent("crash-\(stamp).txt")
         // Rename directly: ENOENT and any other failure both map to "no stale report rotated".
         return rename(crash.path, rotated.path) == 0

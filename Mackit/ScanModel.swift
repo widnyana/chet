@@ -119,6 +119,7 @@ final class ScanModel {
             }
             guard gen == generation else { return }
             heartbeat?.cancel()
+            FlightRecorder.shared?.flushNow()
             progress = nil
             currentStep = nil
             isScanning = false
@@ -141,6 +142,7 @@ final class ScanModel {
         scanTask?.cancel()
         heartbeat?.cancel()
         FlightRecorder.shared?.record(step: "scan", "cancelled")
+        FlightRecorder.shared?.flushNow()
         isScanning = false
         currentStep = nil
         progress = nil

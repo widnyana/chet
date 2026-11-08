@@ -21,20 +21,25 @@ struct CrashHandlerTests {
         recorder.record(step: "duplicates", "hashing 12 files")
         recorder.record(step: "index", "walking /Users/me/Library")
         let tail = recorder.tailData()
+        let session = Array(recorder.sessionID.utf8)
+        // Hex letters in the address exercise emitHex's letter branch.
         var buffer = [UInt8](repeating: 0, count: 32_768)
         let n = buffer.withUnsafeMutableBytes { ptr -> Int in
-            tail.withUnsafeBytes { tailPtr in
-                CrashHandler.crashRecord(
-                    signal: SIGSEGV, code: 1, address: 0x0001_0203_0405_0607,
-                    ringTail: tailPtr.baseAddress, tailLen: tailPtr.count,
-                    into: ptr.baseAddress!, capacity: ptr.count)
+            tail.withUnsafeBytes { tailPtr -> Int in
+                session.withUnsafeBufferPointer { sessionPtr in
+                    CrashHandler.crashRecord(
+                        signal: SIGSEGV, code: 1, address: 0x0000_0000_dead_beef,
+                        session: (UnsafeRawPointer(sessionPtr.baseAddress!), sessionPtr.count),
+                        ringTail: tailPtr.baseAddress, tailLen: tailPtr.count,
+                        into: ptr.baseAddress!, capacity: ptr.count)
+                }
             }
         }
         let text = String(decoding: buffer[0..<n], as: UTF8.self)
         #expect(text.contains("MACKIT CRASH"))
         #expect(text.contains("SIGSEGV"))
         #expect(text.contains("11"))
-        #expect(text.contains("0x1020304050607"))
+        #expect(text.contains("0xdeadbeef"))
         #expect(text.contains("hashing 12 files"))
         #expect(text.contains("walking /Users/me/Library"))
         #expect(text.contains(recorder.sessionID))

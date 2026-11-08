@@ -11,7 +11,7 @@ public enum CrashHandler {
     /// Fixed-format crash record. No allocation: writes bytes into the caller's buffer only.
     /// Returns the number of bytes written.
     public static func crashRecord(
-        signal: Int32, code: Int32, address: UInt,
+        signal: Int32, code: Int32, address: UInt, session: (UnsafeRawPointer, Int)?,
         ringTail: UnsafeRawPointer?, tailLen: Int,
         into out: UnsafeMutableRawPointer, capacity: Int
     ) -> Int {
@@ -20,6 +20,14 @@ public enum CrashHandler {
             var i = 0
             while s[i] != 0 && offset < capacity {
                 (out + offset).storeBytes(of: s[i], as: UInt8.self)
+                i += 1
+                offset += 1
+            }
+        }
+        func emitBytes(_ p: UnsafeRawPointer, _ n: Int) {
+            var i = 0
+            while i < n && offset < capacity {
+                (out + offset).storeBytes(of: p.load(fromByteOffset: i, as: UInt8.self), as: UInt8.self)
                 i += 1
                 offset += 1
             }
@@ -76,9 +84,9 @@ public enum CrashHandler {
         emit(" addr ")
         emitHex(address)
         emit("\n")
-        if let active, let session = active.sessionID {
+        if let (ptr, len) = session {
             emit("session: ")
-            emit(session)
+            emitBytes(ptr, len)
             emit("\n")
         }
         if let tail = ringTail, tailLen > 0 {
@@ -100,6 +108,12 @@ public enum CrashHandler {
         let fd: Int32
         let buffer: UnsafeMutableRawPointer
         let bufferSize = 32_768
+        /// Crash record in the first half, staged ring tail in the second.
+        let tailOffset = 16_384
+        /// Pre-allocated so the handler never mallocs; `backtrace` is warmed at install
+        /// because its first call initializes symbol tables on the heap.
+        let frames: UnsafeMutablePointer<UnsafeMutableRawPointer?>
+        let frameCount = 64
         let sessionID: [UInt8]?
         var previous: [Int32: sigaction] = [:]
         var oldStack: stack_t = stack_t()
@@ -111,7 +125,9 @@ public enum CrashHandler {
             self.recorder = recorder
             self.sessionID = sessionID
             buffer = UnsafeMutableRawPointer.allocate(byteCount: bufferSize, alignment: 1)
+            frames = .allocate(capacity: 64)
             stack = UnsafeMutableRawPointer.allocate(byteCount: Int(SIGSTKSZ) * 8, alignment: 1)
+            _ = backtrace(frames, Int32(frameCount))
         }
     }
 
@@ -187,11 +203,15 @@ public enum CrashHandler {
         // then render the record in the first half around it.
         var tailLen = 0
         if let recorder = state.recorder {
-            tailLen = recorder.tail(into: state.buffer + 16_384, capacity: state.bufferSize - 16_384)
+            tailLen = recorder.tail(
+                into: state.buffer + state.tailOffset, capacity: state.bufferSize - state.tailOffset)
+        }
+        let session = state.sessionID.map { bytes -> (UnsafeRawPointer, Int) in
+            bytes.withUnsafeBufferPointer { (UnsafeRawPointer($0.baseAddress!), $0.count) }
         }
         let n = crashRecord(
-            signal: sig, code: Int32(code), address: address,
-            ringTail: tailLen > 0 ? state.buffer + 16_384 : nil, tailLen: tailLen,
+            signal: sig, code: Int32(code), address: address, session: session,
+            ringTail: tailLen > 0 ? state.buffer + state.tailOffset : nil, tailLen: tailLen,
             into: state.buffer, capacity: state.bufferSize)
         if n > 0 { _ = write(state.fd, state.buffer, n) }
         var frames = [UnsafeMutableRawPointer?](repeating: nil, count: 64)

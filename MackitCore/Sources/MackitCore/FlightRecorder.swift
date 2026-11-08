@@ -16,6 +16,12 @@ public final class FlightRecorder: Sendable {
     public static let maxFileBytes: Int64 = 1_000_000
     public static let rotatedKept = 4
 
+    /// The one log directory every Mackit writer (AuditLog, FlightRecorder, CrashHandler,
+    /// LogMaintenance) uses; derive paths from this, never from a literal.
+    public static var defaultDirectory: URL {
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/Mackit")
+    }
+
     /// The instance installed for the running app; the crash handler reads its ring tail.
     /// Set once at launch (MackitApp), read from a signal handler.
     public nonisolated(unsafe) static var shared: FlightRecorder?
@@ -64,6 +70,8 @@ public final class FlightRecorder: Sendable {
         var fd: Int32 = -1
         var fileSize: Int64 = 0
         var available = true
+        /// False when another instance holds flight.current and this one writes its PID file.
+        var ownsCurrent = true
 
         init(slotBytes: Int, ringSlots: Int, pendingSlots: Int) {
             slotData = [UInt8](repeating: 0, count: ringSlots * slotBytes)
@@ -157,6 +165,15 @@ public final class FlightRecorder: Sendable {
             if n > 0 { _ = memcpy(buffer, mirror.b, n) }
         }
         return n
+    }
+
+    /// Flushes any pending events to the mirror file now. Call at scan end/cancel so the
+    /// last events never wait for the next record (the time-based trigger only fires then).
+    public func flushNow() {
+        state.withLock { s in
+            guard s.available else { return }
+            flushLocked(s)
+        }
     }
 
     public func flushForTesting() {
@@ -285,16 +302,23 @@ public final class FlightRecorder: Sendable {
 
     private func flushLocked(_ s: State) {
         guard s.pendingCount > 0, s.fd >= 0 else { return }
-        let written = s.pending.withUnsafeBytes { ptr -> Int in
-            write(s.fd, ptr.baseAddress!, s.pendingCount)
+        var writtenTotal = 0
+        while writtenTotal < s.pendingCount {
+            let n = s.pending.withUnsafeBytes { ptr -> Int in
+                write(s.fd, ptr.baseAddress! + writtenTotal, s.pendingCount - writtenTotal)
+            }
+            if n > 0 {
+                writtenTotal += n
+            } else if errno == EINTR {
+                continue
+            } else {
+                // Disk full or otherwise unwritable: drop the batch, disable further recording.
+                s.available = false
+                s.pendingCount = 0
+                return
+            }
         }
-        guard written > 0 else {
-            // Disk full or otherwise unwritable: drop the batch, disable further recording.
-            s.available = false
-            s.pendingCount = 0
-            return
-        }
-        s.fileSize += Int64(written)
+        s.fileSize += Int64(writtenTotal)
         s.pendingCount = 0
         s.pendingEvents = 0
         s.lastFlush = now()
@@ -307,6 +331,12 @@ public final class FlightRecorder: Sendable {
         s.fd = -1
         let dir = self.directory
         let base: (String) -> URL = { dir.appendingPathComponent($0) }
+        if !s.ownsCurrent {
+            // The other instance owns flight.current; renaming it would corrupt its file.
+            // This instance's PID file just stops growing: disable further recording.
+            s.available = false
+            return
+        }
         if kept > 0 {
             try? FileManager.default.removeItem(at: base("flight.\(kept).jsonl"))
             for i in stride(from: kept - 1, through: 1, by: -1) {
