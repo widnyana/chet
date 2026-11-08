@@ -20,6 +20,9 @@ app.
 The scan button is in the toolbar on every destination except Applications.
 The Applications destination owns its own toolbar: Done, search, layout, reload.
 
+`Mackit > About Mackit` opens a separate fixed window. It is not a sidebar
+destination and it does not replace the detail pane.
+
 ## Overview
 
 Job: answer "what can I reclaim, and what should I do next?".
@@ -188,6 +191,34 @@ Search inside caches and project build folders. Off by default.
 ```
 
 No other options. The window title is `Settings`.
+
+## About
+
+Job: answer "which build is running, whether access is granted, and where are
+the logs?".
+
+`Mackit > About Mackit` opens one fixed 560 x 680 window. It is independent of
+the main window and can stay open during a scan.
+
+Top to bottom:
+
+1. `PageHeader`: app icon, `Mackit`, the one-sentence product line, metric: the
+   version.
+2. `This build`: build, bundle ID, architecture, minimum macOS.
+3. `Status`: Full Disk Access with `Granted` or the amber `Not granted` plus
+   `Open Settings`; last scan with its byte total and date.
+4. `Logs`: audit log path with `Show` when it exists; logs folder with `Open`.
+
+The window does not inventory the machine. No model, chip, memory, disk, or GPU
+rows.
+
+States:
+
+- Loading: header plus `Reading this build`; no fake values.
+- Partial: a missing build key says `Unknown`; other rows render.
+- Empty: `No scan yet`, `No log yet`; the missing action is removed, not dead.
+- Denied access: amber status, one sentence, `Open Settings`.
+- Long paths truncate in the middle with the full path in the tooltip.
 
 ## Permission page
 

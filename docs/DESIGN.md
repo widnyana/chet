@@ -42,6 +42,8 @@ NavigationSplitView
 - The toolbar carries Scan / Stop on every destination except Applications.
 - Applications owns Done, Search, Layout, and Reload.
 - There are no mode tabs. Applications is a destination, not a mode.
+- About is not a destination. `Mackit > About Mackit` opens one fixed window,
+  separate from the main window.
 
 ## Visual language
 
@@ -215,6 +217,28 @@ One grouped form section with the duplicate-scope toggle.
 A sentence, three plain steps, one primary button, one link, and a native
 spinner while checking. No glass card and no pulsing dot.
 
+### About
+
+One fixed 560 x 680 window, opened from `Mackit > About Mackit`. It is a
+ledger of app facts, not a landing page and not a system report. The window
+title is `About Mackit`; the page header names the app.
+
+Top to bottom:
+
+1. Page header: app icon, `Mackit`, one sentence, the version.
+2. This build: build number, bundle ID, architecture, minimum macOS.
+3. Status: Full Disk Access with `Open Settings` when denied, last scan.
+4. Logs: selectable audit log and logs folder paths with `Show` and `Open`.
+
+Rules:
+
+- Every missing read says `Unknown`. Never a zero standing in for a value.
+- The window reads the app bundle and its own log paths only. It does not
+  inventory the machine.
+- Paths truncate in the middle and keep the full path in the tooltip.
+- No animation. The only motion is the native spinner while the build facts
+  load.
+
 ## Components
 
 - `PageHeader`: title, subtitle, optional metric, hairline.
@@ -232,6 +256,8 @@ spinner while checking. No glass card and no pulsing dot.
   held for at least 0.45 s so a fast pass cannot flash past
   with items, bytes, freed, skipped, failed, current path, and action.
 - `PermissionPage`: plain page, one action.
+- `AboutInfoRow` and `AboutPathRow`: label, value or selectable path, optional
+  status icon, detail, and secondary action.
 
 Detailed anatomy and states are in [design/components.md](design/components.md).
 

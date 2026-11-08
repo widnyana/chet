@@ -52,6 +52,18 @@ struct SelectCommands: Commands {
     }
 }
 
+/// Replaces the system About panel with the app's own window, which can show
+/// the build facts, machine facts, access grant, and log paths.
+private struct AboutCommand: Commands {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some Commands {
+        CommandGroup(replacing: .appInfo) {
+            Button("About Mackit") { openWindow(id: AboutView.windowID) }
+        }
+    }
+}
+
 @main
 struct MackitApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -64,6 +76,7 @@ struct MackitApp: App {
                 .frame(minWidth: 960, minHeight: 600)
         }
         .commands {
+            AboutCommand()
             CommandMenu("Scan") {
                 Button(model.isScanning ? "Stop Scan" : "Scan") {
                     if model.isScanning { model.cancel() } else { model.scan() }
@@ -72,6 +85,14 @@ struct MackitApp: App {
             }
             SelectCommands()
         }
+        // One About window, opened from Mackit > About Mackit. Separate from the
+        // main window so it can stay open while the ledger runs.
+        Window("About Mackit", id: AboutView.windowID) {
+            AboutView()
+                .environment(model)
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
         // The standard macOS Settings scene: "Settings…" in the app menu, Cmd+, opens it.
         Settings {
             SettingsView()
