@@ -8,7 +8,6 @@ struct DiskMapView: View {
     @Environment(ScanModel.self) private var model
     @State private var stack: [FolderNode] = []
     @State private var hovered: FolderNode?
-    @State private var loading = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -52,22 +51,46 @@ struct DiskMapView: View {
                         .allowsHitTesting(false)
                     }
                 }
-            } else if loading {
-                ProgressView("Measuring folders")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if model.isScanning {
+                VStack(spacing: 12) {
+                    ProgressView()
+                    if let progress = model.progress {
+                        Text("\(progress.files) files, \(progress.bytes.formatted(.byteCount(style: .file)))")
+                            .monospacedDigit()
+                        Text(progress.currentFolder)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    } else {
+                        Text("Measuring folders")
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ContentUnavailableView {
                     Label("Disk map", systemImage: "square.grid.3x3.fill")
                 } description: {
                     Text("See which folders take the most space. Click a folder to look inside.")
                 } actions: {
-                    Button("Map Home Folder") { Task { await load() } }
+                    Button("Scan Now") { model.scan() }
                         .buttonStyle(.glassProminent)
                         .controlSize(.large)
                 }
             }
         }
         .navigationTitle("Disk map")
+        // The scan's index step produces the trees; the map rebuilds whenever they change.
+        .task(id: model.folderTrees) {
+            guard !model.folderTrees.isEmpty else { return }
+            let kids = model.folderTrees.sorted { $0.size > $1.size }
+            stack = [
+                FolderNode(
+                    url: FileManager.default.homeDirectoryForCurrentUser, size: kids.reduce(0) { $0 + $1.size },
+                    children: kids)
+            ]
+            hovered = nil
+        }
     }
 
     private var legend: some View {
@@ -84,26 +107,6 @@ struct DiskMapView: View {
         }
         .font(.caption)
         .foregroundStyle(.secondary)
-    }
-
-    private func load() async {
-        loading = true
-        if !model.folderTrees.isEmpty {
-            let kids = model.folderTrees.sorted { $0.size > $1.size }
-            stack = [
-                FolderNode(
-                    url: FileManager.default.homeDirectoryForCurrentUser, size: kids.reduce(0) { $0 + $1.size },
-                    children: kids)
-            ]
-            loading = false
-            return
-        }
-        if let root = await Self.build(FileManager.default.homeDirectoryForCurrentUser) { stack = [root] }
-        loading = false
-    }
-
-    @concurrent nonisolated static func build(_ root: URL) async -> FolderNode? {
-        try? FolderTree.build(root, policy: SafetyPolicy(home: root), maxDepth: 6)
     }
 }
 

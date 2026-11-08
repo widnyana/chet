@@ -35,7 +35,7 @@ public struct LargeFileScanner: Sendable {
     }
 }
 
-public struct FolderNode: Sendable, Identifiable {
+public struct FolderNode: Sendable, Identifiable, Equatable {
     public var id: URL { url }
     public let url: URL
     public let size: Int64
