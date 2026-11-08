@@ -10,7 +10,7 @@ struct LogMaintenanceTests {
         try Data(content.utf8).write(to: dir.appendingPathComponent(name))
     }
 
-    @Test func rotateRenamesCrashFileWithTimestamp() throws {
+    @Test func rotateRenamesCrashFileWithTimestamp() async throws {
         let dir = try TempDir()
         try seed(dir.url, name: "crash.txt", content: "MACKIT CRASH\nsignal: SIGSEGV\n")
         let rotated = LogMaintenance.rotateStaleCrashReport(in: dir.url, now: { 1_700_000_000 })
@@ -23,12 +23,12 @@ struct LogMaintenanceTests {
         #expect(text.contains("MACKIT CRASH"))
     }
 
-    @Test func noStaleCrashFileRotatesNothing() throws {
+    @Test func noStaleCrashFileRotatesNothing() async throws {
         let dir = try TempDir()
         #expect(!LogMaintenance.rotateStaleCrashReport(in: dir.url, now: { 1_700_000_000 }))
     }
 
-    @Test func twoRotationsGetDistinctTimestampNames() throws {
+    @Test func twoRotationsGetDistinctTimestampNames() async throws {
         let dir = try TempDir()
         var clock = 1_700_000_000.0
         try seed(dir.url, name: "crash.txt", content: "first")
@@ -41,7 +41,7 @@ struct LogMaintenanceTests {
         #expect(names.contains("crash-1700000090000.txt"))
     }
 
-    @Test func retentionKeepsNewestFive() throws {
+    @Test func retentionKeepsNewestFive() async throws {
         let dir = try TempDir()
         for i in 0..<7 { try seed(dir.url, name: "crash-\(1_700_000_000 + i).txt", content: "c\(i)") }
         LogMaintenance.pruneCrashHistory(in: dir.url, kept: 5)
@@ -52,12 +52,12 @@ struct LogMaintenanceTests {
         #expect(names.contains("crash-1700000006.txt"))
     }
 
-    @Test func diagnosticReportsExcludedFromLogsRule() throws {
+    @Test func diagnosticReportsExcludedFromLogsRule() async throws {
         let dir = try TempDir()
         let logs = try dir.file("Library/Logs/DiagnosticReports/Mackit-2026-11-04.ips", bytes: 10)
         let scanner = RuleScanner(home: dir.url)
         let rule = try #require(Rule.catalog.first { $0.id == "logs" })
-        let result = try scanner.scan(rule)
+        let result = try await scanner.scan(rule)
         let scanned = result.items.map(\.url)
         #expect(!scanned.contains(logs))
         let mackit = try dir.file("Library/Logs/Mackit/flight.current", bytes: 10)

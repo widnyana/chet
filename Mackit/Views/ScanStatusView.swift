@@ -15,8 +15,24 @@ struct ScanStatusView: View {
                     .controlSize(.small)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(model.currentStep?.title ?? "Scanning").font(.callout).lineLimit(1)
-                    Text("\(model.totalBytes.formatted(.byteCount(style: .file))) found")
-                        .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                    Group {
+                        if let folder = model.rootsProgress?.currentFolder, !folder.isEmpty {
+                            Text(folder).lineLimit(1).truncationMode(.middle).help(folder)
+                        } else {
+                            Text("\(model.totalBytes.formatted(.byteCount(style: .file))) found")
+                        }
+                    }
+                    .font(.caption).foregroundStyle(.secondary)
+                    HStack(spacing: 4) {
+                        if let rate = model.rate {
+                            Text(String(format: "%.1fk files/s", rate)).monospacedDigit()
+                        }
+                        if let started = model.scanStartedAt {
+                            Text(Self.elapsed(since: started)).monospacedDigit()
+                        }
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
                 }
                 Button("Stop", systemImage: "stop.fill") { model.cancel() }
                     .help("Stop the scan (Command-R)")
@@ -28,6 +44,11 @@ struct ScanStatusView: View {
             .buttonStyle(.glassProminent)
             .help("Scan this Mac for junk (Command-R)")
         }
+    }
+
+    static func elapsed(since date: Date) -> String {
+        let interval = Int(Date().timeIntervalSince(date))
+        return String(format: "%02d:%02d", interval / 60, interval % 60)
     }
 
     /// Which scan step produces a category; nil for pages that are not categories.

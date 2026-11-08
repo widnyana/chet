@@ -17,43 +17,43 @@ struct RuleScannerTests {
         #expect(Set(Rule.catalog.map(\.id)).count == Rule.catalog.count)
     }
 
-    @Test func cacheChildrenBecomeItems() throws {
+    @Test func cacheChildrenBecomeItems() async throws {
         let dir = try TempDir()
         try dir.file("Library/Caches/a/x", bytes: 5_000_000)
         try dir.file("Library/Caches/b/y", bytes: 3_000_000)
-        let result = try RuleScanner(home: dir.url).scan(try rule("caches"))
+        let result = try await RuleScanner(home: dir.url).scan(try rule("caches"))
         #expect(Set(result.items.map(\.url.lastPathComponent)) == ["a", "b"])
         #expect(result.items.allSatisfy { $0.risk == .safe && $0.mode == .permanent })
         #expect(result.totalBytes > 7_900_000 && result.totalBytes < 8_200_000)
     }
 
-    @Test func cachesSkipDotDSStore() throws {
+    @Test func cachesSkipDotDSStore() async throws {
         let dir = try TempDir()
         try dir.file("Library/Caches/.DS_Store", bytes: 100)
         try dir.file("Library/Caches/blob/x", bytes: 100)
-        let result = try RuleScanner(home: dir.url).scan(try rule("caches"))
+        let result = try await RuleScanner(home: dir.url).scan(try rule("caches"))
         #expect(result.items.map(\.url.lastPathComponent) == ["blob"])
     }
 
-    @Test func missingRootIsEmptyNotError() throws {
+    @Test func missingRootIsEmptyNotError() async throws {
         let dir = try TempDir()
-        let result = try RuleScanner(home: dir.url).scan(try rule("package-caches"))
+        let result = try await RuleScanner(home: dir.url).scan(try rule("package-caches"))
         #expect(result.items.isEmpty)
         #expect(!result.needsFullDiskAccess)
     }
 
-    @Test func unreadableRootNeedsFullDiskAccess() throws {
+    @Test func unreadableRootNeedsFullDiskAccess() async throws {
         let dir = try TempDir()
         try dir.file("Library/Caches/a/x", bytes: 10)
         let caches = dir.url.appendingPathComponent("Library/Caches")
         #expect(chmod(caches.path, 0o000) == 0)
         defer { chmod(caches.path, 0o755) }
-        let result = try RuleScanner(home: dir.url).scan(try rule("caches"))
+        let result = try await RuleScanner(home: dir.url).scan(try rule("caches"))
         #expect(result.needsFullDiskAccess)
         #expect(result.items.isEmpty)
     }
 
-    @Test func installersNeedAgeAndExtension() throws {
+    @Test func installersNeedAgeAndExtension() async throws {
         let dir = try TempDir()
         let old = try dir.file("Downloads/old.dmg", bytes: 1000)
         let recent = try dir.file("Downloads/new.dmg", bytes: 1000)
@@ -61,54 +61,54 @@ struct RuleScannerTests {
         try setMTime(old, daysAgo: 40)
         try setMTime(recent, daysAgo: 10)
         try setMTime(notes, daysAgo: 40)
-        let result = try RuleScanner(home: dir.url).scan(try rule("installers"))
+        let result = try await RuleScanner(home: dir.url).scan(try rule("installers"))
         #expect(result.items.map(\.url.lastPathComponent) == ["old.dmg"])
         #expect(result.items.first?.mode == .trash)
     }
 
-    @Test func logsSkipMackitOwnLog() throws {
+    @Test func logsSkipMackitOwnLog() async throws {
         let dir = try TempDir()
         try dir.file("Library/Logs/Mackit/clean.log", bytes: 100)
         try dir.file("Library/Logs/other/x.log", bytes: 100)
-        let result = try RuleScanner(home: dir.url).scan(try rule("logs"))
+        let result = try await RuleScanner(home: dir.url).scan(try rule("logs"))
         #expect(result.items.map(\.url.lastPathComponent) == ["other"])
     }
 
-    @Test func parentRuleSkipsFoldersClaimedByOtherRules() throws {
+    @Test func parentRuleSkipsFoldersClaimedByOtherRules() async throws {
         let dir = try TempDir()
         try dir.file("Library/Caches/Google/Chrome/data", bytes: 100)
         try dir.file("Library/Caches/Homebrew/downloads/pkg", bytes: 100)
         try dir.file("Library/Caches/foo/x", bytes: 100)
         let scanner = RuleScanner(home: dir.url)
-        #expect(try scanner.scan(try rule("caches")).items.map(\.url.lastPathComponent) == ["foo"])
-        #expect(try scanner.scan(try rule("browser-chrome")).items.map(\.url.lastPathComponent) == ["data"])
-        #expect(try scanner.scan(try rule("package-caches")).items.map(\.url.lastPathComponent) == ["Homebrew"])
+        #expect(try await scanner.scan(try rule("caches")).items.map(\.url.lastPathComponent) == ["foo"])
+        #expect(try await scanner.scan(try rule("browser-chrome")).items.map(\.url.lastPathComponent) == ["data"])
+        #expect(try await scanner.scan(try rule("package-caches")).items.map(\.url.lastPathComponent) == ["Homebrew"])
     }
 
-    @Test func packageCachesAreOneItemPerTool() throws {
+    @Test func packageCachesAreOneItemPerTool() async throws {
         let dir = try TempDir()
         try dir.file("Library/Caches/go-build/8f/x", bytes: 100)
         try dir.file("Library/Caches/go-build/8a/y", bytes: 100)
         try dir.file("Library/Caches/Homebrew/downloads/z", bytes: 100)
-        let items = try RuleScanner(home: dir.url).scan(try rule("package-caches")).items
+        let items = try await RuleScanner(home: dir.url).scan(try rule("package-caches")).items
         #expect(Set(items.map(\.url.lastPathComponent)) == ["go-build", "Homebrew"])
         #expect(items.allSatisfy { dir.policy.isDeletable($0.url) == .allowed })
     }
 
-    @Test func browserItemsCarryTheirOwnerApp() throws {
+    @Test func browserItemsCarryTheirOwnerApp() async throws {
         let dir = try TempDir()
         try dir.file("Library/Caches/Google/Chrome/Profile 4/data", bytes: 100)
-        let items = try RuleScanner(home: dir.url).scan(try rule("browser-chrome")).items
+        let items = try await RuleScanner(home: dir.url).scan(try rule("browser-chrome")).items
         #expect(items.map(\.url.lastPathComponent) == ["Profile 4"])
         #expect(items.first?.ownerBundleID == "com.google.Chrome")
     }
 
-    @Test func keepNewestKeepsLatestDeviceSupport() throws {
+    @Test func keepNewestKeepsLatestDeviceSupport() async throws {
         let dir = try TempDir()
         try dir.file("Library/Developer/Xcode/iOS DeviceSupport/17.0/x", bytes: 100)
         try dir.file("Library/Developer/Xcode/iOS DeviceSupport/18.0/x", bytes: 100)
         try setMTime(dir.url.appendingPathComponent("Library/Developer/Xcode/iOS DeviceSupport/17.0"), daysAgo: 100)
-        let result = try RuleScanner(home: dir.url).scan(try rule("xcode-device-support"))
+        let result = try await RuleScanner(home: dir.url).scan(try rule("xcode-device-support"))
         #expect(result.items.map(\.url.lastPathComponent) == ["17.0"])
     }
 

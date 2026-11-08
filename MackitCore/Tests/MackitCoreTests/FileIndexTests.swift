@@ -11,12 +11,12 @@ struct FileIndexTests {
         return st
     }
 
-    private func entries(in url: URL) throws -> [String: FileIndexBuilder.Entry] {
+    private func entries(in url: URL) async throws -> [String: FileIndexBuilder.Entry] {
         let fd = open(url.path, O_RDONLY | O_DIRECTORY)
         #expect(fd >= 0)
         defer { close(fd) }
         var found: [String: FileIndexBuilder.Entry] = [:]
-        try FileIndexBuilder.forEachEntry(fd) { found[$0.name] = $0 }
+        try await FileIndexBuilder.forEachEntry(fd) { found[$0.name] = $0 }
         return found
     }
 
@@ -41,13 +41,13 @@ struct FileIndexTests {
         try Data(text.utf8).write(to: url)
     }
 
-    @Test func bulkEntriesMatchLstat() throws {
+    @Test func bulkEntriesMatchLstat() async throws {
         let dir = try TempDir()
         let small = try dir.file("small", bytes: 10)
         let big = try dir.file("big", bytes: 2_000_000)
         try dir.file("sub/inner", bytes: 5)
         #expect(link(big.path, dir.url.appendingPathComponent("link").path) == 0)
-        let found = try entries(in: dir.url)
+        let found = try await entries(in: dir.url)
         #expect(Set(found.keys) == ["small", "big", "sub", "link"])
         for url in [small, big] {
             let st = try lstatOf(url)
@@ -70,7 +70,7 @@ struct FileIndexTests {
     /// Clone semantics in the bulk record (verified empirically on APFS): a persisting `clonefile`
     /// pair reports private size 0 for both members, a partially modified clone holds only its
     /// unshared blocks, and the survivor of a deleted twin owns its full allocation again.
-    @Test func bulkPrivateSizeMatchesCloneSemantics() throws {
+    @Test func bulkPrivateSizeMatchesCloneSemantics() async throws {
         let dir = try TempDir()
         let orig = try dir.file("orig", bytes: 1_000_000)
         let clone = dir.url.appendingPathComponent("clone")
@@ -80,7 +80,7 @@ struct FileIndexTests {
                 clonefile(src, dst, 0) == 0
             }
         }
-        let pair = try entries(in: dir.url)
+        let pair = try await entries(in: dir.url)
         let origEntry = try #require(pair["orig"])
         #expect(origEntry.hasPrivateSize)
         if cloned {
@@ -93,19 +93,19 @@ struct FileIndexTests {
             try fh.seek(toOffset: 4096)
             try fh.write(Data(repeating: 0xFF, count: 4096))
             try fh.close()
-            let partial = try #require(try entries(in: dir.url)["clone"])
+            let partial = try #require(try await entries(in: dir.url)["clone"])
             #expect(partial.privateSize > 0)
             #expect(partial.privateSize < partial.allocatedSize)
             // Deleting the twin gives the survivor its full allocation back.
             try FileManager.default.removeItem(at: orig)
-            let survivor = try #require(try entries(in: dir.url)["clone"])
+            let survivor = try #require(try await entries(in: dir.url)["clone"])
             #expect(survivor.privateSize == survivor.allocatedSize)
         } else {
             #expect(origEntry.privateSize == origEntry.allocatedSize)
         }
     }
 
-    @Test func candidatesSkipPackagesGitAndTaggedCaches() throws {
+    @Test func candidatesSkipPackagesGitAndTaggedCaches() async throws {
         let dir = try TempDir()
         try dir.file("big", bytes: 2_000_000)
         try dir.file("small", bytes: 10)
@@ -116,14 +116,14 @@ struct FileIndexTests {
         try writeTag(dir, "tagged", "Signature: 8a477f597d28d172789f06886806bc55\n# made by a test\n")
         try dir.file("wrongtag/blob", bytes: 2_000_000)
         try writeTag(dir, "wrongtag", "Signature: not-the-real-one\n")
-        let index = try FileIndexBuilder(policy: dir.policy).build(roots: [dir.url])
+        let index = try await FileIndexBuilder(policy: dir.policy).build(roots: [dir.url])
         let relative = Set(index.candidates.map { String($0.url.path.dropFirst(dir.url.path.count + 1)) })
         #expect(relative == ["big", "photo.jpg", "wrongtag/blob"])
         #expect(index.taggedCaches.map(\.url.lastPathComponent) == ["tagged"])
         #expect((index.taggedCaches.first?.bytes ?? 0) >= 2_000_000)
     }
 
-    @Test func treeTotalsMatchIndependentSum() throws {
+    @Test func treeTotalsMatchIndependentSum() async throws {
         let dir = try TempDir()
         try dir.file("a/x", bytes: 1_500_000)
         try dir.file("a/b/y", bytes: 2_500_000)
@@ -131,45 +131,45 @@ struct FileIndexTests {
         try dir.file("tiny", bytes: 3)
         let a = try dir.file("hard", bytes: 1_000_000)
         #expect(link(a.path, dir.url.appendingPathComponent("a/hard2").path) == 0)
-        let tree = try #require(try FileIndexBuilder(policy: dir.policy).build(roots: [dir.url]).trees.first)
+        let tree = try #require(try await FileIndexBuilder(policy: dir.policy).build(roots: [dir.url]).trees.first)
         #expect(tree.size == (try expectedAllocated(dir.url)))
         #expect(tree.children.first?.url.lastPathComponent == "a")
         #expect(tree.children.map(\.size) == tree.children.map(\.size).sorted(by: >))
         #expect(!tree.children.contains { $0.url.lastPathComponent == "tiny" })
-        #expect(FileIndexBuilder.allocatedSize(of: dir.url) == tree.size)
+        #expect(await FileIndexBuilder.allocatedSize(of: dir.url) == tree.size)
         #expect(
-            FileIndexBuilder.allocatedSize(of: dir.url.appendingPathComponent("z")) == Int64(
+            await FileIndexBuilder.allocatedSize(of: dir.url.appendingPathComponent("z")) == Int64(
                 try lstatOf(dir.url.appendingPathComponent("z")).st_blocks) * 512)
     }
 
-    @Test func maxDepthLimitsTreeButNotTotals() throws {
+    @Test func maxDepthLimitsTreeButNotTotals() async throws {
         let dir = try TempDir()
         try dir.file("a/b/c/d", bytes: 1_500_000)
         var builder = FileIndexBuilder(policy: dir.policy)
         builder.maxDepth = 1
-        let tree = try #require(try builder.build(roots: [dir.url]).trees.first)
+        let tree = try #require(try await builder.build(roots: [dir.url]).trees.first)
         let a = try #require(tree.children.first)
         #expect(a.children.isEmpty)
         #expect(a.size == tree.size)
         #expect(tree.size >= 1_500_000)
     }
 
-    @Test func symlinksAreNotFollowed() throws {
+    @Test func symlinksAreNotFollowed() async throws {
         let dir = try TempDir()
         try dir.file("real", bytes: 10)
         try FileManager.default.createSymbolicLink(
             at: dir.url.appendingPathComponent("root"), withDestinationURL: URL(fileURLWithPath: "/"))
-        let index = try FileIndexBuilder(policy: dir.policy).build(roots: [dir.url])
+        let index = try await FileIndexBuilder(policy: dir.policy).build(roots: [dir.url])
         #expect(index.entriesSeen == 2)
         #expect(index.trees.first?.size == (try expectedAllocated(dir.url)))
     }
 
-    @Test func progressCountsEntriesAndBytes() throws {
+    @Test func progressCountsEntriesAndBytes() async throws {
         let dir = try TempDir()
         try dir.file("a/x", bytes: 1_500_000)
         try dir.file("y", bytes: 10)
         let progress = ScanProgress()
-        let index = try FileIndexBuilder(policy: dir.policy, progress: progress).build(roots: [dir.url])
+        let index = try await FileIndexBuilder(policy: dir.policy, progress: progress).build(roots: [dir.url])
         #expect(progress.files == index.entriesSeen)
         #expect(progress.bytes == index.trees.first?.size)
         #expect(!progress.currentFolder.isEmpty)
@@ -181,7 +181,7 @@ struct FileIndexTests {
         let builder = FileIndexBuilder(policy: dir.policy)
         let task = Task { () throws -> FileIndex in
             withUnsafeCurrentTask { $0?.cancel() }
-            return try builder.build(roots: [dir.url])
+            return try await builder.build(roots: [dir.url])
         }
         await #expect(throws: CancellationError.self) { try await task.value }
     }

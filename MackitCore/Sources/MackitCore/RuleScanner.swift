@@ -20,7 +20,7 @@ public struct RuleScanner: Sendable {
         policy = SafetyPolicy(home: home)
     }
 
-    public func scan(_ rule: Rule, now: Date = Date()) throws -> CategoryResult {
+    public func scan(_ rule: Rule, now: Date = Date()) async throws -> CategoryResult {
         var result = CategoryResult(ruleID: rule.id, category: rule.category, items: [], needsFullDiskAccess: false)
         // Roots of other rules are scanned by those rules, so a parent rule skips them.
         let claimed = rules.filter { $0.id != rule.id }.flatMap(\.roots)
@@ -47,7 +47,7 @@ public struct RuleScanner: Sendable {
                 if let extensions = rule.extensions, !extensions.contains(child.pathExtension.lowercased()) { continue }
                 guard policy.isDeletable(child) == .allowed, let stamp = FileStamp.read(child) else { continue }
                 if let minAge = rule.minAge, now.timeIntervalSince(stamp.modified) < minAge { continue }
-                let bytes = FileIndexBuilder.allocatedSize(of: child)
+                let bytes = await FileIndexBuilder.allocatedSize(of: child)
                 guard bytes > 0 else { continue }
                 found.append(
                     ScanItem(
@@ -68,7 +68,7 @@ public struct RuleScanner: Sendable {
             let task = Task {
                 await withTaskGroup(of: CategoryResult?.self) { group in
                     for rule in rules {
-                        group.addTask { try? self.scan(rule) }
+                        group.addTask { try? await self.scan(rule) }
                     }
                     for await result in group {
                         if let result { continuation.yield(result) }

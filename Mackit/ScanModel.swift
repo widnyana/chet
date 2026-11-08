@@ -50,6 +50,16 @@ final class ScanModel {
     var partialTrees: [FolderNode] = []
     /// Live copy of the walk's counters while the index step runs.
     var rootsProgress: ProgressSnapshot?
+    /// Last sampled folders of the walk, newest first (one per progress tick).
+    var recentFolders: [String] = []
+    /// Files per second, from the last two progress ticks.
+    var rate: Double?
+    /// When the running scan started.
+    var scanStartedAt: Date?
+    /// True while the scan is paused via the gate.
+    var isPaused = false
+    /// The pause gate of the running scan; nil when idle.
+    private var pauseGate: ScanPauseGate?
     /// Live counters of the running scan.
     var progress: ScanProgress?
     /// Step currently running, while a scan is active.
@@ -116,7 +126,13 @@ final class ScanModel {
         didFinishScan = false
         isScanning = true
         steps = ScanStepState.all
-        let session = ScanSession()
+        let gate = ScanPauseGate()
+        pauseGate = gate
+        isPaused = false
+        scanStartedAt = Date()
+        recentFolders = []
+        rate = nil
+        let session = ScanSession(gate: gate)
         progress = session.progress
         scanTask = Task {
             for await event in session.events() {
@@ -150,9 +166,25 @@ final class ScanModel {
         heartbeat?.cancel()
         FlightRecorder.shared?.record(step: "scan", "cancelled")
         FlightRecorder.shared?.flushNow()
+        pauseGate?.setPaused(false)
+        pauseGate = nil
+        isPaused = false
+        scanStartedAt = nil
+        rate = nil
         isScanning = false
         currentStep = nil
         progress = nil
+        rootsProgress = nil
+        partialTrees = []
+        recentFolders = []
+    }
+
+    /// Pause or resume the running scan; no-op when idle.
+    func togglePause() {
+        guard isScanning, let gate = pauseGate else { return }
+        let next = !isPaused
+        gate.setPaused(next)
+        isPaused = next
     }
 
     /// Stage what the confirm sheet will clean. No argument: all selected items,
@@ -215,7 +247,15 @@ final class ScanModel {
             partialTrees = []
             rootsProgress = nil
         case .rootMeasured(let node): partialTrees.append(node)
-        case .progress(let snapshot): rootsProgress = snapshot
+        case .progress(let snapshot):
+            if let previous = rootsProgress, snapshot.files >= previous.files {
+                rate = Double(snapshot.files - previous.files)
+            }
+            if snapshot.currentFolder != rootsProgress?.currentFolder, !snapshot.currentFolder.isEmpty {
+                recentFolders.insert(snapshot.currentFolder, at: 0)
+                if recentFolders.count > 6 { recentFolders.removeLast(recentFolders.count - 6) }
+            }
+            rootsProgress = snapshot
         case .taggedCaches(let items): add("tagged-caches", items: items)
         case .largeFiles(let items): add("large-files", items: items)
         case .duplicates(let found):

@@ -40,15 +40,19 @@ public enum ScanEvent: Sendable {
 public final class ScanSession: Sendable {
     public let home: URL
     public let progress = ScanProgress()
+    /// Optional pause control; nil scans never pause.
+    public let gate: ScanPauseGate?
     let largeFileMinSize: Int64
     /// Rule folder scans running at once.
     let ruleConcurrency = 4
 
     public init(
-        home: URL = FileManager.default.homeDirectoryForCurrentUser, largeFileMinSize: Int64 = 500_000_000
+        home: URL = FileManager.default.homeDirectoryForCurrentUser, largeFileMinSize: Int64 = 500_000_000,
+        gate: ScanPauseGate? = nil
     ) {
         self.home = home
         self.largeFileMinSize = largeFileMinSize
+        self.gate = gate
     }
 
     /// Top-level folders of the home folder, without Library and hidden folders.
@@ -69,6 +73,7 @@ public final class ScanSession: Sendable {
     }
 
     func run(_ emit: @escaping @Sendable (ScanEvent) -> Void) async {
+        let pause: @Sendable () async -> Void = { try? await self.gate?.wait() }
         let previous = getiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_PROCESS)
         setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_PROCESS, IOPOL_THROTTLE)
         defer { setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_PROCESS, previous) }
@@ -79,15 +84,16 @@ public final class ScanSession: Sendable {
         await withTaskGroup(of: CategoryResult?.self) { group in
             var pending = scanner.rules.makeIterator()
             for _ in 0..<ruleConcurrency {
-                if let rule = pending.next() { group.addTask { try? scanner.scan(rule) } }
+                if let rule = pending.next() { group.addTask { try? await scanner.scan(rule) } }
             }
             for await result in group {
                 if let result { emit(.rules(result)) }
-                if !Task.isCancelled, let rule = pending.next() { group.addTask { try? scanner.scan(rule) } }
+                if !Task.isCancelled, let rule = pending.next() { group.addTask { try? await scanner.scan(rule) } }
             }
         }
         guard !Task.isCancelled else { return }
         emit(.finished(.rules))
+        await pause()
 
         emit(.started(.index))
         // The index step is metadata-only and interactive when the disk map is open; the
@@ -96,7 +102,8 @@ public final class ScanSession: Sendable {
         var builder = FileIndexBuilder(policy: policy, progress: progress)
         builder.onRootMeasured = { emit(.rootMeasured($0)) }
         builder.onProgress = { emit(.progress($0)) }
-        let index = try? builder.build(roots: Self.userRoots(home))
+        builder.onPause = { await pause() }
+        let index = try? await builder.build(roots: Self.userRoots(home))
         setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_PROCESS, IOPOL_THROTTLE)
         guard let index, !Task.isCancelled else { return }
         emit(.folderTrees(index.trees))
@@ -112,36 +119,42 @@ public final class ScanSession: Sendable {
                 }))
         emit(.finished(.index))
 
+        await pause()
         emit(.started(.largeFiles))
         var large = LargeFileScanner(policy: policy)
         large.minSize = largeFileMinSize
         emit(.largeFiles(large.select(from: index.candidates)))
         emit(.finished(.largeFiles))
 
+        await pause()
         emit(.started(.duplicates))
         let duplicates = (try? DuplicateFinder(policy: policy).find(entries: index.candidates)) ?? []
         guard !Task.isCancelled else { return }
         emit(.duplicates(duplicates))
         emit(.finished(.duplicates))
 
+        await pause()
         emit(.started(.leftovers))
         let leftovers = (try? LeftoverScanner(home: home).scan()) ?? []
         guard !Task.isCancelled else { return }
         emit(.leftovers(leftovers))
         emit(.finished(.leftovers))
 
+        await pause()
         emit(.started(.photos))
         let photos = try? SimilarPhotos(policy: policy).scan(entries: index.candidates)
         guard !Task.isCancelled else { return }
         if let photos { emit(.photos(photos)) }
         emit(.finished(.photos))
 
+        await pause()
         emit(.started(.videos))
         let videos = (try? await SimilarVideos(policy: policy).scan(entries: index.candidates)) ?? []
         guard !Task.isCancelled else { return }
         emit(.videos(videos))
         emit(.finished(.videos))
 
+        await pause()
         emit(.started(.snapshots))
         let snapshots = (try? Snapshots.list()) ?? []
         guard !Task.isCancelled else { return }

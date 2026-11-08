@@ -80,6 +80,8 @@ public struct FileIndexBuilder: Sendable {
     /// Called a few times a second while the walk runs, with live counters and the
     /// in-flight root's growing byte total.
     public var onProgress: (@Sendable (ProgressSnapshot) -> Void)?
+    /// Called before each top-level root starts; a paused gate suspends the walk here.
+    public var onPause: (@Sendable () async throws -> Void)?
     /// Folder levels kept in `FileIndex.trees`; deeper folders only add to their ancestors.
     public var maxDepth = 6
     public var candidateMinSize: Int64 = 1_000_000
@@ -96,7 +98,7 @@ public struct FileIndexBuilder: Sendable {
         self.progress = progress
     }
 
-    public func build(roots: [URL]) throws -> FileIndex {
+    public func build(roots: [URL]) async throws -> FileIndex {
         var index = FileIndex()
         var seenInodes = Set<UInt64>()
         let media = SimilarPhotos.extensions.union(SimilarVideos.extensions)
@@ -112,8 +114,9 @@ public struct FileIndexBuilder: Sendable {
             nonisolated(unsafe) var lastTick = DispatchTime.now().uptimeNanoseconds
             // The in-flight root is reported by URL so the callback can pick up its
             // growing total from the shared counters.
+            try await onPause?()
             let runningRoot = root
-            let node = try walk(
+            let node = try await walk(
                 fd: fd, url: root, depth: 0, device: st.st_dev, excluded: false, media: media,
                 seenInodes: &seenInodes, index: &index,
                 tick: { files, bytes, folder in
@@ -134,7 +137,7 @@ public struct FileIndexBuilder: Sendable {
     }
 
     /// Allocated bytes of a file or folder tree (hard links once, dataless files 0), in one pass.
-    public static func allocatedSize(of url: URL) -> Int64 {
+    public static func allocatedSize(of url: URL) async -> Int64 {
         var st = stat()
         guard lstat(url.path, &st) == 0 else { return 0 }
         if (st.st_mode & S_IFMT) == S_IFREG {
@@ -144,14 +147,14 @@ public struct FileIndexBuilder: Sendable {
         var builder = FileIndexBuilder(policy: SafetyPolicy(home: url.deletingLastPathComponent()))
         builder.maxDepth = 0
         builder.collectCandidates = false
-        return (try? builder.build(roots: [url]))?.trees.first?.size ?? 0
+        return (try? await builder.build(roots: [url]))?.trees.first?.size ?? 0
     }
 
     private func walk(
         fd: Int32, url: URL, depth: Int, device: dev_t, excluded: Bool, media: Set<String>,
         seenInodes: inout Set<UInt64>, index: inout FileIndex,
         tick: @Sendable (Int, Int64, String) -> Void
-    ) throws -> FolderNode {
+    ) async throws -> FolderNode {
         try Task.checkCancellation()
         progress.enter(url.path)
         let tagged = !excluded && Self.isCacheDir(fd)
@@ -159,7 +162,7 @@ public struct FileIndexBuilder: Sendable {
         var total: Int64 = 0
         var children: [FolderNode] = []
         var entries = 0
-        try Self.forEachEntry(fd) { entry in
+        try await Self.forEachEntry(fd) { entry in
             entries += 1
             switch entry.kind {
             case .directory:
@@ -168,7 +171,7 @@ public struct FileIndexBuilder: Sendable {
                 guard childFD >= 0 else { return }
                 defer { close(childFD) }
                 let ext = (entry.name as NSString).pathExtension.lowercased()
-                let node = try walk(
+                let node = try await walk(
                     fd: childFD, url: url.appendingPathComponent(entry.name, isDirectory: true), depth: depth + 1,
                     device: device,
                     excluded: noCandidates || entry.name == ".git" || Self.packageExtensions.contains(ext),
@@ -243,7 +246,7 @@ public struct FileIndexBuilder: Sendable {
     /// length, returned attribute_set_t (20 bytes), error, name attrreference, devid, objtype,
     /// modtime timespec, flags, fileid, then file attributes linkcount, totalsize, allocsize,
     /// and — with FSOPT_ATTR_CMN_EXTENDED, required for fork attributes — the privatesize.
-    static func forEachEntry(_ fd: Int32, _ body: (Entry) throws -> Void) throws {
+    static func forEachEntry(_ fd: Int32, _ body: (Entry) async throws -> Void) async throws {
         var request = attrlist()
         request.bitmapcount = u_short(ATTR_BIT_MAP_COUNT)
         // RETURNED_ATTRS | ERROR | NAME | DEVID | OBJTYPE | MODTIME | FLAGS | FILEID
@@ -295,7 +298,7 @@ public struct FileIndexBuilder: Sendable {
                 guard error == 0 else { continue }
                 // fsobj_type_t: VREG = 1, VDIR = 2.
                 let kind: Entry.Kind = type == 1 ? .file : type == 2 ? .directory : .other
-                try body(
+                try await body(
                     Entry(
                         name: name, kind: kind, device: device,
                         modified: Date(

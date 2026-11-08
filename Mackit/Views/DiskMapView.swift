@@ -112,25 +112,45 @@ struct DiskMapView: View {
                     Text(
                         "\(snap.files) files · \(snap.bytes.formatted(.byteCount(style: .file)))"
                             + " · root \(snap.rootsDone + 1) of \(snap.rootsTotal)"
+                            + (model.rate.map { " · \(String(format: "%.1f", $0))k files/s" } ?? "")
+                            + (model.scanStartedAt.map { " · " + Self.elapsed(since: $0) } ?? "")
                     )
                     .monospacedDigit()
                     Text(snap.currentFolder)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.callout)
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .help(snap.currentFolder)
                 }
+                // The walk's recent trail: sampled milestones, newest on top.
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(Array(model.recentFolders.prefix(5).enumerated()), id: \.offset) { index, folder in
+                        Text(folder)
+                            .font(.caption)
+                            .monospacedDigit()
+                            .foregroundStyle(index == 0 ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                }
+                .frame(width: 480)
             } else {
                 ProgressView()
                 Text("Measuring folders")
             }
             HStack(spacing: 10) {
+                Button(model.isPaused ? "Resume" : "Pause") { model.togglePause() }
+                    .disabled(model.isPaused == false && model.currentStep != .index)
                 Button("Stop", systemImage: "stop.fill") { model.cancel() }
             }
             .controlSize(.regular)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    static func elapsed(since date: Date) -> String {
+        let interval = Int(Date().timeIntervalSince(date))
+        return String(format: "%02d:%02d", interval / 60, interval % 60)
     }
 
     /// The bar's moving baseline: max files seen so far (grows as the walk does).
