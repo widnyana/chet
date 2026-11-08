@@ -94,12 +94,34 @@ How it draws:
 ## Uninstall
 
 Uninstall is a destination, not a mode. Selecting **Applications** in the sidebar opens the
-app browser in the detail pane: a searchable grid of installed apps (adaptive cells, 52 pt
-icon, name, version; an orange dot when the app runs, a lock when only an administrator can
-remove it). The search field filters by display name and bundle ID; the toolbar Reload
-button re-reads the applications folder. Void states: a skeleton grid in the exact cell
-shape while reading, "No applications found" when the folder yields nothing, "No matches"
-when the search misses. Opening a cell pushes the review surface:
+app browser in the detail pane: a searchable inventory of installed apps, switchable
+between a **grid** (adaptive cells) and a **list** (dense rows) from the toolbar. Both
+styles render the same model state; the choice persists across launches.
+
+Every app carries its facts: display name, publisher (`vendorLabel`, falling back to the
+bundle ID), size (measured by a background loop after each reload — cells show "—" until
+their measurement lands), and install location (`Applications`, `User Applications`, or
+the parent folder). A running app shows an orange dot; an app only an administrator can
+remove shows a lock. Neither blocks anything — the confirm sheet and the core carry the
+consequences.
+
+Removing in bulk: the corner circle-check (grid) or leading checkbox (list) marks apps;
+a floating glass capsule reports the marked count and total bytes. Its `Remove…` button
+opens the bulk confirm — the marked apps, the total, and the removal policy ("each app
+bundle and its exact-match Library files move to the Trash"; running apps will be
+skipped). The dry-run notice appears here when `DryRun.enabled`. During the pass the
+capsule becomes a progress line ("Removing 3 of 7…") and the grid stays interactive.
+Afterwards a summary sheet reports the total, one row per app, and every skipped or
+failed item with the app it belonged to. The dry run reads `DryRun.enabled` exactly once
+per pass and passes it to every core call — the same gate the single-app flow uses, so
+dry-run bulk removal performs zero trash moves and logs `dry-` audit rows.
+
+The search field filters by display name and bundle ID; the toolbar Reload button
+re-reads the applications folder. Void states: a skeleton in the exact shape of the
+chosen style while reading, "No applications found" when the folder yields nothing, "No
+matches" when the search misses. The context menu on every cell and row offers Show
+Related Files (pushes the review surface), Open, Reveal in Finder, and Mark/Unmark for
+Removal. Opening a cell pushes the review surface:
 
 1. **App header** - 64 pt icon, display name, bundle ID, path, version and measured bundle
    size. The "Remove app bundle" checkbox is the only control that targets the app itself.
@@ -235,6 +257,18 @@ Rules the script enforces:
       "insets": {"bottom": 16},
       "verify": {
         "contains": ["glassEffect(.regular, in: .capsule)\n        .frame(maxWidth: .infinity)"]
+      }
+    },
+    {
+      "id": "app-browser-bulk-bar",
+      "file": "Mackit/Views/AppBrowserView.swift",
+      "surface": "app-browser",
+      "mechanism": "safeAreaInset-bottom-centered-capsule",
+      "width": 420,
+      "height": 50,
+      "insets": {"bottom": 16},
+      "verify": {
+        "contains": ["glassEffect(.regular, in: .capsule)\n                .frame(maxWidth: .infinity)"]
       }
     },
     {
