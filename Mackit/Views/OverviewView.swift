@@ -37,16 +37,14 @@ struct OverviewView: View {
     }
 
     /// The one door into the uninstaller. Present in every overview state — removing
-    /// apps does not depend on a scan. It carries a feature's presence: icon badge,
-    /// bold title, explicit Open chip.
+    /// apps does not depend on a scan. Same card grammar as every card here: 24 pt
+    /// padding, 22 pt corners, bare tinted symbol, bold action title, neutral chip.
     private var uninstallDoor: some View {
         Button(action: onUninstall) {
             HStack(spacing: 18) {
                 Image(systemName: "app.dashed")
-                    .font(.system(size: 26, weight: .medium))
+                    .font(.system(size: 28))
                     .foregroundStyle(.tint)
-                    .frame(width: 56, height: 56)
-                    .background(.tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Uninstall apps")
                         .font(.title3.bold())

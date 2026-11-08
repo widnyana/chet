@@ -118,8 +118,12 @@ struct AppBrowserView: View {
         }
         .toolbar {
             ToolbarItem(placement: .navigation) {
-                Button("Done", action: onDone)
-                    .help("Back to the Overview")
+                Button {
+                    onDone()
+                } label: {
+                    Label("Back to the Overview", systemImage: "chevron.left")
+                }
+                .help("Back to the Overview")
             }
             ToolbarItem(placement: .primaryAction) {
                 Picker("Layout", selection: $model.style) {

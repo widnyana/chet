@@ -152,6 +152,19 @@ size, mtime), match still valid, protected path, writability. The app bundle mov
 
 ## Visual language
 
+One grammar, applied everywhere. Every surface speaks it; nothing speaks a second one.
+
+- **Cards.** One recipe: 24 pt padding, 22 pt corners, `.glassEffect(.regular, in:
+  .rect(cornerRadius: 22))`. Action cards carry a `.title3.bold()` title and may end in
+  a neutral quaternary capsule chip; status strips (disk bar, scan progress) carry a
+  `.headline` label. Nothing else gets a card.
+- **Icons.** Bare, tinted SF Symbols — never inside a filled badge or box. Row scale
+  16-18 pt (sidebar), list scale 20-24 pt (detail rows), card scale 28 pt. Color comes
+  from `CategoryStyle` or `.tint`/`.secondary`; orange is reserved for attention.
+- **Toolbar.** Icon buttons and the search field, nothing else. A mode exit is an
+  icon-only `chevron.left` with a help tag; a view switcher is a segmented icon picker.
+- **Buttons.** Exactly one `.glassProminent` button per surface (the primary act).
+  Neutral secondary actions are plain or quaternary capsules.
 - **Glass everywhere.** Floating chrome is `.glassEffect(.regular, in: .capsule/.rect)`;
   primary buttons are `.glassProminent`. Glass is used for: the floating ActionBar capsule
   (bottom of category views), overview cards
