@@ -309,4 +309,15 @@ struct RuleScannerTests {
         #expect(items.map(\.url.lastPathComponent) == [".terraform"])
         #expect(items.allSatisfy { $0.risk == .safe && $0.mode == .permanent })
     }
+
+    @Test func virtualBoxSupportFilesSkipTheLiveRegistry() async throws {
+        let dir = try TempDir()
+        try dir.file("Library/VirtualBox/VBoxSVC.log", bytes: 1_000)
+        try dir.file("Library/VirtualBox/VBoxSVC.log.1", bytes: 2_000_000)
+        try dir.file("Library/VirtualBox/VirtualBox.xml", bytes: 500)
+        let items = try await RuleScanner(home: dir.url).scan(try rule("virtualbox-support")).items
+        #expect(Set(items.map(\.url.lastPathComponent)) == ["VBoxSVC.log", "VBoxSVC.log.1"])
+        #expect(items.allSatisfy { $0.risk == .safe && $0.mode == .permanent })
+        #expect(items.allSatisfy { $0.ownerBundleID == "org.virtualbox.app.VirtualBox" })
+    }
 }
