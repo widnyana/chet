@@ -141,5 +141,6 @@ symbols.
 | Command bar height | 52 pt plus safe-area bottom |
 | Command bar top rule | 1 px `hairline` |
 | Capacity bar height | 10 pt |
+| Capacity bar outline | 1 px `hairline` |
 | Capacity bar segment gap | 1 px `paper` |
 | Focus ring | 2 pt `accent` |

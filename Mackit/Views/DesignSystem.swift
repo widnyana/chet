@@ -309,6 +309,9 @@ struct CapacityBarView: View {
                     }
                 }
                 .frame(height: 10)
+                .overlay {
+                    Rectangle().strokeBorder(Theme.hairline, lineWidth: 1)
+                }
                 HStack(spacing: Spacing.s4) {
                     legend("Used", Theme.capacityUsed, used)
                     if reclaimable > 0 {

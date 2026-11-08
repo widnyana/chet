@@ -63,7 +63,8 @@ used (capacityUsed) | reclaimable (accent) | free (capacityFree)
 
 Rules:
 
-- Height 10 pt. Segments have a 1 px `paper` gap.
+- Height 10 pt. Segments have a 1 px `paper` gap, and the bar has a 1 px
+  `hairline` outline so the free end stays visible on paper.
 - The bar is the only chart on Overview.
 - The legend is text: `Used 320 GB`, `Can be reclaimed 12.4 GB`, `Free 88 GB`.
 - The reclaimable segment is the accent. It is the only accent on the page
