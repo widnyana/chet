@@ -14,7 +14,7 @@ struct SnapshotsView: View {
         VStack(spacing: 0) {
             PageHeader(
                 title: "Local snapshots",
-                subtitle: "Time Machine keeps these on the startup disk while it has room.",
+                subtitle: "macOS reports each snapshot's size only when it is deleted.",
                 metric: "\(model.snapshots.count)",
                 metricLabel: model.snapshots.count == 1 ? "snapshot" : "snapshots"
             )
@@ -35,10 +35,7 @@ struct SnapshotsView: View {
                 } else {
                     EmptyStateView(
                         title: "No local snapshots",
-                        message: "Time Machine keeps local snapshots only while it has room on the disk.",
-                        actionTitle: "Scan this Mac",
-                        action: { model.scan() }
-                    )
+                        message: "Time Machine keeps local snapshots only while it has room on the disk.")
                     .padding(.horizontal, Spacing.s6)
                 }
                 Spacer()
