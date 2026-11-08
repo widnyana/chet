@@ -64,7 +64,7 @@ struct AppUninstallConfirmSheet: View {
             }
             if DryRun.enabled {
                 StatusLabel(
-                    text: "Dry run. Nothing will be moved.",
+                    text: "Dry run. No files will be moved.",
                     systemImage: "exclamationmark.triangle",
                     tone: .amber)
             }
@@ -263,9 +263,7 @@ struct BulkUninstallConfirmSheet: View {
                     icon: "checkmark.shield")
                 if model.markedRunningCount > 0 {
                     StatusLabel(
-                        text: model.markedRunningCount == 1
-                            ? "1 running app will be skipped."
-                            : "\(model.markedRunningCount) running apps will be skipped.",
+                        text: "Running apps are skipped.",
                         systemImage: "exclamationmark.triangle",
                         tone: .amber)
                 }
@@ -275,7 +273,7 @@ struct BulkUninstallConfirmSheet: View {
                 .foregroundStyle(Theme.inkSecondary)
             if DryRun.enabled {
                 StatusLabel(
-                    text: "Dry run. Nothing will be moved.",
+                    text: "Dry run. No files will be moved.",
                     systemImage: "exclamationmark.triangle",
                     tone: .amber)
             }

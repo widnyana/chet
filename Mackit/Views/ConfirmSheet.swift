@@ -90,7 +90,7 @@ struct ConfirmSheet: View {
                 .foregroundStyle(Theme.inkSecondary)
             if DryRun.enabled {
                 StatusLabel(
-                    text: "Dry run. No files will be deleted.",
+                    text: "Dry run. No files will be moved.",
                     systemImage: "exclamationmark.triangle",
                     tone: .amber)
             }
@@ -109,7 +109,7 @@ struct ConfirmSheet: View {
             }
         }
         .padding(Spacing.s6)
-        .frame(width: 480)
+        .frame(width: 520)
         .background(Theme.paper)
     }
 
