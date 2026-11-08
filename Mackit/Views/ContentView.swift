@@ -5,7 +5,7 @@ import SwiftUI
 struct ContentView: View {
     @Environment(ScanModel.self) private var model
     @State private var appCleaner = AppCleanerModel()
-    @State private var selection: String? = "applications"
+    @State private var selection: String? = "overview"
     @State private var confirming = false
 
     var body: some View {

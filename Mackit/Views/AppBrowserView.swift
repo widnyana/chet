@@ -165,19 +165,21 @@ struct AppBrowserView: View {
         }
     }
 
-    @ViewBuilder private var list: some View {
-        AppListHeader()
+    private var list: some View {
         ScrollView {
-            LazyVStack(spacing: 0) {
-                ForEach(model.filteredApps) { app in
-                    AppRow(app: app)
-                    if app.id != model.filteredApps.last?.id {
-                        Hairline().padding(.horizontal, Metrics.widePageMargin)
+            LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
+                Section {
+                    ForEach(model.filteredApps) { app in
+                        AppRow(app: app)
+                        if app.id != model.filteredApps.last?.id {
+                            Hairline().padding(.horizontal, Metrics.widePageMargin)
+                        }
                     }
+                } header: {
+                    AppListHeader().background(Theme.paper)
                 }
             }
         }
-        .frame(maxHeight: .infinity)
         .background(Theme.paper)
     }
 
