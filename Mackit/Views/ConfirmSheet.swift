@@ -63,6 +63,11 @@ struct ConfirmSheet: View {
             Text("Each item is checked again right before removal. Items that changed since the scan are left alone.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            if DryRun.enabled {
+                Label("DRY RUN: nothing will be deleted", systemImage: "exclamationmark.triangle.fill")
+                    .font(.callout.weight(.medium))
+                    .foregroundStyle(.orange)
+            }
             HStack {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }

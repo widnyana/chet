@@ -7,7 +7,7 @@ struct AuditLogTests {
     @Test func writesOneJSONLinePerItem() throws {
         let dir = try TempDir()
         let logURL = dir.url.appendingPathComponent("logs/clean.log")
-        var cleaner = Cleaner(policy: dir.policy, log: AuditLog(url: logURL))
+        var cleaner = Cleaner(policy: dir.policy, log: AuditLog(url: logURL), dryRun: false)
         cleaner.isRunning = { _ in false }
         let a = try dir.file("cache/a", bytes: 100)
         let b = try dir.file("cache/b", bytes: 200)

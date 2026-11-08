@@ -20,13 +20,17 @@ struct SummaryView: View {
         VStack(spacing: 14) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 56))
-                .foregroundStyle(.green)
+                .foregroundStyle(report.dryRun ? Color.orange : Color.green)
                 .symbolEffect(.bounce, value: appeared)
             Text(report.freedBytes.formatted(.byteCount(style: .file)))
                 .font(.system(size: 40, weight: .bold, design: .rounded))
                 .monospacedDigit()
-            Text("freed. \(report.results.count - problems.count) of \(report.results.count) items cleaned.")
-                .foregroundStyle(.secondary)
+            Text(
+                report.dryRun
+                    ? "would be freed (dry run). \(report.results.count - problems.count) of \(report.results.count) items would be cleaned. Nothing was deleted."
+                    : "freed. \(report.results.count - problems.count) of \(report.results.count) items cleaned."
+            )
+            .foregroundStyle(.secondary)
             if !problems.isEmpty {
                 DisclosureGroup("\(problems.count) items left alone") {
                     List(problems, id: \.item.url) { result in

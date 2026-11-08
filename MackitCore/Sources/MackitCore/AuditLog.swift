@@ -19,10 +19,14 @@ public struct AuditLog: Sendable {
         let result: String
     }
 
-    public func append(_ item: ScanItem, _ outcome: CleanOutcome, at date: Date = Date()) {
+    public func append(
+        _ item: ScanItem, _ outcome: CleanOutcome, dryRun: Bool, at date: Date = Date()
+    ) {
         let entry = Entry(
             time: ISO8601DateFormatter().string(from: date), path: item.url.path, bytes: item.reclaimableBytes,
-            mode: item.mode.rawValue, result: outcome.logValue)
+            mode: item.mode.rawValue,
+            // "dry-removed" can never be misread as a performed deletion.
+            result: dryRun ? "dry-" + outcome.logValue : outcome.logValue)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         guard var line = try? encoder.encode(entry) else { return }

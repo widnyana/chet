@@ -11,8 +11,10 @@ struct CleanerTests {
             url: url, categoryID: "test", risk: .safe, mode: mode, reclaimableBytes: stamp.size, stamp: stamp)
     }
 
-    private func cleaner(_ dir: TempDir) -> Cleaner {
-        var cleaner = Cleaner(policy: dir.policy, log: AuditLog(url: dir.url.appendingPathComponent("audit.log")))
+    private func cleaner(_ dir: TempDir, dryRun: Bool = false) -> Cleaner {
+        var cleaner = Cleaner(
+            policy: dir.policy, log: AuditLog(url: dir.url.appendingPathComponent("audit.log")),
+            dryRun: dryRun)
         let fakeTrash = dir.url.appendingPathComponent("FakeTrash")
         cleaner.trash = { url in
             try FileManager.default.createDirectory(at: fakeTrash, withIntermediateDirectories: true)
@@ -90,10 +92,9 @@ struct CleanerTests {
     @Test func dryRunPermanentReportsRemovedButKeepsFile() throws {
         let dir = try TempDir()
         let file = try dir.file("cache/x", bytes: 1000)
-        var cleaner = cleaner(dir)
-        cleaner.dryRun = true
-        let report = cleaner.clean([try item(file)])
+        let report = cleaner(dir, dryRun: true).clean([try item(file)])
         #expect(report.results.first?.outcome == .removed(1000))
+        #expect(report.dryRun)
         #expect(report.freedBytes == 1000)
         #expect(FileManager.default.fileExists(atPath: file.path))
     }
@@ -101,9 +102,7 @@ struct CleanerTests {
     @Test func dryRunTrashReportsTrashedButKeepsFile() throws {
         let dir = try TempDir()
         let file = try dir.file("photos/x.jpg", bytes: 1000)
-        var cleaner = cleaner(dir)
-        cleaner.dryRun = true
-        let report = cleaner.clean([try item(file, .trash)])
+        let report = cleaner(dir, dryRun: true).clean([try item(file, .trash)])
         #expect(report.results.first?.outcome == .trashed(1000))
         #expect(FileManager.default.fileExists(atPath: file.path))
         #expect(!FileManager.default.fileExists(atPath: dir.url.appendingPathComponent("FakeTrash/x.jpg").path))
@@ -115,9 +114,7 @@ struct CleanerTests {
         let scanned = try item(file)
         try FileManager.default.setAttributes(
             [.modificationDate: Date().addingTimeInterval(-60)], ofItemAtPath: file.path)
-        var cleaner = cleaner(dir)
-        cleaner.dryRun = true
-        #expect(cleaner.clean([scanned]).results.first?.outcome == .skipped(.changed))
+        #expect(cleaner(dir, dryRun: true).clean([scanned]).results.first?.outcome == .skipped(.changed))
         #expect(FileManager.default.fileExists(atPath: file.path))
     }
 
@@ -136,5 +133,17 @@ struct CleanerTests {
         }
         #expect(report.results[1].outcome == .removed(1000))
         #expect(FileManager.default.fileExists(atPath: locked.path))
+    }
+
+    @Test func dryRunIsRecordedHonestly() throws {
+        let dir = try TempDir()
+        let file = try dir.file("cache/x", bytes: 1000)
+        let logURL = dir.url.appendingPathComponent("audit.log")
+        let report = Cleaner(policy: dir.policy, log: AuditLog(url: logURL), dryRun: true).clean([try item(file)])
+        #expect(report.dryRun)
+        #expect(report.results.first?.dryRun == true)
+        let line = try #require(String(contentsOf: logURL, encoding: .utf8).split(separator: "\n").first)
+        let entry = try JSONDecoder().decode(AuditLog.Entry.self, from: Data(line.utf8))
+        #expect(entry.result == "dry-removed")
     }
 }

@@ -24,10 +24,15 @@ public enum CleanOutcome: Sendable, Equatable {
 public struct CleanResult: Sendable {
     public let item: ScanItem
     public let outcome: CleanOutcome
+    /// True when this row is a dry-run simulation, not a performed action.
+    public let dryRun: Bool
 }
 
 public struct CleanReport: Sendable {
     public var results: [CleanResult] = []
+    /// True when every row was simulated by the dry-run gate; UI and logs must never
+    /// present a dry-run report as a real deletion.
+    public var dryRun = false
 
     public var freedBytes: Int64 {
         results.reduce(0) { total, result in
@@ -47,8 +52,9 @@ public struct Cleaner: Sendable {
     /// When set, receives one batch summary per clean run (per-file rows go only to `log`).
     public let recorder: FlightRecorder?
     /// Dry-run gate: when true, every guard still runs and success is reported, but no file
-    /// is removed or trashed. Set by the composition root from `DryRun.enabled`.
-    public var dryRun: Bool = false
+    /// is removed or trashed. Required, not defaulted: every composition root must decide
+    /// explicitly, so an unwired cleaner cannot silently mutate.
+    public let dryRun: Bool
     /// Bundle ID of the app that owns an item, if any.
     public var owner: @Sendable (ScanItem) -> String? = { _ in nil }
     public var isRunning: @Sendable (String) -> Bool = { id in
@@ -58,18 +64,22 @@ public struct Cleaner: Sendable {
         try FileManager.default.trashItem(at: url, resultingItemURL: nil)
     }
 
-    public init(policy: SafetyPolicy, log: AuditLog = AuditLog(), recorder: FlightRecorder? = nil) {
+    public init(
+        policy: SafetyPolicy, log: AuditLog = AuditLog(), recorder: FlightRecorder? = nil, dryRun: Bool
+    ) {
         self.policy = policy
         self.log = log
         self.recorder = recorder
+        self.dryRun = dryRun
     }
 
     public func clean(_ items: [ScanItem]) -> CleanReport {
         var report = CleanReport()
+        report.dryRun = dryRun
         for (index, item) in items.enumerated() {
             let outcome = clean(item)
-            log.append(item, outcome)
-            report.results.append(CleanResult(item: item, outcome: outcome))
+            log.append(item, outcome, dryRun: dryRun)
+            report.results.append(CleanResult(item: item, outcome: outcome, dryRun: dryRun))
             if let recorder, (index + 1) % 16 == 0 {
                 recorder.record(step: "clean", "progress: \(index + 1)/\(items.count) items")
             }

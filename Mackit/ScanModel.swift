@@ -417,9 +417,9 @@ final class ScanModel {
     }
 
     @concurrent nonisolated static func runClean(_ items: [ScanItem]) async -> CleanReport {
-        var cleaner = Cleaner(policy: SafetyPolicy(), recorder: FlightRecorder.shared)
+        var cleaner = Cleaner(
+            policy: SafetyPolicy(), recorder: FlightRecorder.shared, dryRun: DryRun.enabled)
         cleaner.owner = { $0.ownerBundleID }
-        cleaner.dryRun = DryRun.enabled
         return cleaner.clean(items)
     }
 

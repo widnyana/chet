@@ -64,7 +64,7 @@ struct RecorderInstrumentationTests {
         let dir = try TempDir()
         let recorder = FlightRecorder(directory: dir.url)
         let cleanLog = dir.url.appendingPathComponent("clean.log")
-        var cleaner = Cleaner(policy: dir.policy, log: AuditLog(url: cleanLog), recorder: recorder)
+        var cleaner = Cleaner(policy: dir.policy, log: AuditLog(url: cleanLog), recorder: recorder, dryRun: false)
         cleaner.isRunning = { _ in false }
         let a = try dir.file("cache/a", bytes: 100)
         let stampA = try #require(FileStamp.read(a))

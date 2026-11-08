@@ -102,7 +102,11 @@ How it draws:
   after that choice. Onboarding: shield icon, bold title, a three-step glass card, a
   prominent glass button, and an orange "Waiting for access" dot.
 - Debug: an orange "DRY RUN ENGAGED" capsule floats bottom-left — compile-time
-  `#if DEBUG` plus runtime `DryRun.enabled`, so release builds can't show it.
+  `#if DEBUG` plus runtime `DryRun.enabled`, so release builds can't show it. Under dry
+  run the confirm sheet says nothing will be deleted, the summary says "would be freed",
+  and audit rows are prefixed `dry-` — a simulated clean never reads as a real deletion.
+  `Cleaner.dryRun` is a required init parameter, so no composition root can build a
+  mutating cleaner without deciding.
 
 ## Rules of thumb
 
