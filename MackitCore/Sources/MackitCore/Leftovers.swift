@@ -13,10 +13,11 @@ public struct LeftoverScanner: Sendable {
 
     public init(
         home: URL = FileManager.default.homeDirectoryForCurrentUser,
-        installedBundleIDs: Set<String> = LeftoverScanner.installedBundleIDs()
+        installedBundleIDs: Set<String> = LeftoverScanner.installedBundleIDs(),
+        policy: SafetyPolicy? = nil
     ) {
         self.home = home
-        self.policy = SafetyPolicy(home: home)
+        self.policy = policy ?? SafetyPolicy(home: home)
         self.installedBundleIDs = installedBundleIDs
     }
 

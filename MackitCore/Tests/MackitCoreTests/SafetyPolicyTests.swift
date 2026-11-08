@@ -130,4 +130,34 @@ struct SafetyPolicyTests {
         let policy = SafetyPolicy(home: dir.url, externalRoots: [dir.url.appendingPathComponent("nix/var/nix/profiles").path])
         #expect(policy.isDeletable(dir.url.appendingPathComponent("nix/var/nix/profiles/Real.app")) == .denied("app bundle"))
     }
+
+    // MARK: - excluded folders
+
+    @Test func excludedFolderAndItsChildrenAreDenied() throws {
+        let dir = try TempDir()
+        try dir.file("Development/keep/project/main.tf", bytes: 10)
+        let policy = SafetyPolicy(home: dir.url, excludedPaths: ["~/Development/keep"])
+        let keep = dir.url.appendingPathComponent("Development/keep")
+        #expect(policy.isDeletable(keep) == .denied("excluded folder"))
+        #expect(policy.isDeletable(keep.appendingPathComponent("project/main.tf")) == .denied("excluded folder"))
+        #expect(policy.isExcluded(keep.appendingPathComponent("project")))
+    }
+
+    @Test func exclusionMatchesWholePathPrefix() throws {
+        let dir = try TempDir()
+        try dir.file("Development/keeper/main.tf", bytes: 10)
+        try dir.file("Development/keep/main.tf", bytes: 10)
+        let policy = SafetyPolicy(home: dir.url, excludedPaths: [dir.url.appendingPathComponent("Development/keep").path])
+        #expect(
+            policy.isDeletable(dir.url.appendingPathComponent("Development/keeper/main.tf")) == .allowed)
+        #expect(policy.isDeletable(dir.url.appendingPathComponent("Development/keep/main.tf")) != .allowed)
+    }
+
+    @Test func relativeExclusionIsIgnored() throws {
+        let dir = try TempDir()
+        try dir.file("Development/keepx/main.tf", bytes: 10)
+        let policy = SafetyPolicy(home: dir.url, excludedPaths: ["Development/keep", ""])
+        #expect(policy.excludedPaths.isEmpty)
+        #expect(policy.isDeletable(dir.url.appendingPathComponent("Development/keepx/main.tf")) == .allowed)
+    }
 }

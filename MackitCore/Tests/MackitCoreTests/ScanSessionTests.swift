@@ -131,6 +131,30 @@ struct ScanSessionTests {
         #expect(trees == 3)
     }
 
+    @Test func disabledStepsFinishWithoutRunning() async throws {
+        let dir = try TempDir()
+        try dir.file("Documents/a/copy", bytes: 2_000_000, fill: 9)
+        var enabled = Set(ScanStep.allCases)
+        enabled.remove(.photos)
+        enabled.remove(.videos)
+        var events: [ScanEvent] = []
+        for await event in ScanSession(home: dir.url, enabledSteps: enabled).events() {
+            events.append(event)
+            if case .done = event { break }
+        }
+        let started = events.compactMap { event -> ScanStep? in
+            if case .started(let step) = event { step } else { nil }
+        }
+        let finished = events.compactMap { event -> ScanStep? in
+            if case .finished(let step) = event { step } else { nil }
+        }
+        #expect(!started.contains(.photos))
+        #expect(!started.contains(.videos))
+        #expect(finished.contains(.photos))
+        #expect(finished.contains(.videos))
+        #expect(Set(started).contains(.rules))
+    }
+
     @Test func leavingTheStreamStopsTheScanAndRestoresIOPolicy() async throws {
         let dir = try TempDir()
         for i in 0..<200 { try dir.file("Documents/f\(i)", bytes: 10) }

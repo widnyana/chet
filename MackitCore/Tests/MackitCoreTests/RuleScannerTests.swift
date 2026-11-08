@@ -320,4 +320,19 @@ struct RuleScannerTests {
         #expect(items.allSatisfy { $0.risk == .safe && $0.mode == .permanent })
         #expect(items.allSatisfy { $0.ownerBundleID == "org.virtualbox.app.VirtualBox" })
     }
+
+    @Test func excludedFolderIsNotScanned() async throws {
+        let dir = try TempDir()
+        try dir.file("Library/Caches/a/x", bytes: 100)
+        try dir.file("Library/Caches/keep/y", bytes: 100)
+        try dir.file("Development/app/target/bin", bytes: 100)
+        try dir.file("Development/keep/target/bin", bytes: 500_000)
+        let keep = dir.url.appendingPathComponent("Library/Caches/keep").path
+        let keepProject = dir.url.appendingPathComponent("Development/keep").path
+        let scanner = RuleScanner(home: dir.url, excludedPaths: [keep, keepProject])
+        #expect(try await scanner.scan(try rule("caches")).items.map(\.url.lastPathComponent) == ["a"])
+        let buildDirs = try await scanner.scan(try rule("dev-garbage")).items.map(\.url.path)
+        #expect(buildDirs.count == 1)
+        #expect(buildDirs.first?.hasSuffix("Development/app/target") == true)
+    }
 }

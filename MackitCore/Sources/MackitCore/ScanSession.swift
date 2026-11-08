@@ -61,6 +61,17 @@ public final class ScanSession: Sendable {
     /// Which folders the duplicates step may hash. `.standard` (the default) skips
     /// regenerable build dirs, caches, and temporary places; `.everything` includes them.
     public let scope: DuplicateScope
+    /// Settings opt-in: scan and clean paths outside the home folder.
+    public let allowOutsideHome: Bool
+    /// Settings list: folders never scanned and never cleaned.
+    public let excludedPaths: [String]
+    /// Settings opt-out: steps the user turned off. `.rules` and `.index` always run, because
+    /// the index feeds the disk map and the candidate list every optional step reads.
+    public let enabledSteps: Set<ScanStep>
+    /// Minimum file size the duplicates step considers.
+    public let duplicateMinSize: Int64
+    /// Files at least this old count as old in the large-files step.
+    public let largeFileOldAge: TimeInterval
     let largeFileMinSize: Int64
     /// Worker count for the disk-usage walk (ncdu's `-t`): 0 = CPU count, 1 = serial shape.
     public let scanThreads: Int
@@ -69,13 +80,21 @@ public final class ScanSession: Sendable {
 
     public init(
         home: URL = FileManager.default.homeDirectoryForCurrentUser, largeFileMinSize: Int64 = 500_000_000,
-        gate: ScanPauseGate? = nil, scope: DuplicateScope = .standard, scanThreads: Int = 0
+        gate: ScanPauseGate? = nil, scope: DuplicateScope = .standard, scanThreads: Int = 0,
+        allowOutsideHome: Bool = false, excludedPaths: [String] = [],
+        enabledSteps: Set<ScanStep> = Set(ScanStep.allCases), duplicateMinSize: Int64 = 1_000_000,
+        largeFileOldAge: TimeInterval = 365 * 86_400
     ) {
         self.home = home
         self.largeFileMinSize = largeFileMinSize
         self.gate = gate
         self.scope = scope
         self.scanThreads = scanThreads
+        self.allowOutsideHome = allowOutsideHome
+        self.excludedPaths = excludedPaths
+        self.enabledSteps = enabledSteps
+        self.duplicateMinSize = duplicateMinSize
+        self.largeFileOldAge = largeFileOldAge
     }
 
     /// Top-level folders of the home folder, without Library and hidden folders.
@@ -100,10 +119,12 @@ public final class ScanSession: Sendable {
         let previous = getiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_PROCESS)
         setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_PROCESS, IOPOL_THROTTLE)
         defer { setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_PROCESS, previous) }
-        let policy = SafetyPolicy(home: home)
+        let policy = SafetyPolicy(
+            home: home, allowsOutsideHome: allowOutsideHome, excludedPaths: excludedPaths)
 
         emit(.started(.rules))
-        let scanner = RuleScanner(home: home)
+        let scanner = RuleScanner(
+            home: home, allowOutsideHome: allowOutsideHome, excludedPaths: excludedPaths)
         let ruleTotal = scanner.rules.count
         emit(.stepActivity(.rules, done: 0, total: ruleTotal, label: "starting"))
         var rulesDone = 0
@@ -155,54 +176,68 @@ public final class ScanSession: Sendable {
         emit(.finished(.index))
 
         await pause()
-        emit(.started(.largeFiles))
-        emit(.stepActivity(.largeFiles, done: 0, total: 0, label: "large and old files"))
-        var large = LargeFileScanner(policy: policy)
-        large.minSize = largeFileMinSize
-        emit(.largeFiles(large.select(from: index.candidates)))
+        if enabledSteps.contains(.largeFiles) {
+            emit(.started(.largeFiles))
+            emit(.stepActivity(.largeFiles, done: 0, total: 0, label: "large and old files"))
+            var large = LargeFileScanner(policy: policy)
+            large.minSize = largeFileMinSize
+            large.oldAge = largeFileOldAge
+            emit(.largeFiles(large.select(from: index.candidates)))
+        }
         emit(.finished(.largeFiles))
 
         await pause()
-        emit(.started(.duplicates))
-        emit(.stepActivity(.duplicates, done: 0, total: 0, label: "hashing duplicate candidates"))
-        // The scope drops regenerable and temporary folders before any hashing runs.
-        let duplicates =
-            (try? DuplicateFinder(policy: policy).find(entries: DuplicateScope.filter(index.candidates, scope: scope)))
-            ?? []
-        guard !Task.isCancelled else { return }
-        emit(.duplicates(duplicates))
+        if enabledSteps.contains(.duplicates) {
+            emit(.started(.duplicates))
+            emit(.stepActivity(.duplicates, done: 0, total: 0, label: "hashing duplicate candidates"))
+            // The scope drops regenerable and temporary folders before any hashing runs.
+            var finder = DuplicateFinder(policy: policy)
+            finder.minSize = duplicateMinSize
+            let duplicates =
+                (try? finder.find(entries: DuplicateScope.filter(index.candidates, scope: scope))) ?? []
+            guard !Task.isCancelled else { return }
+            emit(.duplicates(duplicates))
+        }
         emit(.finished(.duplicates))
 
         await pause()
-        emit(.started(.leftovers))
-        emit(.stepActivity(.leftovers, done: 0, total: 0, label: "unused app data"))
-        let leftovers = (try? LeftoverScanner(home: home).scan()) ?? []
-        guard !Task.isCancelled else { return }
-        emit(.leftovers(leftovers))
+        if enabledSteps.contains(.leftovers) {
+            emit(.started(.leftovers))
+            emit(.stepActivity(.leftovers, done: 0, total: 0, label: "unused app data"))
+            let leftovers = (try? LeftoverScanner(home: home, policy: policy).scan()) ?? []
+            guard !Task.isCancelled else { return }
+            emit(.leftovers(leftovers))
+        }
         emit(.finished(.leftovers))
 
         await pause()
-        emit(.started(.photos))
-        emit(.stepActivity(.photos, done: 0, total: 0, label: "hashing photos"))
-        let photos = try? SimilarPhotos(policy: policy).scan(entries: index.candidates)
-        guard !Task.isCancelled else { return }
-        if let photos { emit(.photos(photos)) }
+        if enabledSteps.contains(.photos) {
+            emit(.started(.photos))
+            emit(.stepActivity(.photos, done: 0, total: 0, label: "hashing photos"))
+            let photos = try? SimilarPhotos(policy: policy).scan(entries: index.candidates)
+            guard !Task.isCancelled else { return }
+            if let photos { emit(.photos(photos)) }
+        }
         emit(.finished(.photos))
 
         await pause()
-        emit(.started(.videos))
-        emit(.stepActivity(.videos, done: 0, total: 0, label: "sampling video frames"))
-        let videos = (try? await SimilarVideos(policy: policy).scan(entries: index.candidates)) ?? []
-        guard !Task.isCancelled else { return }
-        emit(.videos(videos))
+        if enabledSteps.contains(.videos) {
+            emit(.started(.videos))
+            emit(.stepActivity(.videos, done: 0, total: 0, label: "sampling video frames"))
+            let videos = (try? await SimilarVideos(policy: policy).scan(entries: index.candidates)) ?? []
+            guard !Task.isCancelled else { return }
+            emit(.videos(videos))
+        }
         emit(.finished(.videos))
 
         await pause()
-        emit(.started(.snapshots))
-        emit(.stepActivity(.snapshots, done: 0, total: 0, label: "listing snapshots"))
-        let snapshots = (try? Snapshots.list()) ?? []
-        guard !Task.isCancelled else { return }
-        emit(.snapshots(snapshots))
+        if enabledSteps.contains(.snapshots) {
+            emit(.started(.snapshots))
+            emit(.stepActivity(.snapshots, done: 0, total: 0, label: "listing snapshots"))
+            let snapshots = (try? Snapshots.list()) ?? []
+            guard !Task.isCancelled else { return }
+            emit(.snapshots(snapshots))
+        }
         emit(.finished(.snapshots))
         emit(.done)
     }

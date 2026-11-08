@@ -11,6 +11,10 @@ public struct SafetyPolicy: Sendable {
     public let home: String
     /// Absolute paths (e.g. "/nix/var/nix/profiles") that bypass the home check.
     public let externalRoots: Set<String>
+    /// Settings opt-in: paths outside the home folder pass the home check; the other rules still apply.
+    public let allowsOutsideHome: Bool
+    /// Settings list: a path equal to or below an entry is never scanned or cleaned.
+    public let excludedPaths: [String]
     /// The realpath(3) form of `home`. Foundation's `resolvingSymlinksInPath` leaves the `/var`
     /// symlink as `/var`, while the directory walk (openat/readdir) yields `/private/var`; both
     /// forms name the same folder, so path rules must accept either.
@@ -25,12 +29,37 @@ public struct SafetyPolicy: Sendable {
 
     public init(
         home: URL = FileManager.default.homeDirectoryForCurrentUser,
-        externalRoots: Set<String> = []
+        externalRoots: Set<String> = [],
+        allowsOutsideHome: Bool = false,
+        excludedPaths: [String] = []
     ) {
         self.home = home.resolvingSymlinksInPath().path
         self.externalRoots = externalRoots
+        self.allowsOutsideHome = allowsOutsideHome
+        self.excludedPaths = Self.normalize(excludedPaths, home: home)
         self.realHome =
             home.path.withCString { realpath($0, nil) }.map { String(cString: $0) } ?? self.home
+    }
+
+    /// `~/x` resolves against `home`, `/x` stays absolute, anything else is dropped: a relative
+    /// entry would silently exclude nothing.
+    static func normalize(_ paths: [String], home: URL) -> [String] {
+        let base = home.standardizedFileURL.path
+        return paths.compactMap { raw in
+            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty { return nil }
+            if trimmed == "~" { return base }
+            if trimmed.hasPrefix("~/") { return base + "/" + trimmed.dropFirst(2) }
+            guard trimmed.hasPrefix("/") else { return nil }
+            return URL(fileURLWithPath: trimmed).standardizedFileURL.path
+        }
+    }
+
+    /// The rule walk uses this to stop descending into an excluded tree.
+    public func isExcluded(_ url: URL) -> Bool {
+        guard !excludedPaths.isEmpty else { return false }
+        let path = url.standardizedFileURL.path
+        return excludedPaths.contains { path == $0 || path.hasPrefix($0 + "/") }
     }
 
     /// The path-string rules shared by `isDeletable` and `scanGateAllows`, in one place so the
@@ -39,7 +68,10 @@ public struct SafetyPolicy: Sendable {
     private func pathDenialReason(
         path: String, rel: String?, parts: [String], inVolumeTrash: Bool
     ) -> String? {
-        if rel == nil && !inVolumeTrash && !isExternal(path) { return "outside home" }
+        if !excludedPaths.isEmpty, excludedPaths.contains(where: { path == $0 || path.hasPrefix($0 + "/") }) {
+            return "excluded folder"
+        }
+        if rel == nil && !inVolumeTrash && !isExternal(path) && !allowsOutsideHome { return "outside home" }
         if let rel {
             if Self.containerRoots.contains(rel) { return "container folder" }
             if Self.protectedInHome.contains(where: { rel == $0 || rel.hasPrefix($0 + "/") }) {

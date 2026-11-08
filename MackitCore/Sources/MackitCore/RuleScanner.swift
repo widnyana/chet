@@ -19,11 +19,16 @@ public struct RuleScanner: Sendable {
     public let rules: [Rule]
     public let policy: SafetyPolicy
 
-    public init(home: URL = FileManager.default.homeDirectoryForCurrentUser, rules: [Rule] = Rule.catalog) {
+    public init(
+        home: URL = FileManager.default.homeDirectoryForCurrentUser, rules: [Rule] = Rule.catalog,
+        allowOutsideHome: Bool = false, excludedPaths: [String] = []
+    ) {
         self.home = home
         self.rules = rules
         let absoluteRoots = Set(rules.flatMap { $0.roots }.filter { $0.hasPrefix("/") })
-        policy = SafetyPolicy(home: home, externalRoots: absoluteRoots)
+        policy = SafetyPolicy(
+            home: home, externalRoots: absoluteRoots, allowsOutsideHome: allowOutsideHome,
+            excludedPaths: excludedPaths)
     }
 
     public func scan(_ rule: Rule, now: Date = Date()) async throws -> CategoryResult {
@@ -61,8 +66,7 @@ public struct RuleScanner: Sendable {
                 if let minAge = rule.minAge, now.timeIntervalSince(stamp.modified) < minAge { continue }
                 let bytes = await FileIndexBuilder.allocatedSize(of: child)
                 guard bytes > 0 else { continue }
-                // A tool directory holding local Terraform state is never safe: the cleaner
-                // refuses it, so the row must not claim a permanent delete.
+                // A tool dir holding Terraform state is never safe: the cleaner refuses it.
                 let holdsState = TerraformState.holdsLocalState(child)
                 found.append(
                     ScanItem(
@@ -96,6 +100,7 @@ public struct RuleScanner: Sendable {
             else { continue }
             let name = child.lastPathComponent
             if name == ".git" { continue }
+            if policy.isExcluded(child) { continue }
             if names.contains(name) {
                 found.append(child)
             } else if !pruning.contains(name) {

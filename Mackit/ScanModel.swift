@@ -49,7 +49,13 @@ final class ScanModel {
     /// "Mackit may be listed twice" hint.
     var grantAttempts = UserDefaults.standard.integer(forKey: "grantAttempts")
     /// Worker count for the disk-usage walk (ncdu's `-t`): 0 = CPU count, 1 = serial shape.
-    var scanThreads = 0
+    var scanThreads = UserDefaults.standard.integer(forKey: ScanModel.threadsKey) {
+        didSet {
+            guard oldValue != scanThreads else { return }
+            UserDefaults.standard.set(scanThreads, forKey: ScanModel.threadsKey)
+        }
+    }
+    nonisolated static let threadsKey = "scanThreads"
     /// Duplicates opt-in: when true the duplicates step also hashes caches, project build
     /// dirs, and temporary places. Off by default; the Settings page is the only writer.
     var includeTempInDuplicates = UserDefaults.standard.bool(forKey: "includeTempInDuplicates") {
@@ -58,6 +64,55 @@ final class ScanModel {
             UserDefaults.standard.set(includeTempInDuplicates, forKey: "includeTempInDuplicates")
         }
     }
+    /// Outside-home opt-in: scan and clean paths outside the home folder, for machines and
+    /// projects kept on another disk. Off by default; the Settings page is the only writer.
+    var scanOutsideHome = UserDefaults.standard.bool(forKey: ScanModel.outsideHomeKey) {
+        didSet {
+            guard oldValue != scanOutsideHome else { return }
+            UserDefaults.standard.set(scanOutsideHome, forKey: ScanModel.outsideHomeKey)
+        }
+    }
+    nonisolated static let outsideHomeKey = "scanOutsideHome"
+    /// Large-file threshold in MB.
+    var largeFileMinSizeMB = UserDefaults.standard.object(forKey: ScanModel.largeFileKey) as? Int ?? 500 {
+        didSet {
+            guard oldValue != largeFileMinSizeMB else { return }
+            UserDefaults.standard.set(largeFileMinSizeMB, forKey: ScanModel.largeFileKey)
+        }
+    }
+    nonisolated static let largeFileKey = "largeFileMinSizeMB"
+    /// Settings list: folders the scan and the cleaner never touch. Stored normalized.
+    var excludedPaths = UserDefaults.standard.stringArray(forKey: ScanModel.excludedKey) ?? [] {
+        didSet {
+            guard oldValue != excludedPaths else { return }
+            UserDefaults.standard.set(excludedPaths, forKey: ScanModel.excludedKey)
+        }
+    }
+    nonisolated static let excludedKey = "excludedPaths"
+    /// Steps the user turned off in Settings. Raw values, so a step added later defaults on.
+    var disabledSteps = Set(UserDefaults.standard.stringArray(forKey: ScanModel.disabledStepsKey) ?? []) {
+        didSet {
+            guard oldValue != disabledSteps else { return }
+            UserDefaults.standard.set(disabledSteps.sorted(), forKey: ScanModel.disabledStepsKey)
+        }
+    }
+    nonisolated static let disabledStepsKey = "disabledSteps"
+    /// Duplicates: smallest file worth hashing, in MB.
+    var duplicateMinSizeMB = UserDefaults.standard.object(forKey: ScanModel.duplicateMinKey) as? Int ?? 1 {
+        didSet {
+            guard oldValue != duplicateMinSizeMB else { return }
+            UserDefaults.standard.set(duplicateMinSizeMB, forKey: ScanModel.duplicateMinKey)
+        }
+    }
+    nonisolated static let duplicateMinKey = "duplicateMinSizeMB"
+    /// Large files: age in days at which a smaller file still counts as old.
+    var largeFileOldAgeDays = UserDefaults.standard.object(forKey: ScanModel.oldAgeKey) as? Int ?? 365 {
+        didSet {
+            guard oldValue != largeFileOldAgeDays else { return }
+            UserDefaults.standard.set(largeFileOldAgeDays, forKey: ScanModel.oldAgeKey)
+        }
+    }
+    nonisolated static let oldAgeKey = "largeFileOldAgeDays"
     var categories: [CategoryState] = []
     /// Category id -> groups, for duplicates and similar media.
     var groups: [String: [ItemGroup]] = [:]
@@ -195,7 +250,11 @@ final class ScanModel {
         recentFolders = []
         rate = nil
         let session = ScanSession(
-            gate: gate, scope: includeTempInDuplicates ? .everything : .standard, scanThreads: scanThreads)
+            largeFileMinSize: Int64(largeFileMinSizeMB) * 1_000_000,
+            gate: gate, scope: includeTempInDuplicates ? .everything : .standard, scanThreads: scanThreads,
+            allowOutsideHome: scanOutsideHome, excludedPaths: excludedPaths,
+            enabledSteps: enabledScanSteps, duplicateMinSize: Int64(duplicateMinSizeMB) * 1_000_000,
+            largeFileOldAge: TimeInterval(largeFileOldAgeDays) * 86_400)
         progress = session.progress
         scanTask = Task {
             for await event in session.events() {
@@ -468,9 +527,54 @@ final class ScanModel {
         progress: @escaping @Sendable (CleanProgress) -> Void
     ) async -> CleanReport {
         var cleaner = Cleaner(
-            policy: SafetyPolicy(), recorder: FlightRecorder.shared, dryRun: DryRun.enabled)
+            policy: SafetyPolicy(
+                allowsOutsideHome: UserDefaults.standard.bool(forKey: outsideHomeKey),
+                excludedPaths: UserDefaults.standard.stringArray(forKey: excludedKey) ?? []),
+            recorder: FlightRecorder.shared, dryRun: DryRun.enabled)
         cleaner.owner = { $0.ownerBundleID }
         return cleaner.clean(items, progress: progress)
+    }
+
+    /// Steps that will run: everything except the ones switched off. Rules and the folder
+    /// index always run; they feed the sidebar and the disk map.
+    var enabledScanSteps: Set<ScanStep> {
+        Set(ScanStep.allCases.filter { !disabledSteps.contains($0.rawValue) })
+    }
+
+    func isStepEnabled(_ step: ScanStep) -> Bool {
+        !disabledSteps.contains(step.rawValue)
+    }
+
+    func setStep(_ step: ScanStep, enabled: Bool) {
+        if enabled {
+            disabledSteps.remove(step.rawValue)
+        } else {
+            disabledSteps.insert(step.rawValue)
+        }
+    }
+
+    /// False when the text is not an absolute or `~` path, or when it is already listed.
+    @discardableResult
+    func addExcludedPath(_ raw: String) -> Bool {
+        guard let path = Self.normalizedPath(raw), !excludedPaths.contains(path) else { return false }
+        excludedPaths = (excludedPaths + [path]).sorted()
+        return true
+    }
+
+    func removeExcludedPath(_ path: String) {
+        excludedPaths.removeAll { $0 == path }
+    }
+
+    /// `~/x` becomes `<home>/x`, `/x` stays absolute. Relative text is rejected: it would
+    /// exclude nothing and look like it worked.
+    static func normalizedPath(_ raw: String) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let home = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL.path
+        if trimmed == "~" { return home }
+        if trimmed.hasPrefix("~/") { return home + "/" + trimmed.dropFirst(2) }
+        guard trimmed.hasPrefix("/") else { return nil }
+        return URL(fileURLWithPath: trimmed).standardizedFileURL.path
     }
 
     @concurrent nonisolated static func deleteSnapshot(_ snapshot: LocalSnapshot) async -> String? {

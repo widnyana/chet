@@ -1,9 +1,7 @@
 import Foundation
 
-/// Local Terraform and OpenTofu state. It is the one part of a tool directory that a clean
-/// pass must never remove: providers and modules download again, resource state does not.
-/// Terragrunt copies the working directory into `.terragrunt-cache`, so a cache can carry the
-/// same state files.
+/// Local Terraform and OpenTofu state: providers and modules re-download, state does not.
+/// Terragrunt copies the working directory into `.terragrunt-cache`, so a cache can carry it.
 public enum TerraformState {
     /// Directory names whose contents can hold state.
     public static let toolDirNames: Set<String> = [".terraform", ".terragrunt-cache"]
@@ -29,8 +27,7 @@ public enum TerraformState {
             {
                 continue
             }
-            // Covers terraform.tfstate, its .backup and numbered .backup copies, errored.tfstate,
-            // and the terraform.tfstate.d workspace tree.
+            // Covers terraform.tfstate, its backups, errored.tfstate, and terraform.tfstate.d.
             if candidate.lastPathComponent.contains(".tfstate") { return true }
         }
         return false
