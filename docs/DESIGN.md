@@ -59,11 +59,14 @@ How it draws:
   inset 1 pt so the parent's color shows as a border; recursion goes three levels deep and
   only into blocks big enough to be legible (≥ 1.5% of the canvas area). Painter's order:
   ancestors first, descendants on top.
-- **Colors** come from the sidebar legend: orange caches and logs, purple developer data,
-  green media, blue other. Two channels: hue is the category, brightness is size. A block's
-  brightness scales with its share of the canvas (`0.55 + 0.45 * sqrt(share)`, clamped to
-  1.0), so the folders that dominate the disk read as the strongest color and slivers read
-  dim. Container blocks render dimmed (0.72) so their children pop.
+- **Colors**, two channels: the 1 pt parent border is the category (orange caches and
+  logs, purple developer data, green media, blue other); the block fill carries size.
+  Fill is a quantized four-tier ramp on the block's share of its parent (`sqrt(share)`
+  cut at 0.2/0.45/0.7): lower tiers mix the block's own category hue toward neutral
+  dark, the top tier is the full category color. Bigger blocks read brighter and more
+  colorful; small blocks go gray. Container blocks render dimmed (0.72). Top-tier
+  blocks (84 pt a side) carry direct name + size labels; the legend shows outlined
+  category swatches and the four-tier size scale.
 - **Navigation** is a URL path stack, not node references: the live tree is replaced
   several times a second, so the current node is re-resolved against the newest tree on
   every render; stale paths trim the breadcrumb stack instead of crashing.

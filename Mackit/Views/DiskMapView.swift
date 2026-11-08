@@ -18,6 +18,8 @@ struct DiskMapView: View {
     /// flicker. The poll below publishes a 250 ms snapshot instead.
     @State private var displayTree: FolderNode?
     @State private var hovered: FolderNode?
+    /// Name + size labels for the top-tier blocks, published by the Metal view.
+    @State private var labels: [TreemapLabel] = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -59,11 +61,38 @@ struct DiskMapView: View {
                     onHover: { hovered = $0 },
                     onOpen: { child in
                         if !child.children.isEmpty { stack.append(child.url) }
-                    }
+                    },
+                    onLabels: { labels = $0 }
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .padding([.horizontal, .bottom], 12)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .overlay {
+                    // Direct labels on the top tier: the biggest folders read without
+                    // hovering. Coordinates are the canvas layout's own, top-left origin.
+                    GeometryReader { geo in
+                        ForEach(labels) { label in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(label.title)
+                                    .font(.headline)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                                Text(label.subtitle)
+                                    .font(.caption)
+                                    .monospacedDigit()
+                                    .lineLimit(1)
+                            }
+                            .foregroundStyle(
+                                label.prominent
+                                    ? AnyShapeStyle(Color.black.opacity(0.85))
+                                    : AnyShapeStyle(Color.white.opacity(0.85))
+                            )
+                            .frame(maxWidth: label.rect.width - 12, alignment: .leading)
+                            .offset(x: label.rect.minX + 8, y: label.rect.minY + 8)
+                        }
+                    }
+                    .allowsHitTesting(false)
+                }
                 .overlay(alignment: .bottomLeading) {
                     if let hovered {
                         HStack(spacing: 8) {
@@ -237,14 +266,40 @@ struct DiskMapView: View {
     }
 
     private var legend: some View {
-        HStack(spacing: 12) {
-            ForEach(
-                [("Caches and logs", Color.orange), ("Developer", .purple), ("Media", .green), ("Other", .blue)],
-                id: \.0
-            ) { item in
-                HStack(spacing: 4) {
-                    Circle().fill(item.1).frame(width: 8, height: 8)
-                    Text(item.0)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 12) {
+                // Frames carry category identity, so the swatches are outlines.
+                ForEach(
+                    [("Caches and logs", Color.orange), ("Developer", .purple), ("Media", .green), ("Other", .blue)],
+                    id: \.0
+                ) { item in
+                    HStack(spacing: 4) {
+                        RoundedRectangle(cornerRadius: 2.5)
+                            .strokeBorder(item.1, lineWidth: 2)
+                            .frame(width: 10, height: 10)
+                        Text(item.0)
+                    }
+                }
+            }
+            HStack(spacing: 8) {
+                Text("Fill = share of parent").foregroundStyle(.tertiary)
+                // Ramp preview in the "other" hue; in the map each block takes its own
+                // category's hue at the same weight. Values mirror `TreemapMTKView.shaded`.
+                ForEach(
+                    [
+                        (Color(red: 0.21, green: 0.23, blue: 0.26), "under 4%"),
+                        (Color(red: 0.24, green: 0.30, blue: 0.39), "4 to 11%"),
+                        (Color(red: 0.28, green: 0.39, blue: 0.56), "11 to 25%"),
+                        (Color(red: 0.35, green: 0.55, blue: 0.85), "over 25%"),
+                    ],
+                    id: \.1
+                ) { color, text in
+                    HStack(spacing: 3) {
+                        RoundedRectangle(cornerRadius: 2.5)
+                            .fill(color)
+                            .frame(width: 10, height: 10)
+                        Text(text)
+                    }
                 }
             }
         }
@@ -257,6 +312,7 @@ struct TreemapCanvas: NSViewRepresentable {
     let node: FolderNode
     let onHover: (FolderNode?) -> Void
     let onOpen: (FolderNode) -> Void
+    let onLabels: ([TreemapLabel]) -> Void
 
     func makeNSView(context: Context) -> TreemapMTKView {
         let view = TreemapMTKView(frame: .zero, device: GPUContext.shared?.device)
@@ -267,6 +323,7 @@ struct TreemapCanvas: NSViewRepresentable {
     func updateNSView(_ view: TreemapMTKView, context: Context) {
         view.onHover = onHover
         view.onOpen = onOpen
+        view.onLabels = onLabels
         // FolderNode is Equatable: relayout on any structural change (sizes grow live
         // during a scan even though the URL stays the same).
         if view.node != node {
@@ -285,10 +342,23 @@ struct TreemapTile {
     let node: FolderNode
 }
 
+/// A name and byte count drawn directly on a big top-level block, so the biggest
+/// folders read without hovering. `prominent` tiles are tier 3+: their fill is bright,
+/// so labels use dark ink.
+struct TreemapLabel: Identifiable {
+    let rect: CGRect
+    let title: String
+    let subtitle: String
+    let prominent: Bool
+    var id: CGRect { rect }
+}
+
 final class TreemapMTKView: MTKView, MTKViewDelegate {
     var node: FolderNode?
     var onHover: (FolderNode?) -> Void = { _ in }
     var onOpen: (FolderNode) -> Void = { _ in }
+    /// Publishes the top-tier labels (name + size on big blocks) to the SwiftUI layer.
+    var onLabels: ([TreemapLabel]) -> Void = { _ in }
     private var tiles: [TreemapTile] = []
     private var instances: MTLBuffer?
     private var pipeline: MTLRenderPipelineState?
@@ -329,6 +399,27 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
         instances =
             data.isEmpty ? nil : device.makeBuffer(bytes: data, length: data.count * MemoryLayout<SIMD4<Float>>.stride)
         needsDisplay = true
+        onLabels(Self.labels(for: node, in: bounds))
+    }
+
+    /// Labels for top-level children big enough to carry two lines of text (84 pt a
+    /// side). Shares mirror `tiles(for:in:level:)`, so label rects match the canvas.
+    static func labels(for node: FolderNode, in bounds: CGRect) -> [TreemapLabel] {
+        guard !node.children.isEmpty, bounds.width > 0 else { return [] }
+        let boundsArea = bounds.width * bounds.height
+        var out: [TreemapLabel] = []
+        for item in Treemap.layout(node.children.map(\.size), in: bounds)
+        where item.rect.width >= 84 && item.rect.height >= 84 {
+            let child = node.children[item.index]
+            let share = boundsArea > 0 ? item.rect.width * item.rect.height / boundsArea : 0
+            out.append(
+                TreemapLabel(
+                    rect: item.rect,
+                    title: child.url.lastPathComponent,
+                    subtitle: child.size.formatted(.byteCount(style: .file)),
+                    prominent: sqrt(share) > 0.45))
+        }
+        return out
     }
 
     /// Nested layout (V4): squarify the children, inset each child rect so the parent's color
@@ -358,18 +449,22 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
         }
         return out
     }
-
     /// Dim a container block so its children pop.
     private static func dimmed(_ color: SIMD4<Float>) -> SIMD4<Float> {
         SIMD4(color.x * 0.72, color.y * 0.72, color.z * 0.72, 1)
     }
 
-    /// Size coding on top of the category hue: a block's brightness grows with its share
-    /// of the canvas, so the folders that dominate the disk read as the strongest color.
-    /// Square root: area shares are skewed, a 10% block is already near full brightness.
+    /// Fill color from the block's category hue and its share of the parent: four
+    /// quantized tiers on `sqrt(share)`. Lower tiers mix the hue toward neutral dark,
+    /// the top tier is the full category color, so bigger blocks read brighter and more
+    /// colorful while every block's hue still names its category. Quantized on purpose:
+    /// adjacent tiers must differ enough to rank at a glance.
     static func shaded(_ color: SIMD4<Float>, share: CGFloat) -> SIMD4<Float> {
-        let factor = Float(min(1, 0.55 + 0.45 * sqrt(max(0, share))))
-        return SIMD4(color.x * factor, color.y * factor, color.z * factor, 1)
+        let tier = Float(min(1, sqrt(max(0, share))))
+        let weight: Float = tier > 0.7 ? 1 : tier > 0.45 ? 0.55 : tier > 0.2 ? 0.28 : 0.08
+        let gray = SIMD4<Float>(0.20, 0.20, 0.21, 1)
+        let mixed = color * weight + gray * (1 - weight)
+        return SIMD4(mixed.x, mixed.y, mixed.z, 1)
     }
 
     override func setFrameSize(_ newSize: NSSize) {
