@@ -31,5 +31,6 @@ struct CategoryStyle {
         "similar-videos": CategoryStyle(symbol: "film.stack", color: .green),
         "snapshots": CategoryStyle(symbol: "clock.arrow.circlepath", color: .gray),
         "disk-map": CategoryStyle(symbol: "square.grid.3x3.fill", color: .blue),
+        "apps": CategoryStyle(symbol: "app.badge.minus", color: .gray),
     ]
 }

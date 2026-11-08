@@ -5,7 +5,6 @@ import SwiftUI
 struct ContentView: View {
     @Environment(ScanModel.self) private var model
     @State private var appCleaner = AppCleanerModel()
-    @State private var mode: AppMode = .clean
     @State private var selection: String? = "overview"
     @State private var confirming = false
 
@@ -15,17 +14,15 @@ struct ContentView: View {
                 OnboardingView()
             } else {
                 NavigationSplitView {
-                    SidebarView(selection: $selection, mode: $mode)
+                    SidebarView(selection: $selection)
                 } detail: {
                     VStack(spacing: 0) {
                         AccessBanner()
                         detail
                     }
                     .toolbar {
-                        if mode == .clean {
+                        if selection != "apps" {
                             scanButton
-                        } else {
-                            appToolbar
                         }
                     }
                 }
@@ -43,17 +40,18 @@ struct ContentView: View {
             if let report = model.report { SummaryView(report: report) }
         }
         // Below the toolbar, above the content: an overlay at .top would sit on the
-        // title bar and cover the scan pill.
+        // title bar and cover the scan pill. Uninstall surfaces never scan, so the
+        // toast stays off them.
         .safeAreaInset(edge: .top, spacing: 0) {
-            if mode == .clean { ScanFinishedToast() }
+            if selection != "apps" { ScanFinishedToast() }
         }
         .overlay(alignment: .bottomLeading) { dryRunBadge }
-        .onChange(of: mode) { _, next in
-            if next == .uninstall { appCleaner.load() }
+        .onChange(of: selection) { _, next in
+            if next == "apps" { appCleaner.load() }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.refreshAccess()
-            if mode == .uninstall {
+            if selection == "apps" {
                 appCleaner.hasFullDiskAccess = FullDiskAccess.status() == .granted
                 appCleaner.refreshRunningState()
             }
@@ -61,8 +59,8 @@ struct ContentView: View {
     }
 
     @ViewBuilder private var detail: some View {
-        if mode == .uninstall {
-            AppCleanerDetailView()
+        if selection == "apps" {
+            UninstallWorkspace()
         } else if selection == "disk-map" {
             DiskMapView()
         } else if selection == "snapshots" {
@@ -98,16 +96,6 @@ struct ContentView: View {
     @ToolbarContentBuilder private var scanButton: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
             ScanStatusView()
-        }
-    }
-
-    @ToolbarContentBuilder private var appToolbar: some ToolbarContent {
-        ToolbarItem(placement: .primaryAction) {
-            Button("Reload Apps", systemImage: "arrow.clockwise") {
-                appCleaner.load()
-            }
-            .disabled(appCleaner.isLoadingApps)
-            .help("Read the applications folder again")
         }
     }
 }

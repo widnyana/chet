@@ -2,53 +2,21 @@ import AppKit
 import MackitCore
 import SwiftUI
 
+/// The review surface for one app: header, related files, floating action bar.
+/// Reached only by pushing from the app browser, so `app` is always present.
 struct AppCleanerDetailView: View {
     @Environment(AppCleanerModel.self) private var model
+    let app: InstalledApp
 
     var body: some View {
-        @Bindable var model = model
-        Group {
-            if let app = model.selectedApp {
-                detail(app)
-            } else {
-                ContentUnavailableView(
-                    "Choose an app",
-                    systemImage: "app.badge.minus",
-                    description: Text("Select an application in the sidebar to see its files."))
-            }
-        }
-        .navigationTitle(model.selectedApp?.name ?? "Uninstall")
-        .navigationSubtitle(subtitle)
-        .sheet(isPresented: $model.showConfirm) {
-            AppUninstallConfirmSheet()
-        }
-        .sheet(
-            isPresented: Binding(
-                get: { model.report != nil },
-                set: { if !$0 { model.report = nil } })
-        ) {
-            if let report = model.report { UninstallSummaryView(report: report) }
-        }
-        .onReceive(
-            NSWorkspace.shared.notificationCenter.publisher(
-                for: NSWorkspace.didTerminateApplicationNotification)
-        ) { _ in
-            model.refreshRunningState()
-        }
-        .onReceive(
-            NSWorkspace.shared.notificationCenter.publisher(
-                for: NSWorkspace.didLaunchApplicationNotification)
-        ) { _ in
-            model.refreshRunningState()
-        }
-        .onAppear { model.refreshRunningState() }
+        detail(app)
+            .navigationTitle(app.name)
+            .navigationSubtitle(subtitle)
+            .onAppear { model.refreshRunningState() }
     }
 
     private var subtitle: String {
-        guard let app = model.selectedApp else {
-            return "Move an app and its Library files to the Trash"
-        }
-        return "\(app.version.map { "Version \($0)" } ?? "Unknown version") · \(app.bundleID ?? "no bundle ID")"
+        "\(app.version.map { "Version \($0)" } ?? "Unknown version") · \(app.bundleID ?? "no bundle ID")"
     }
 
     private func detail(_ app: InstalledApp) -> some View {

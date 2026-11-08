@@ -6,9 +6,10 @@ the right — on macOS 26 Liquid Glass.
 
 ## Sidebar
 
-The sidebar is the app's spine. A segmented **mode picker** sits above the list:
-`Clean` (the junk scan) and `Uninstall` (the app uninstaller). Each mode has its own
-`List` selection; the picker never changes the window's detail routing on its own.
+The sidebar is the app's spine. There is no mode switch: one `List` carries every
+destination. The clean job owns the top (Overview, the Reclaimable categories, Disk map
+under Inspect); a trailing **Uninstall** section holds a single **Applications** row whose
+trailing value is the number of installed apps.
 
 In **Clean** mode the list has three visual zones, top to bottom:
 
@@ -36,10 +37,9 @@ Row anatomy is deliberately flat: `Label { title + states + Spacer + trailing va
 No custom backgrounds, no disclosure chrome — selection, hover, and focus come from the
 system list.
 
-In **Uninstall** mode the list is a searchable inventory of app bundles: app icon, display
-name, bundle ID on a second line, the version right-aligned in monospaced digits, and a small
-lock when the app cannot be moved without an administrator. The search field filters by
-display name and bundle ID. Selecting a row loads that app's related files in the detail pane.
+The app inventory does not live in the sidebar. Selecting **Applications** opens the app
+browser in the detail pane (see Uninstall below); the sidebar stays the clean-mode spine
+the whole time.
 
 ## Disk map — live nested treemap
 
@@ -91,15 +91,22 @@ How it draws:
   pill relayout at most 4x/s instead of strobing. Hover re-resolves by URL against the
   newest snapshot.
 
-## Uninstall mode
+## Uninstall
 
-The uninstaller is a second mode, not a category. The detail pane starts with an empty state
-("Choose an app") and becomes a two-part surface:
+Uninstall is a destination, not a mode. Selecting **Applications** in the sidebar opens the
+app browser in the detail pane: a searchable grid of installed apps (adaptive cells, 52 pt
+icon, name, version; an orange dot when the app runs, a lock when only an administrator can
+remove it). The search field filters by display name and bundle ID; the toolbar Reload
+button re-reads the applications folder. Void states: a skeleton grid in the exact cell
+shape while reading, "No applications found" when the folder yields nothing, "No matches"
+when the search misses. Opening a cell pushes the review surface:
 
 1. **App header** - 64 pt icon, display name, bundle ID, path, version and measured bundle
    size. The "Remove app bundle" checkbox is the only control that targets the app itself.
    It is disabled while the app (or a helper) runs or when the bundle cannot be written. A
-   running app gets an orange warning; an administrator-owned app gets a lock warning.
+   running app gets an orange warning; an administrator-owned app gets a lock warning. A
+   back button returns to the grid; the confirm and summary sheets attach to the
+   workspace, so the summary survives the automatic pop after a completed removal.
 2. **Related files list** - sections by component kind (Application Support, Preferences,
    Caches, Logs, Containers, Group Containers, Saved Application State, Cookies, Application
    Scripts, Launch Agents, WebKit). Each row carries a checkbox, workspace icon, path, size
@@ -195,7 +202,7 @@ Rules the script enforces:
       "mechanism": "safeAreaInset-top",
       "height": 40,
       "verify": {
-        "contains": ["safeAreaInset(edge: .top, spacing: 0) {\n            if mode == .clean { ScanFinishedToast() }"],
+        "contains": ["safeAreaInset(edge: .top, spacing: 0) {\n            if selection != \"apps\" { ScanFinishedToast() }"],
         "not-contains": [".overlay(alignment: .top)"]
       }
     },

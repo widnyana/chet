@@ -3,22 +3,7 @@ import Foundation
 import MackitCore
 import Observation
 
-/// Top-level mode: the existing junk scan, or the app uninstaller.
-enum AppMode: String, CaseIterable, Identifiable {
-    case clean, uninstall
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .clean: "Clean"
-        case .uninstall: "Uninstall"
-        }
-    }
-
-}
-
-/// State for the uninstall mode. The core struct does discovery, matching and removal;
+/// State for the uninstall destination. The core struct does discovery, matching and removal;
 /// this model owns the async lifecycle, the selection, and the report sheet.
 @MainActor
 @Observable
