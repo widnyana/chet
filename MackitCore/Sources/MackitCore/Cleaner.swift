@@ -46,6 +46,9 @@ public struct Cleaner: Sendable {
     public let log: AuditLog
     /// When set, receives one batch summary per clean run (per-file rows go only to `log`).
     public let recorder: FlightRecorder?
+    /// Dry-run gate: when true, every guard still runs and success is reported, but no file
+    /// is removed or trashed. Set by the composition root from `DryRun.enabled`.
+    public var dryRun: Bool = false
     /// Bundle ID of the app that owns an item, if any.
     public var owner: @Sendable (ScanItem) -> String? = { _ in nil }
     public var isRunning: @Sendable (String) -> Bool = { id in
@@ -75,6 +78,7 @@ public struct Cleaner: Sendable {
             recorder.record(
                 step: "clean",
                 "\(report.results.count) checked, \(report.freedBytes) bytes freed")
+            if dryRun { recorder.record(step: "clean", "dry run: nothing was deleted") }
         }
         return report
     }
@@ -86,6 +90,9 @@ public struct Cleaner: Sendable {
         else { return .skipped(.changed) }
         guard policy.isDeletable(item.url) == .allowed else { return .skipped(.policy) }
         if let owner = owner(item), isRunning(owner) { return .skipped(.appRunning) }
+        if dryRun {
+            return item.mode == .permanent ? .removed(item.reclaimableBytes) : .trashed(item.reclaimableBytes)
+        }
         do {
             switch item.mode {
             case .permanent:

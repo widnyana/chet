@@ -390,10 +390,13 @@ final class ScanModel {
     @concurrent nonisolated static func runClean(_ items: [ScanItem]) async -> CleanReport {
         var cleaner = Cleaner(policy: SafetyPolicy(), recorder: FlightRecorder.shared)
         cleaner.owner = { $0.ownerBundleID }
+        cleaner.dryRun = DryRun.enabled
         return cleaner.clean(items)
     }
 
     @concurrent nonisolated static func deleteSnapshot(_ snapshot: LocalSnapshot) async -> String? {
+        // Dry run reports success so the UI drops the row, but tmutil never runs.
+        if DryRun.enabled { return nil }
         do {
             try Snapshots.delete(snapshot)
             return nil

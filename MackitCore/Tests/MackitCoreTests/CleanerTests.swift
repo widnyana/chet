@@ -87,6 +87,40 @@ struct CleanerTests {
         #expect(FileManager.default.fileExists(atPath: file.path))
     }
 
+    @Test func dryRunPermanentReportsRemovedButKeepsFile() throws {
+        let dir = try TempDir()
+        let file = try dir.file("cache/x", bytes: 1000)
+        var cleaner = cleaner(dir)
+        cleaner.dryRun = true
+        let report = cleaner.clean([try item(file)])
+        #expect(report.results.first?.outcome == .removed(1000))
+        #expect(report.freedBytes == 1000)
+        #expect(FileManager.default.fileExists(atPath: file.path))
+    }
+
+    @Test func dryRunTrashReportsTrashedButKeepsFile() throws {
+        let dir = try TempDir()
+        let file = try dir.file("photos/x.jpg", bytes: 1000)
+        var cleaner = cleaner(dir)
+        cleaner.dryRun = true
+        let report = cleaner.clean([try item(file, .trash)])
+        #expect(report.results.first?.outcome == .trashed(1000))
+        #expect(FileManager.default.fileExists(atPath: file.path))
+        #expect(!FileManager.default.fileExists(atPath: dir.url.appendingPathComponent("FakeTrash/x.jpg").path))
+    }
+
+    @Test func dryRunStillSkipsChangedFiles() throws {
+        let dir = try TempDir()
+        let file = try dir.file("cache/x", bytes: 1000)
+        let scanned = try item(file)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date().addingTimeInterval(-60)], ofItemAtPath: file.path)
+        var cleaner = cleaner(dir)
+        cleaner.dryRun = true
+        #expect(cleaner.clean([scanned]).results.first?.outcome == .skipped(.changed))
+        #expect(FileManager.default.fileExists(atPath: file.path))
+    }
+
     @Test func failureDoesNotStopTheRest() throws {
         let dir = try TempDir()
         let locked = try dir.file("locked/x", bytes: 1000)
