@@ -9,6 +9,8 @@ public enum Verdict: Equatable, Sendable {
 /// The one gate every scanner and the cleaner pass a path through.
 public struct SafetyPolicy: Sendable {
     public let home: String
+    /// Absolute paths (e.g. "/nix/var/nix/profiles") that bypass the home check.
+    public let externalRoots: Set<String>
 
     static let protectedInHome = ["Library/Keychains", "Library/Mobile Documents", "Library/Messages", "Library/Mail"]
     static let containerRoots: Set<String> = [
@@ -17,8 +19,12 @@ public struct SafetyPolicy: Sendable {
         "Downloads", "Pictures", "Movies", "Music", "Applications", ".Trash",
     ]
 
-    public init(home: URL = FileManager.default.homeDirectoryForCurrentUser) {
+    public init(
+        home: URL = FileManager.default.homeDirectoryForCurrentUser,
+        externalRoots: Set<String> = []
+    ) {
         self.home = home.resolvingSymlinksInPath().path
+        self.externalRoots = externalRoots
     }
 
     public func isDeletable(_ url: URL) -> Verdict {
@@ -29,7 +35,11 @@ public struct SafetyPolicy: Sendable {
         let inVolumeTrash = parts.count > 4 && parts[0] == "Volumes" && parts[2] == ".Trashes"
         let rel = relative(path)
 
-        if rel == nil && !inVolumeTrash { return .denied("outside home") }
+        if rel == nil && !inVolumeTrash {
+            if !externalRoots.contains(where: { path == $0 || path.hasPrefix($0 + "/") }) {
+                return .denied("outside home")
+            }
+        }
         if let rel {
             if Self.containerRoots.contains(rel) { return .denied("container folder") }
             if Self.protectedInHome.contains(where: { rel == $0 || rel.hasPrefix($0 + "/") }) {

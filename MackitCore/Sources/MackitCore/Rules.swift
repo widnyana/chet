@@ -2,6 +2,7 @@ import Foundation
 
 /// A data-driven junk category: which folders to look in and how to clean them.
 /// Each direct child of an existing root folder becomes one ScanItem (or the root itself, see `wholeRoots`).
+/// Roots starting with "/" are absolute paths; everything else is relative to the home folder.
 public struct Rule: Sendable, Identifiable {
     public let id: String
     /// Rules with the same category are shown together.
@@ -77,7 +78,7 @@ extension Rule {
             roots: [
                 "Library/Caches/Homebrew", "Library/Caches/pip", "Library/Caches/org.swift.swiftpm",
                 "Library/Caches/CocoaPods", "Library/Caches/go-build", "Library/Caches/Yarn", "Library/Caches/pnpm",
-                ".npm/_cacache", ".cargo/registry/cache", ".gradle/caches", ".cache/uv",
+                ".npm/_cacache", ".cargo/registry/cache", ".gradle/caches", ".cache/uv", ".cache/nix",
             ], risk: .safe, mode: .permanent, wholeRoots: true),
         Rule(
             id: "browser-safari", category: "browser", title: "Safari cache",
@@ -115,5 +116,8 @@ extension Rule {
             id: "dev-garbage", title: "Project build dirs",
             roots: ["Development", "Projects", "Documents", "Desktop"], risk: .review, mode: .trash,
             recursiveNames: DuplicateScope.regenerableNames),
+        Rule(
+            id: "nix", title: "Nix store profiles",
+            roots: ["/nix/var/nix/profiles"], risk: .review, mode: .trash, wholeRoots: true),
     ]
 }

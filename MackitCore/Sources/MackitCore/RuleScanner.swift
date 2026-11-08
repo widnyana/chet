@@ -20,7 +20,8 @@ public struct RuleScanner: Sendable {
     public init(home: URL = FileManager.default.homeDirectoryForCurrentUser, rules: [Rule] = Rule.catalog) {
         self.home = home
         self.rules = rules
-        policy = SafetyPolicy(home: home)
+        let absoluteRoots = Set(rules.flatMap { $0.roots }.filter { $0.hasPrefix("/") })
+        policy = SafetyPolicy(home: home, externalRoots: absoluteRoots)
     }
 
     public func scan(_ rule: Rule, now: Date = Date()) async throws -> CategoryResult {
@@ -28,7 +29,8 @@ public struct RuleScanner: Sendable {
         // Roots of other rules are scanned by those rules, so a parent rule skips them.
         let claimed = rules.filter { $0.id != rule.id }.flatMap(\.roots)
         for root in rule.roots {
-            let rootURL = home.appendingPathComponent(root)
+            let rootURL: URL = root.hasPrefix("/") ? URL(fileURLWithPath: root) : home.appendingPathComponent(root)
+            let isAbsolute = root.hasPrefix("/")
             var candidates: [URL]
             if let names = rule.recursiveNames {
                 candidates = try recursiveMatches(rootURL, names)
@@ -49,7 +51,7 @@ public struct RuleScanner: Sendable {
                 try Task.checkCancellation()
                 if child.lastPathComponent == ".DS_Store" { continue }
                 let name = child.lastPathComponent
-                let rel = rule.wholeRoots ? root : String(child.path.dropFirst(home.path.count + 1))
+                let rel = rule.wholeRoots ? root : (isAbsolute ? String(child.path.dropFirst(rootURL.path.count + 1)) : String(child.path.dropFirst(home.path.count + 1)))
                 if rule.excluded.contains(name) { continue }
                 if claimed.contains(where: { $0 == rel || $0.hasPrefix(rel + "/") }) { continue }
                 if let extensions = rule.extensions, !extensions.contains(child.pathExtension.lowercased()) { continue }

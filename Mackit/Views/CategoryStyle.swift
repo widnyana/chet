@@ -31,5 +31,6 @@ struct CategoryStyle {
         "similar-videos": "film.stack",
         "snapshots": "clock.arrow.circlepath",
         "disk-map": "square.grid.3x3.fill",
+        "nix": "shippingbox",
     ]
 }

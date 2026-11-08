@@ -57,4 +57,36 @@ struct SafetyPolicyTests {
         #expect(dir.policy.isDeletable(link) == .denied("symlink"))
         #expect(dir.policy.isDeletable(target) == .allowed)
     }
+
+    // MARK: - external roots
+
+    @Test func allowsPathUnderExternalRoot() throws {
+        let dir = try TempDir()
+        try dir.file("nix/var/nix/profiles/per-user/wid/a-profile", bytes: 100)
+        let policy = SafetyPolicy(home: dir.url, externalRoots: [dir.url.appendingPathComponent("nix/var/nix/profiles").path])
+        #expect(policy.isDeletable(dir.url.appendingPathComponent("nix/var/nix/profiles/per-user/wid/a-profile")) == .allowed)
+    }
+
+    @Test func deniesPathOutsideExternalRoot() throws {
+        let dir = try TempDir()
+        let policy = SafetyPolicy(home: dir.url, externalRoots: [dir.url.appendingPathComponent("nix/var/nix/profiles").path])
+        #expect(policy.isDeletable(dir.url.appendingPathComponent("nix/var")) == .denied("outside home"))
+    }
+
+    @Test func externalRootStillDeniesSymlink() throws {
+        let dir = try TempDir()
+        try dir.file("nix/var/nix/profiles/real", bytes: 10)
+        let link = dir.url.appendingPathComponent("nix/var/nix/profiles/link")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: dir.url.appendingPathComponent("nix/var/nix/profiles/real"))
+        let policy = SafetyPolicy(home: dir.url, externalRoots: [dir.url.appendingPathComponent("nix/var/nix/profiles").path])
+        #expect(policy.isDeletable(link) == .denied("symlink"))
+    }
+
+    @Test func externalRootStillDeniesRealAppBundle() throws {
+        let dir = try TempDir()
+        try dir.file("nix/var/nix/profiles/Real.app/Contents/Info.plist", bytes: 10)
+        try dir.file("nix/var/nix/profiles/Real.app/Contents/MacOS/Real", bytes: 10)
+        let policy = SafetyPolicy(home: dir.url, externalRoots: [dir.url.appendingPathComponent("nix/var/nix/profiles").path])
+        #expect(policy.isDeletable(dir.url.appendingPathComponent("nix/var/nix/profiles/Real.app")) == .denied("app bundle"))
+    }
 }
