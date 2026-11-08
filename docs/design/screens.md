@@ -181,16 +181,27 @@ the ink that contrasts with the block. The map does not encode categories.
 
 ## Settings
 
-Job: answer "which duplicate scope do I want?".
+Job: answer "what will the next scan do, and what did each step find last time?".
+One fixed 600 x 820 window, scrolling, titled `Settings`.
 
-One grouped form section:
+Top to bottom:
 
-```
-Include caches and build folders                 [toggle]
-Search inside caches and project build folders. Off by default.
-```
+1. `PageHeader`: `Settings`, `What the next scan looks at. Nothing here changes a scan
+   already running.` Under it one caption line of real state:
+   `6 of 6 steps on · last scan 9 Nov 2026, 01:14`, `· no scan yet`, or `· scanning now`.
+2. `Steps`: a ledger with column captions `Step`, `Found`, `On`. The first row is locked
+   (`Rules and folder index`, `Always on` with a lock). Each optional step is a row with its
+   switch and what it found last scan (`12 files`, `3 groups`, `0 snapshots`). Before any scan
+   the column reads `not run`, never `0`; while a scan runs it reads `running`.
+3. `Limits`: three sliders with tabular readouts: duplicate floor, large-file size, old age.
+4. `Keep out`: the outside-home switch, the excluded folders list with a text `Remove`, an
+   empty state that names the next action, an add field, and inline correction for a relative
+   path.
+5. Footer: one row for `Folder walk threads` with the segmented picker and the Auto line.
 
-No other options. The window title is `Settings`.
+A set `DRY_RUN` adds one amber status label under the header.
+
+No section boxes, no cards, radius 0, hairlines between rows. The accent tints controls only.
 
 ## About
 

@@ -210,7 +210,24 @@ macOS reports the size only when the snapshot is deleted.
 
 ### Settings
 
-One grouped form section with the duplicate-scope toggle.
+A board for the next scan, not a list of preferences. Every switch sits next to what
+that step found last time, so a step is never just a name.
+
+- Header: `Settings`, one line on what changes and when, then one caption line of real
+  state: steps on, and the last scan time, `no scan yet`, or `scanning now`.
+- Steps ledger: column captions `Step`, `Found`, `On`. The always-on base (`Rules and
+  folder index`) is a locked row with a lock label, never a dead switch. Optional rows
+  carry their switch and the last scan's result (`12 files`, `3 groups`). Before any scan
+  the column says `not run`, never a zero standing in for a value.
+- Limits: three sliders with tabular readouts.
+- Keep out: the outside-home switch with its consequence, the excluded folders list with a
+  text `Remove`, an empty state that names the next action, and inline correction for a
+  relative path.
+- Footer: the thread picker with the Auto line, without a section header, so the page does
+  not repeat one section shape five times.
+- A set `DRY_RUN` shows one amber status label under the header.
+
+Radius stays 0, hairlines separate rows, no cards, and the accent tints controls only.
 
 ### Permission page
 
