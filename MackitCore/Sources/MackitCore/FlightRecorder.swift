@@ -390,6 +390,13 @@ extension FlightRecorder {
             return ("videos", "\(clusters.count) clusters, \(bytes) bytes reclaimable")
         case .snapshots(let snapshots):
             return ("snapshots", "\(snapshots.count) local snapshots")
+        case .rootMeasured(let node):
+            return ("index", "measured \(node.url.lastPathComponent): \(node.size) bytes")
+        case .progress(let snapshot):
+            return (
+                "index",
+                "progress: \(snapshot.files) files, \(snapshot.bytes) bytes, in \(snapshot.currentFolder)"
+            )
         case .folderTrees(let trees):
             return ("index", "\(trees.count) root trees measured")
         }

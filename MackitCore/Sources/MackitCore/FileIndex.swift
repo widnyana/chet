@@ -2,6 +2,32 @@ import Darwin
 import Foundation
 import Synchronization
 
+/// One renderable copy of the walk's live counters. The walker refreshes it a few times a
+/// second; `runningRootBytes` is what the in-flight top-level root has accumulated so far,
+/// so the treemap can grow its block while that root is still being measured.
+public struct ProgressSnapshot: Sendable, Equatable {
+    public let files: Int
+    public let bytes: Int64
+    public let currentFolder: String
+    public let rootsDone: Int
+    public let rootsTotal: Int
+    public let runningRootURL: URL?
+    public let runningRootBytes: Int64
+
+    public init(
+        files: Int, bytes: Int64, currentFolder: String, rootsDone: Int, rootsTotal: Int,
+        runningRootURL: URL?, runningRootBytes: Int64
+    ) {
+        self.files = files
+        self.bytes = bytes
+        self.currentFolder = currentFolder
+        self.rootsDone = rootsDone
+        self.rootsTotal = rootsTotal
+        self.runningRootURL = runningRootURL
+        self.runningRootBytes = runningRootBytes
+    }
+}
+
 /// Live scan counters. The walker writes them, the UI reads them about 10 times a second
 /// (relaxed atomics, like ncdu's `files_seen` and `bytes_seen`).
 public final class ScanProgress: Sendable {
@@ -23,6 +49,9 @@ public final class ScanProgress: Sendable {
     func enter(_ path: String) {
         folder.withLock { $0 = path }
     }
+
+    /// Per-root-start notification, if a builder installed one: (root, done, total).
+    let rootStart = Mutex<(@Sendable (URL, Int, Int) -> Void)?>(nil)
 }
 
 public struct TaggedFolder: Sendable, Equatable {
@@ -46,6 +75,11 @@ public struct FileIndex: Sendable {
 public struct FileIndexBuilder: Sendable {
     public let policy: SafetyPolicy
     public let progress: ScanProgress
+    /// Called once per measured top-level root, with its finished node.
+    public var onRootMeasured: (@Sendable (FolderNode) -> Void)?
+    /// Called a few times a second while the walk runs, with live counters and the
+    /// in-flight root's growing byte total.
+    public var onProgress: (@Sendable (ProgressSnapshot) -> Void)?
     /// Folder levels kept in `FileIndex.trees`; deeper folders only add to their ancestors.
     public var maxDepth = 6
     public var candidateMinSize: Int64 = 1_000_000
@@ -66,15 +100,34 @@ public struct FileIndexBuilder: Sendable {
         var index = FileIndex()
         var seenInodes = Set<UInt64>()
         let media = SimilarPhotos.extensions.union(SimilarVideos.extensions)
-        for root in roots {
+        let total = roots.count
+        for (rootIndex, root) in roots.enumerated() {
             let fd = open(root.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
             guard fd >= 0 else { continue }
             defer { close(fd) }
             var st = stat()
             guard fstat(fd, &st) == 0 else { continue }
+            let bytesAtStart = progress.bytes
+            progress.enter(root.path)
+            nonisolated(unsafe) var lastTick = DispatchTime.now().uptimeNanoseconds
+            // The in-flight root is reported by URL so the callback can pick up its
+            // growing total from the shared counters.
+            let runningRoot = root
             let node = try walk(
                 fd: fd, url: root, depth: 0, device: st.st_dev, excluded: false, media: media,
-                seenInodes: &seenInodes, index: &index)
+                seenInodes: &seenInodes, index: &index,
+                tick: { files, bytes, folder in
+                    let now = DispatchTime.now().uptimeNanoseconds
+                    guard now - lastTick >= 250_000_000 else { return }  // ~4 Hz
+                    lastTick = now
+                    self.onProgress?(
+                        ProgressSnapshot(
+                            files: files, bytes: bytes, currentFolder: folder,
+                            rootsDone: rootIndex, rootsTotal: total,
+                            runningRootURL: runningRoot,
+                            runningRootBytes: max(0, bytes - bytesAtStart)))
+                })
+            onRootMeasured?(node)
             index.trees.append(node)
         }
         return index
@@ -96,7 +149,8 @@ public struct FileIndexBuilder: Sendable {
 
     private func walk(
         fd: Int32, url: URL, depth: Int, device: dev_t, excluded: Bool, media: Set<String>,
-        seenInodes: inout Set<UInt64>, index: inout FileIndex
+        seenInodes: inout Set<UInt64>, index: inout FileIndex,
+        tick: @Sendable (Int, Int64, String) -> Void
     ) throws -> FolderNode {
         try Task.checkCancellation()
         progress.enter(url.path)
@@ -118,7 +172,7 @@ public struct FileIndexBuilder: Sendable {
                     fd: childFD, url: url.appendingPathComponent(entry.name, isDirectory: true), depth: depth + 1,
                     device: device,
                     excluded: noCandidates || entry.name == ".git" || Self.packageExtensions.contains(ext),
-                    media: media, seenInodes: &seenInodes, index: &index)
+                    media: media, seenInodes: &seenInodes, index: &index, tick: tick)
                 total += node.size
                 if depth < maxDepth { children.append(node) }
             case .file:
@@ -151,6 +205,7 @@ public struct FileIndexBuilder: Sendable {
         }
         progress.add(files: entries, bytes: 0)
         index.entriesSeen += entries
+        tick(progress.files, progress.bytes, url.path)
         if tagged { index.taggedCaches.append(TaggedFolder(url: url, bytes: total)) }
         return FolderNode(url: url, size: total, children: children.sorted { $0.size > $1.size })
     }

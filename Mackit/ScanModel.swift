@@ -46,6 +46,10 @@ final class ScanModel {
     var steps: [ScanStepState] = []
     /// Folder size trees of the last scan, for the disk map.
     var folderTrees: [FolderNode] = []
+    /// Top-level roots measured so far in the running scan, for the disk map's partial render.
+    var partialTrees: [FolderNode] = []
+    /// Live copy of the walk's counters while the index step runs.
+    var rootsProgress: ProgressSnapshot?
     /// Live counters of the running scan.
     var progress: ScanProgress?
     /// Step currently running, while a scan is active.
@@ -106,6 +110,9 @@ final class ScanModel {
         confirmItems = []
         confirmSnapshots = []
         report = nil
+        folderTrees = []
+        partialTrees = []
+        rootsProgress = nil
         didFinishScan = false
         isScanning = true
         steps = ScanStepState.all
@@ -203,7 +210,12 @@ final class ScanModel {
         switch event {
         case .started(let step): currentStep = step
         case .rules(let result): merge(result)
-        case .folderTrees(let trees): folderTrees = trees
+        case .folderTrees(let trees):
+            folderTrees = trees
+            partialTrees = []
+            rootsProgress = nil
+        case .rootMeasured(let node): partialTrees.append(node)
+        case .progress(let snapshot): rootsProgress = snapshot
         case .taggedCaches(let items): add("tagged-caches", items: items)
         case .largeFiles(let items): add("large-files", items: items)
         case .duplicates(let found):

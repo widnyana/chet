@@ -19,6 +19,51 @@ struct ScanSessionTests {
         #expect(Set(ScanSession.userRoots(dir.url).map(\.lastPathComponent)) == ["Documents", "Movies"])
     }
 
+    @Test func rootMeasuredArrivesPerRootBeforeFolderTrees() async throws {
+        let dir = try TempDir()
+        for name in ["Documents", "Movies", "Downloads"] {
+            try dir.file("\(name)/big.bin", bytes: 2_000_000, fill: 7)
+        }
+        var events: [ScanEvent] = []
+        for await event in ScanSession(home: dir.url, largeFileMinSize: 2_500_000).events() {
+            events.append(event)
+            if case .done = event { break }
+        }
+        let roots = events.compactMap { event -> FolderNode? in
+            if case .rootMeasured(let node) = event { node } else { nil }
+        }
+        #expect(Set(roots.map { $0.url.lastPathComponent }) == ["Documents", "Movies", "Downloads"])
+        #expect(roots.allSatisfy { $0.size >= 2_000_000 })
+        // Every rootMeasured precedes the final folderTrees event.
+        let treeIndex = events.firstIndex { if case .folderTrees = $0 { true } else { false } } ?? events.count
+        let rootIndices = events.indices.filter { if case .rootMeasured = events[$0] { true } else { false } }
+        #expect(rootIndices.allSatisfy { $0 < treeIndex })
+        // Progress snapshots carry the running root and totals.
+        let snapshots = events.compactMap { event -> ProgressSnapshot? in
+            if case .progress(let snapshot) = event { snapshot } else { nil }
+        }
+        #expect(
+            snapshots.isEmpty || snapshots.allSatisfy { $0.rootsTotal == 3 && $0.runningRootURL != nil })
+    }
+
+    @Test func taggedCargoTargetBecomesOneCacheItem() async throws {
+        let dir = try TempDir()
+        try dir.file("Development/proj/target/debug/blob", bytes: 2_000_000, fill: 3)
+        try Data("Signature: 8a477f597d28d172789f06886806bc55\n".utf8).write(
+            to: dir.url.appendingPathComponent("Development/proj/target/CACHEDIR.TAG"))
+        var events: [ScanEvent] = []
+        for await event in ScanSession(home: dir.url, largeFileMinSize: 2_500_000).events() {
+            events.append(event)
+            if case .done = event { break }
+        }
+        let tagged = events.compactMap { event -> [ScanItem]? in
+            if case .taggedCaches(let items) = event { items } else { nil }
+        }.flatMap { $0 }
+        #expect(tagged.count == 1)
+        #expect(tagged.first?.url.lastPathComponent == "target")
+        #expect(tagged.first?.categoryID == "tagged-caches")
+    }
+
     @Test func stepsRunInOrderAndFindEachKind() async throws {
         let dir = try TempDir()
         try dir.file("Documents/a/copy", bytes: 2_000_000, fill: 9)

@@ -8,6 +8,9 @@ struct DiskMapView: View {
     @Environment(ScanModel.self) private var model
     @State private var stack: [FolderNode] = []
     @State private var hovered: FolderNode?
+    /// Copy of the walk's counters; ScanProgress is not observable, so the poll task
+    /// refreshes this to re-render the bar and folder line.
+    @State private var snapshot: ProgressSnapshot?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -52,21 +55,7 @@ struct DiskMapView: View {
                     }
                 }
             } else if model.isScanning {
-                VStack(spacing: 12) {
-                    ProgressView()
-                    if let progress = model.progress {
-                        Text("\(progress.files) files, \(progress.bytes.formatted(.byteCount(style: .file)))")
-                            .monospacedDigit()
-                        Text(progress.currentFolder)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    } else {
-                        Text("Measuring folders")
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                measuringPanel
             } else {
                 ContentUnavailableView {
                     Label("Disk map", systemImage: "square.grid.3x3.fill")
@@ -80,7 +69,27 @@ struct DiskMapView: View {
             }
         }
         .navigationTitle("Disk map")
-        // The scan's index step produces the trees; the map rebuilds whenever they change.
+        // While measuring, poll the non-observable counters ~4x a second.
+        .task {
+            while model.isScanning {
+                try? await Task.sleep(for: .milliseconds(250))
+                snapshot = model.rootsProgress
+            }
+        }
+        // Measured roots so far: draw them growing in while the walk runs.
+        .task(id: model.partialTrees) {
+            guard model.folderTrees.isEmpty, !model.partialTrees.isEmpty,
+                let snap = model.rootsProgress
+            else { return }
+            var children = model.partialTrees
+            if let url = snap.runningRootURL {
+                // The in-flight root draws as a live-growing block from its byte total so far.
+                children.append(FolderNode(url: url, size: snap.runningRootBytes, children: []))
+            }
+            let home = FileManager.default.homeDirectoryForCurrentUser
+            stack = [FolderNode(url: home, size: children.reduce(0) { $0 + $1.size }, children: children)]
+        }
+        // The final trees replace the partial render (same canvas, full data).
         .task(id: model.folderTrees) {
             guard !model.folderTrees.isEmpty else { return }
             let kids = model.folderTrees.sorted { $0.size > $1.size }
@@ -91,6 +100,42 @@ struct DiskMapView: View {
             ]
             hovered = nil
         }
+    }
+
+    private var measuringPanel: some View {
+        VStack(spacing: 14) {
+            if let snap = snapshot ?? model.rootsProgress {
+                ProgressView(value: Double(snap.files), total: Double(max(baseline, snap.files)))
+                    .progressViewStyle(.linear)
+                    .frame(width: 420)
+                VStack(spacing: 4) {
+                    Text(
+                        "\(snap.files) files · \(snap.bytes.formatted(.byteCount(style: .file)))"
+                            + " · root \(snap.rootsDone + 1) of \(snap.rootsTotal)"
+                    )
+                    .monospacedDigit()
+                    Text(snap.currentFolder)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .help(snap.currentFolder)
+                }
+            } else {
+                ProgressView()
+                Text("Measuring folders")
+            }
+            HStack(spacing: 10) {
+                Button("Stop", systemImage: "stop.fill") { model.cancel() }
+            }
+            .controlSize(.regular)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// The bar's moving baseline: max files seen so far (grows as the walk does).
+    private var baseline: Int {
+        max(model.rootsProgress?.files ?? 0, snapshot?.files ?? 0)
     }
 
     private var legend: some View {

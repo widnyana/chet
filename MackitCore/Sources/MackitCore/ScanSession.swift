@@ -20,6 +20,8 @@ public enum ScanStep: String, Sendable, CaseIterable {
 
 public enum ScanEvent: Sendable {
     case started(ScanStep)
+    case rootMeasured(FolderNode)
+    case progress(ProgressSnapshot)
     case rules(CategoryResult)
     case folderTrees([FolderNode])
     case taggedCaches([ScanItem])
@@ -66,7 +68,7 @@ public final class ScanSession: Sendable {
         }
     }
 
-    func run(_ emit: @Sendable (ScanEvent) -> Void) async {
+    func run(_ emit: @escaping @Sendable (ScanEvent) -> Void) async {
         let previous = getiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_PROCESS)
         setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_PROCESS, IOPOL_THROTTLE)
         defer { setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_PROCESS, previous) }
@@ -88,10 +90,15 @@ public final class ScanSession: Sendable {
         emit(.finished(.rules))
 
         emit(.started(.index))
-        guard
-            let index = try? FileIndexBuilder(policy: policy, progress: progress).build(roots: Self.userRoots(home)),
-            !Task.isCancelled
-        else { return }
+        // The index step is metadata-only and interactive when the disk map is open; the
+        // throttle resumes for the hashing-heavy steps that follow.
+        setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_PROCESS, IOPOL_IMPORTANT)
+        var builder = FileIndexBuilder(policy: policy, progress: progress)
+        builder.onRootMeasured = { emit(.rootMeasured($0)) }
+        builder.onProgress = { emit(.progress($0)) }
+        let index = try? builder.build(roots: Self.userRoots(home))
+        setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_PROCESS, IOPOL_THROTTLE)
+        guard let index, !Task.isCancelled else { return }
         emit(.folderTrees(index.trees))
         emit(
             .taggedCaches(
