@@ -7,11 +7,10 @@ import SwiftUI
 /// bulk pass. The sheets attach here so the summary survives the pop.
 struct UninstallWorkspace: View {
     @Environment(AppCleanerModel.self) private var model
-    let onDone: () -> Void
 
     var body: some View {
         NavigationStack {
-            AppBrowserView(onDone: onDone)
+            AppBrowserView()
                 .navigationDestination(item: selectionBinding) { id in
                     if let app = model.apps.first(where: { $0.url == id }) {
                         AppCleanerDetailView(app: app)
@@ -67,7 +66,6 @@ struct UninstallWorkspace: View {
 
 struct AppBrowserView: View {
     @Environment(AppCleanerModel.self) private var model
-    let onDone: () -> Void
 
     private let columns = [GridItem(.adaptive(minimum: 164), spacing: Spacing.s3)]
 
@@ -120,21 +118,18 @@ struct AppBrowserView: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Button("Done", action: onDone)
-                    .help("Back to the Overview")
-            }
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
                 Picker("Layout", selection: $model.style) {
                     ForEach(AppBrowserStyle.allCases) { style in
-                        Text(style.title).tag(style)
+                        Image(systemName: style.systemImage)
+                            .help(style.title)
+                            .tag(style)
                     }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .help("Show the inventory as a list or a grid")
-            }
-            ToolbarItem(placement: .primaryAction) {
+
                 Button {
                     model.load()
                 } label: {
@@ -170,21 +165,20 @@ struct AppBrowserView: View {
         }
     }
 
-    private var list: some View {
-        VStack(spacing: 0) {
-            AppListHeader()
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(model.filteredApps) { app in
-                        AppRow(app: app)
-                        if app.id != model.filteredApps.last?.id {
-                            Hairline().padding(.horizontal, Metrics.widePageMargin)
-                        }
+    @ViewBuilder private var list: some View {
+        AppListHeader()
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                ForEach(model.filteredApps) { app in
+                    AppRow(app: app)
+                    if app.id != model.filteredApps.last?.id {
+                        Hairline().padding(.horizontal, Metrics.widePageMargin)
                     }
                 }
             }
-            .background(Theme.paper)
         }
+        .frame(maxHeight: .infinity)
+        .background(Theme.paper)
     }
 
     private var bulkBar: some View {
@@ -214,12 +208,35 @@ struct AppBrowserView: View {
 private enum AppColumns {
     static let mark: CGFloat = 20
     static let icon: CGFloat = 22
-    static let location: CGFloat = 130
+    static let location: CGFloat = 120
+    static let lastUsed: CGFloat = 110
     static let version: CGFloat = 68
     static let size: CGFloat = 82
     static let status: CGFloat = 118
     static let open: CGFloat = 20
     static let spacing: CGFloat = 10
+}
+
+/// The "Last used" cell, shared by the list row and the grid footer. Shows a relative date
+/// when Spotlight has one, "Unknown" when it resolved with no record, and a dim placeholder
+/// while the lazy lookup is still running.
+private struct LastUsedText: View {
+    @Environment(AppCleanerModel.self) private var model
+    let url: URL
+
+    var body: some View {
+        if let entry = model.appLastUsed[url] {
+            if let date = entry {
+                Text(date, format: .relative(presentation: .named))
+                    .foregroundStyle(Theme.inkSecondary)
+                    .help(date.formatted(date: .long, time: .shortened))
+            } else {
+                Text("Unknown").foregroundStyle(Theme.inkSecondary)
+            }
+        } else {
+            Text("...").foregroundStyle(Theme.inkTertiary)
+        }
+    }
 }
 
 private struct AppListHeader: View {
@@ -230,6 +247,7 @@ private struct AppListHeader: View {
                 Text("Application")
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Text("Location").frame(width: AppColumns.location, alignment: .leading)
+                Text("Last used").frame(width: AppColumns.lastUsed, alignment: .leading)
                 Text("Version").frame(width: AppColumns.version, alignment: .trailing)
                 Text("Size").frame(width: AppColumns.size, alignment: .trailing)
                 Text("Status").frame(width: AppColumns.status, alignment: .leading)
@@ -280,6 +298,10 @@ private struct AppRow: View {
                 .foregroundStyle(Theme.inkSecondary)
                 .lineLimit(1)
                 .frame(width: AppColumns.location, alignment: .leading)
+            LastUsedText(url: app.url)
+                .font(Typography.caption)
+                .lineLimit(1)
+                .frame(width: AppColumns.lastUsed, alignment: .leading)
             Text(app.version ?? " ")
                 .font(Typography.caption)
                 .monospacedDigit()

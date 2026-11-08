@@ -1,4 +1,5 @@
 import AppKit
+import CoreServices
 import Darwin
 import Foundation
 
@@ -338,6 +339,13 @@ public struct AppUninstaller: Sendable {
             url: url, name: name, bundleID: bundleID, version: version, helperBundleIDs: helperIDs,
             vendorLabel: bundleID.flatMap(vendorLabel), isWritable: isWritable(url.deletingLastPathComponent()),
             stamp: stamp)
+    }
+
+    /// Spotlight's last-used date for a bundle. Nil when the index has no record (never
+    /// launched, indexing off). Read on demand, never during discovery.
+    public static func lastUsedDate(_ url: URL) -> Date? {
+        guard let item = MDItemCreate(nil, url.path as CFString) else { return nil }
+        return MDItemCopyAttribute(item, kMDItemLastUsedDate) as? Date
     }
 
     /// Bundle IDs of embedded helpers. They make Chrome Helper data match Chrome without a

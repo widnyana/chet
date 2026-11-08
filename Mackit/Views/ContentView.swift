@@ -5,7 +5,7 @@ import SwiftUI
 struct ContentView: View {
     @Environment(ScanModel.self) private var model
     @State private var appCleaner = AppCleanerModel()
-    @State private var selection: String? = "overview"
+    @State private var selection: String? = "applications"
     @State private var confirming = false
 
     var body: some View {
@@ -45,7 +45,7 @@ struct ContentView: View {
 
     @ViewBuilder private var detail: some View {
         if selection == "applications" {
-            UninstallWorkspace(onDone: { selection = "overview" })
+            UninstallWorkspace()
         } else if selection == "disk-map" {
             DiskMapView()
         } else if selection == "snapshots" {
