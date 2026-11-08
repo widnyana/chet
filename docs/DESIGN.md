@@ -54,7 +54,10 @@ How it draws:
   only into blocks big enough to be legible (≥ 1.5% of the canvas area). Painter's order:
   ancestors first, descendants on top.
 - **Colors** come from the sidebar legend: orange caches and logs, purple developer data,
-  green media, blue other. Container blocks render dimmed so their children pop.
+  green media, blue other. Two channels: hue is the category, brightness is size. A block's
+  brightness scales with its share of the canvas (`0.55 + 0.45 * sqrt(share)`, clamped to
+  1.0), so the folders that dominate the disk read as the strongest color and slivers read
+  dim. Container blocks render dimmed (0.72) so their children pop.
 - **Navigation** is a URL path stack, not node references: the live tree is replaced
   several times a second, so the current node is re-resolved against the newest tree on
   every render; stale paths trim the breadcrumb stack instead of crashing.

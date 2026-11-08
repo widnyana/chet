@@ -339,12 +339,18 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
             TreemapTile(rect: bounds, color: Self.dimmed(Self.color(for: node.url)), node: node)
         ]
         let rects = Treemap.layout(node.children.map(\.size), in: bounds)
+        let boundsArea = bounds.width * bounds.height
         for item in rects where item.rect.width > 4 && item.rect.height > 4 {
             let child = node.children[item.index]
             let inner = item.rect.insetBy(dx: 1, dy: 1)
-            out.append(TreemapTile(rect: inner, color: Self.color(for: child.url), node: child))
+            let share = boundsArea > 0 ? item.rect.width * item.rect.height / boundsArea : 0
+            out.append(
+                TreemapTile(
+                    rect: inner,
+                    color: Self.shaded(Self.color(for: child.url), share: share),
+                    node: child))
             if level < nestingLevels - 1, !child.children.isEmpty,
-                inner.width * inner.height >= bounds.width * bounds.height * minRecursionFraction
+                inner.width * inner.height >= boundsArea * minRecursionFraction
             {
                 out.append(
                     contentsOf: tiles(for: child, in: inner.insetBy(dx: 3, dy: 3), level: level + 1))
@@ -353,8 +359,17 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
         return out
     }
 
+    /// Dim a container block so its children pop.
     private static func dimmed(_ color: SIMD4<Float>) -> SIMD4<Float> {
         SIMD4(color.x * 0.72, color.y * 0.72, color.z * 0.72, 1)
+    }
+
+    /// Size coding on top of the category hue: a block's brightness grows with its share
+    /// of the canvas, so the folders that dominate the disk read as the strongest color.
+    /// Square root: area shares are skewed, a 10% block is already near full brightness.
+    static func shaded(_ color: SIMD4<Float>, share: CGFloat) -> SIMD4<Float> {
+        let factor = Float(min(1, 0.55 + 0.45 * sqrt(max(0, share))))
+        return SIMD4(color.x * factor, color.y * factor, color.z * factor, 1)
     }
 
     override func setFrameSize(_ newSize: NSSize) {
