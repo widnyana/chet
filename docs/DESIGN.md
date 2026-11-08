@@ -60,8 +60,15 @@ How it draws:
   every render; stale paths trim the breadcrumb stack instead of crashing.
 - **Hover** shows a glass capsule with the folder name and byte count (monospaced digits);
   **click** zooms into a folder with children; right-click offers Reveal in Finder.
-- A slim status strip (file/byte counters, pause/stop) sits above the map while it grows;
-  the full measuring panel only appears before the first rollup arrives.
+- **Two sections.** The treemap owns the top; progress owns the bottom. The bottom strip
+  (quaternary background, top divider) carries the phase headline, the linear bar, the
+  detail line (label, rate, elapsed, paused), file counters, the five-line folder trail,
+  and Pause/Stop. It appears only while scanning and is text-only: its per-tick updates
+  never relayout the Metal canvas.
+- **Throttled snapshots.** Rollups replace `liveTree` several times a second; the UI draws
+  a 250 ms snapshot (`displayTree`, refreshed by a poll task) so the canvas and the path
+  pill relayout at most 4x/s instead of strobing. Hover re-resolves by URL against the
+  newest snapshot.
 
 ## Visual language
 
@@ -172,6 +179,13 @@ Rules the script enforces:
       "mechanism": "in-flow-header",
       "height": 30,
       "verify": {"contains": ["glassEffect(.regular, in: .capsule)"]}
+    },
+    {
+      "id": "disk-map-progress-strip",
+      "file": "Mackit/Views/DiskMapView.swift",
+      "mechanism": "in-flow-bottom-of-page",
+      "height": 150,
+      "verify": {"contains": ["background(.quaternary.opacity(0.4))"]}
     },
     {
       "id": "access-banner",

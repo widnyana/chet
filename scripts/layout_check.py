@@ -90,9 +90,13 @@ def main():
             floating.append((entry, rect_fn(window, entry)))
 
     # Any window-level top overlay would cover the title bar and the toolbar pill.
+    # A top overlay carrying only a Divider is an in-flow separator, not chrome.
     for swift in sorted(VIEWS.rglob("*.swift")):
-        for match in re.finditer(r"\.overlay\(alignment: \.top[,\)]", swift.read_text()):
-            line = swift.read_text()[: match.start()].count("\n") + 1
+        text = swift.read_text()
+        for match in re.finditer(r"\.overlay\(alignment: \.top[,\)]", text):
+            if "Divider" in text[match.end():match.end() + 40]:
+                continue
+            line = text[: match.start()].count("\n") + 1
             errors.append(f"top overlay forbidden (covers the toolbar): {swift.name}:{line}")
 
     # Floating pieces must not intersect each other on the minimum window.

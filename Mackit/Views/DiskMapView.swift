@@ -13,6 +13,10 @@ struct DiskMapView: View {
     @State private var stack: [URL] = []
     /// Home tree of the finished scan; nil while the live tree is still growing.
     @State private var finalHome: FolderNode?
+    /// Snapshot the UI draws. `liveTree` is replaced several times a second while the
+    /// scan runs; feeding every replacement straight to the Metal canvas made the page
+    /// flicker. The poll below publishes a 250 ms snapshot instead.
+    @State private var displayTree: FolderNode?
     @State private var hovered: FolderNode?
 
     var body: some View {
@@ -47,9 +51,8 @@ struct DiskMapView: View {
                 legend
             }
             .padding(12)
-            if model.isScanning, pathNodes.count > 1 || model.liveTree != nil {
-                liveStatusBar
-            }
+            Divider()
+            // Top section: the diagram. It grows live while the scan runs.
             if let current = pathNodes.last {
                 TreemapCanvas(
                     node: current,
@@ -60,6 +63,7 @@ struct DiskMapView: View {
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .padding([.horizontal, .bottom], 12)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .overlay(alignment: .bottomLeading) {
                     if let hovered {
                         HStack(spacing: 8) {
@@ -75,9 +79,7 @@ struct DiskMapView: View {
                         .allowsHitTesting(false)
                     }
                 }
-            } else if model.isScanning {
-                measuringPanel
-            } else {
+            } else if !model.isScanning {
                 ContentUnavailableView {
                     Label("Disk map", systemImage: "square.grid.3x3.fill")
                 } description: {
@@ -87,6 +89,14 @@ struct DiskMapView: View {
                         .buttonStyle(.glassProminent)
                         .controlSize(.large)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                // Measuring, no rollup yet: keep the diagram section sized, blank.
+                Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            // Bottom section: progress. Its per-tick text updates never touch the canvas.
+            if model.isScanning {
+                progressPanel
             }
         }
         .navigationTitle("Disk map")
@@ -100,12 +110,32 @@ struct DiskMapView: View {
             stack = []
             hovered = nil
         }
+        // Publish a throttled tree snapshot and re-resolve the hover against it, so the
+        // canvas and the path pill see a stable tree instead of every rollup.
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(250))
+                guard let newest = model.liveTree ?? finalHome else { continue }
+                guard newest != displayTree else { continue }
+                displayTree = newest
+                hovered = hovered.flatMap { Self.node(with: $0.url, in: newest) }
+            }
+        }
+    }
+
+    /// The newest node with this URL, or nil when the update dropped it.
+    private static func node(with url: URL, in tree: FolderNode) -> FolderNode? {
+        if tree.url == url { return tree }
+        for child in tree.children {
+            if let hit = node(with: url, in: child) { return hit }
+        }
+        return nil
     }
 
     /// Home tree first, then children along the navigation stack; the stack is trimmed to the
-    /// prefix that still exists in the newest tree (V3).
+    /// prefix that still exists in the newest snapshot.
     private var pathNodes: [FolderNode] {
-        guard var node = model.liveTree ?? finalHome else { return [] }
+        guard var node = displayTree else { return [] }
         var nodes = [node]
         for url in stack {
             guard let child = node.children.first(where: { $0.url == url }) else { break }
@@ -115,57 +145,48 @@ struct DiskMapView: View {
         return nodes
     }
 
-    /// Slim progress strip shown above the map while it grows live.
-    private var liveStatusBar: some View {
-        HStack(spacing: 10) {
-            if let snap = model.rootsProgress {
-                Text(
-                    "\(snap.files) files · \(snap.bytes.formatted(.byteCount(style: .file)))"
-                        + " · root \(snap.rootsDone + 1) of \(snap.rootsTotal)"
-                )
-                .font(.caption)
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-            }
-            Spacer()
-            Button(model.isPaused ? "Resume" : "Pause") { model.togglePause() }
-                .controlSize(.small)
-            Button("Stop", systemImage: "stop.fill") { model.cancel() }
-                .controlSize(.small)
-        }
-        .padding([.horizontal, .bottom], 12)
-    }
-
-    private var measuringPanel: some View {
-        VStack(spacing: 14) {
-            if let activity = model.activity {
-                Text(headline(activity))
-                    .font(.headline)
-                    .lineLimit(1)
-                // Determinate only when the phase has a denominator that can actually grow.
-                if activity.total > activity.done, activity.total > 0 {
-                    ProgressView(value: Double(activity.done), total: Double(activity.total))
-                        .progressViewStyle(.linear)
-                        .frame(width: 420)
+    /// Bottom section: everything the scan is doing right now, in one strip. Text-only,
+    /// so its per-tick updates never relayout the Metal canvas above.
+    private var progressPanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                if let activity = model.activity {
+                    Text(headline(activity))
+                        .font(.headline)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                    Spacer()
+                    if let snap = model.rootsProgress {
+                        Text(
+                            "\(snap.files) files · \(snap.bytes.formatted(.byteCount(style: .file)))"
+                                + " · root \(snap.rootsDone + 1) of \(snap.rootsTotal)"
+                        )
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                    }
                 } else {
-                    ProgressView()
-                        .progressViewStyle(.linear)
-                        .frame(width: 420)
+                    ProgressView().controlSize(.small)
+                    Text(model.currentStep?.title ?? "Starting scan")
+                        .font(.headline)
                 }
+            }
+            if let activity = model.activity {
+                // Determinate only when the phase has a denominator that can actually grow.
+                Group {
+                    if activity.total > activity.done, activity.total > 0 {
+                        ProgressView(value: Double(activity.done), total: Double(activity.total))
+                    } else {
+                        ProgressView()
+                    }
+                }
+                .progressViewStyle(.linear)
                 Text(detailLine(activity))
                     .font(.callout)
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .help(activity.label)
-                if let snap = model.rootsProgress {
-                    Text(
-                        "\(snap.files) files · \(snap.bytes.formatted(.byteCount(style: .file)))"
-                            + " · root \(snap.rootsDone + 1) of \(snap.rootsTotal)"
-                    )
-                    .font(.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                }
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(Array(activity.trail.prefix(5).enumerated()), id: \.offset) { index, label in
                         Text(label)
@@ -176,18 +197,19 @@ struct DiskMapView: View {
                             .truncationMode(.middle)
                     }
                 }
-                .frame(width: 480, alignment: .leading)
-            } else {
-                ProgressView()
-                Text(model.currentStep?.title ?? "Starting scan")
             }
             HStack(spacing: 10) {
+                Spacer()
                 Button(model.isPaused ? "Resume" : "Pause") { model.togglePause() }
+                    .controlSize(.small)
                 Button("Stop", systemImage: "stop.fill") { model.cancel() }
+                    .controlSize(.small)
             }
-            .controlSize(.regular)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.quaternary.opacity(0.4))
+        .overlay(alignment: .top) { Divider() }
     }
 
     /// "<phase title>" plus its fraction when the phase knows one.
