@@ -1,20 +1,36 @@
-# Ignore everything by default. To commit a file, add an explicit "!path" line below.
-*
-# Keep directories traversable so nested "!path" lines work.
-!*/
+# ============================================================
+# IGNORE-BY-DEFAULT POLICY
+# Every file is ignored by default ("*"). A file is committable
+# ONLY after it gets an explicit un-ignore line ("!<path>", or
+# "!<dir>/**" for a whole tree) added in the same commit.
+# Never bypass this with "git add -f".
+# Check a path: git check-ignore -v <path>   (no output = not ignored)
+# ============================================================
 
-!.gitignore
-!project.yml
-!mise.toml
+# --- 1. Default: ignore everything ---
+*
+
+# --- 2. Keep needed directories traversable so nested "!path" lines work ---
+# Scoped on purpose: a blanket "!*/" would re-include ignored dirs like
+# .codegraph/ and let their inner .gitignore files leak through.
+!Mackit/
+!MackitCore/
+!docs/
+!scripts/
+
+# --- 3. Committable files (un-ignore list; add "!<path>" here in the same commit) ---
+# Anchored to the repo root so nested dotfiles (e.g. .codegraph/.gitignore) stay ignored.
+!/.gitignore
+!/project.yml
+!/mise.toml
 !/README.md
-!.swift-format
+!/.swift-format
 !Mackit/**
 !MackitCore/**
 !docs/findings.md
+!scripts/**
+
+# --- 4. Explicit re-ignores inside committable trees ---
 MackitCore/.build/
 MackitCore/.swiftpm/
 .DS_Store
-.worktrees/
-ref/
-
-!scripts/**
