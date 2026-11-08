@@ -21,6 +21,8 @@ public enum ScanStep: String, Sendable, CaseIterable {
 public enum ScanEvent: Sendable {
     case started(ScanStep)
     case rootMeasured(FolderNode)
+    /// Directory rollup while the walk runs; the disk map merges these into a live home tree.
+    case treeUpdate(FolderNode)
     case progress(ProgressSnapshot)
     /// Rules step: one completion per scanned rule, so the UI can name the active category.
     case rulesProgress(done: Int, total: Int, category: String)
@@ -115,6 +117,7 @@ public final class ScanSession: Sendable {
         var builder = FileIndexBuilder(policy: policy, progress: progress)
         builder.onRootMeasured = { emit(.rootMeasured($0)) }
         builder.onProgress = { emit(.progress($0)) }
+        builder.onRollup = { emit(.treeUpdate($0)) }
         builder.onPause = { await pause() }
         let index = try? await builder.build(roots: Self.userRoots(home))
         setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_PROCESS, IOPOL_THROTTLE)

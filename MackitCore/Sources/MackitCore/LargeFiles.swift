@@ -47,6 +47,45 @@ public struct FolderNode: Sendable, Identifiable, Equatable {
         self.size = size
         self.children = children
     }
+
+    /// Live tree merge: replaces the subtree at `update.url`, or appends it as a new child.
+    /// Walker rollups arrive post-order, so an update always supersedes older data for its
+    /// path; ancestors keep their own (older, larger-or-equal) totals until their own rollup
+    /// lands. Pure, so the disk map's merge path is unit-testable without AppKit.
+    public func merging(_ update: FolderNode) -> FolderNode {
+        if url == update.url { return update }
+        var children = self.children
+        if let index = children.firstIndex(where: { $0.url.path == update.url.path }) {
+            children[index] = update
+        } else {
+            children.append(update)
+        }
+        // Ancestors keep their own measured total, but never shrink below what their
+        // children now account for (the home root grows as roots measure in).
+        let size = max(size, children.reduce(0) { $0 + $1.size })
+        return FolderNode(url: url, size: size, children: children.sorted { $0.size > $1.size })
+    }
+
+    /// Grafts a rollup that may arrive before its parent chain exists: descends from `self`
+    /// (the tree root) along `update.url`'s path, replacing the subtree at the update's own
+    /// position. Returns nil when some intermediate folder hasn't been measured yet — its
+    /// own rollup will arrive later and carry this subtree with it. Pure.
+    public func inserting(_ update: FolderNode) -> FolderNode? {
+        if url.path == update.url.path { return update }
+        let parent = update.url.deletingLastPathComponent()
+        if parent.path == url.path {
+            return merging(update)
+        }
+        guard
+            let index = children.firstIndex(where: {
+                update.url.path.hasPrefix($0.url.path + "/")
+            }), let updated = children[index].inserting(update)
+        else { return nil }
+        var children = self.children
+        children[index] = updated
+        let size = max(size, children.reduce(0) { $0 + $1.size })
+        return FolderNode(url: url, size: size, children: children.sorted { $0.size > $1.size })
+    }
 }
 
 public enum FolderTree {

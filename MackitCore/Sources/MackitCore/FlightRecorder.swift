@@ -392,6 +392,8 @@ extension FlightRecorder {
             return ("snapshots", "\(snapshots.count) local snapshots")
         case .rootMeasured(let node):
             return ("index", "measured \(node.url.lastPathComponent): \(node.size) bytes")
+        case .treeUpdate(let node):
+            return ("index", "rollup \(node.url.lastPathComponent): \(node.size) bytes")
         case .rulesProgress(let done, let total, let category):
             return ("rules", "\(done)/\(total) rules, last: \(category)")
         case .stepActivity(let step, let done, let total, let label):

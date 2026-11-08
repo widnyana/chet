@@ -82,6 +82,14 @@ public struct FileIndexBuilder: Sendable {
     public var onProgress: (@Sendable (ProgressSnapshot) -> Void)?
     /// Called before each top-level root starts; a paused gate suspends the walk here.
     public var onPause: (@Sendable () async throws -> Void)?
+    /// Called when a directory finishes measuring (post-order, so children come first) if it
+    /// is interesting enough to render live: shallow enough, or big enough. The disk map
+    /// merges these into a live home tree while the walk runs.
+    public var onRollup: (@Sendable (FolderNode) -> Void)?
+    /// Deepest folder level reported through `onRollup`.
+    public var rollupMaxDepth = 2
+    /// Folders at or above this size are reported regardless of depth.
+    public var rollupMinBytes: Int64 = 32_000_000
     /// Folder levels kept in `FileIndex.trees`; deeper folders only add to their ancestors.
     public var maxDepth = 6
     public var candidateMinSize: Int64 = 1_000_000
@@ -210,7 +218,9 @@ public struct FileIndexBuilder: Sendable {
         index.entriesSeen += entries
         tick(progress.files, progress.bytes, url.path)
         if tagged { index.taggedCaches.append(TaggedFolder(url: url, bytes: total)) }
-        return FolderNode(url: url, size: total, children: children.sorted { $0.size > $1.size })
+        let node = FolderNode(url: url, size: total, children: children.sorted { $0.size > $1.size })
+        if depth <= rollupMaxDepth || node.size >= rollupMinBytes { onRollup?(node) }
+        return node
     }
 
     /// True when the folder holds a `CACHEDIR.TAG` starting with the spec signature (ncdu `isCacheDir`).
