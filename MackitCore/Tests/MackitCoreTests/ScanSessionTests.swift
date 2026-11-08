@@ -46,6 +46,31 @@ struct ScanSessionTests {
             snapshots.isEmpty || snapshots.allSatisfy { $0.rootsTotal == 3 && $0.runningRootURL != nil })
     }
 
+    @Test func everyPhaseReportsStepActivity() async throws {
+        let dir = try TempDir()
+        try dir.file("Documents/a/copy", bytes: 2_000_000, fill: 9)
+        try dir.file("Documents/b/copy", bytes: 2_000_000, fill: 9)
+        var events: [ScanEvent] = []
+        for await event in ScanSession(home: dir.url, largeFileMinSize: 2_500_000).events() {
+            events.append(event)
+            if case .done = event { break }
+        }
+        let activities = events.compactMap { event -> (ScanStep, Int, Int, String)? in
+            if case .stepActivity(let step, let done, let total, let label) = event {
+                return (step, done, total, label)
+            }
+            return nil
+        }
+        // Every phase announces itself.
+        #expect(Set(activities.map(\.0)) == Set(ScanStep.allCases))
+        #expect(activities.allSatisfy { !$0.3.isEmpty })
+        // The rules step counts every catalog rule exactly once.
+        let rules = activities.filter { $0.0 == .rules && $0.2 > 0 }
+        #expect(rules.last?.1 == Rule.catalog.count)
+        #expect(rules.last?.2 == Rule.catalog.count)
+        #expect(rules.map(\.1) == rules.map(\.1).sorted())
+    }
+
     @Test func taggedCargoTargetBecomesOneCacheItem() async throws {
         let dir = try TempDir()
         try dir.file("Development/proj/target/debug/blob", bytes: 2_000_000, fill: 3)

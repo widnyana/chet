@@ -26,6 +26,18 @@ struct ItemGroup: Identifiable {
     let items: [ScanItem]
 }
 
+/// What the scan is doing right now, for every phase. One value feeds the Disk map
+/// panel and the toolbar line so the two cannot disagree.
+struct ScanActivity {
+    var phase: MackitCore.ScanStep
+    var done: Int
+    /// Zero when the phase has no useful denominator; the bar is then indeterminate.
+    var total: Int
+    var label: String
+    var trail: [String] = []
+    var paused = false
+}
+
 @MainActor
 @Observable
 final class ScanModel {
@@ -60,12 +72,14 @@ final class ScanModel {
     var rootsProgress: ProgressSnapshot?
     /// Last sampled folders of the walk, newest first (one per progress tick).
     var recentFolders: [String] = []
+    /// Live activity for whichever phase is running.
+    var activity: ScanActivity?
     /// Files per second, from the last two progress ticks.
     var rate: Double?
     /// When the running scan started.
     var scanStartedAt: Date?
     /// True while the scan is paused via the gate.
-    var isPaused = false
+    var isPaused = false { didSet { activity?.paused = isPaused } }
     /// The pause gate of the running scan; nil when idle.
     private var pauseGate: ScanPauseGate?
     /// Live counters of the running scan.
@@ -205,6 +219,7 @@ final class ScanModel {
         rootsProgress = nil
         partialTrees = []
         recentFolders = []
+        activity = nil
     }
 
     /// Pause or resume the running scan; no-op when idle.
@@ -262,13 +277,33 @@ final class ScanModel {
         }
     }
 
+    /// Updates the activity value, appending the label to the trail when it changes.
+    private func pushActivity(_ step: MackitCore.ScanStep, done: Int, total: Int, label: String) {
+        var next = activity ?? ScanActivity(phase: step, done: done, total: total, label: label)
+        next.phase = step
+        next.done = done
+        next.total = total
+        if next.label != label || next.trail.isEmpty {
+            next.label = label
+            next.trail.insert(label, at: 0)
+            if next.trail.count > 6 { next.trail.removeLast(next.trail.count - 6) }
+        }
+        activity = next
+    }
+
     private func markDone(_ id: MackitCore.ScanStep) {
         if let index = steps.firstIndex(where: { $0.id == id }) { steps[index].done = true }
     }
 
     private func apply(_ event: ScanEvent) {
         switch event {
-        case .started(let step): currentStep = step
+        case .started(let step):
+            currentStep = step
+            activity = ScanActivity(phase: step, done: 0, total: 0, label: step.title, trail: [])
+        case .rulesProgress(let done, let total, let category):
+            pushActivity(.rules, done: done, total: total, label: category)
+        case .stepActivity(let step, let done, let total, let label):
+            pushActivity(step, done: done, total: total, label: label)
         case .rules(let result): merge(result)
         case .folderTrees(let trees):
             folderTrees = trees
@@ -284,6 +319,7 @@ final class ScanModel {
                 if recentFolders.count > 6 { recentFolders.removeLast(recentFolders.count - 6) }
             }
             rootsProgress = snapshot
+            pushActivity(.index, done: snapshot.rootsDone, total: snapshot.rootsTotal, label: snapshot.currentFolder)
         case .taggedCaches(let items): add("tagged-caches", items: items)
         case .largeFiles(let items): add("large-files", items: items)
         case .duplicates(let found):

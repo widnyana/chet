@@ -22,6 +22,10 @@ public enum ScanEvent: Sendable {
     case started(ScanStep)
     case rootMeasured(FolderNode)
     case progress(ProgressSnapshot)
+    /// Rules step: one completion per scanned rule, so the UI can name the active category.
+    case rulesProgress(done: Int, total: Int, category: String)
+    /// Any step: how far through its own units it is, with a label naming the unit.
+    case stepActivity(ScanStep, done: Int, total: Int, label: String)
     case rules(CategoryResult)
     case folderTrees([FolderNode])
     case taggedCaches([ScanItem])
@@ -81,13 +85,21 @@ public final class ScanSession: Sendable {
 
         emit(.started(.rules))
         let scanner = RuleScanner(home: home)
+        let ruleTotal = scanner.rules.count
+        emit(.stepActivity(.rules, done: 0, total: ruleTotal, label: "starting"))
+        var rulesDone = 0
         await withTaskGroup(of: CategoryResult?.self) { group in
             var pending = scanner.rules.makeIterator()
             for _ in 0..<ruleConcurrency {
                 if let rule = pending.next() { group.addTask { try? await scanner.scan(rule) } }
             }
             for await result in group {
+                rulesDone += 1
                 if let result { emit(.rules(result)) }
+                emit(
+                    .stepActivity(
+                        .rules, done: rulesDone, total: ruleTotal,
+                        label: result?.category ?? "unreadable rule"))
                 if !Task.isCancelled, let rule = pending.next() { group.addTask { try? await scanner.scan(rule) } }
             }
         }
@@ -96,6 +108,7 @@ public final class ScanSession: Sendable {
         await pause()
 
         emit(.started(.index))
+        emit(.stepActivity(.index, done: 0, total: 0, label: "measuring folders"))
         // The index step is metadata-only and interactive when the disk map is open; the
         // throttle resumes for the hashing-heavy steps that follow.
         setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_PROCESS, IOPOL_IMPORTANT)
@@ -121,6 +134,7 @@ public final class ScanSession: Sendable {
 
         await pause()
         emit(.started(.largeFiles))
+        emit(.stepActivity(.largeFiles, done: 0, total: 0, label: "large and old files"))
         var large = LargeFileScanner(policy: policy)
         large.minSize = largeFileMinSize
         emit(.largeFiles(large.select(from: index.candidates)))
@@ -128,6 +142,7 @@ public final class ScanSession: Sendable {
 
         await pause()
         emit(.started(.duplicates))
+        emit(.stepActivity(.duplicates, done: 0, total: 0, label: "hashing duplicate candidates"))
         let duplicates = (try? DuplicateFinder(policy: policy).find(entries: index.candidates)) ?? []
         guard !Task.isCancelled else { return }
         emit(.duplicates(duplicates))
@@ -135,6 +150,7 @@ public final class ScanSession: Sendable {
 
         await pause()
         emit(.started(.leftovers))
+        emit(.stepActivity(.leftovers, done: 0, total: 0, label: "unused app data"))
         let leftovers = (try? LeftoverScanner(home: home).scan()) ?? []
         guard !Task.isCancelled else { return }
         emit(.leftovers(leftovers))
@@ -142,6 +158,7 @@ public final class ScanSession: Sendable {
 
         await pause()
         emit(.started(.photos))
+        emit(.stepActivity(.photos, done: 0, total: 0, label: "hashing photos"))
         let photos = try? SimilarPhotos(policy: policy).scan(entries: index.candidates)
         guard !Task.isCancelled else { return }
         if let photos { emit(.photos(photos)) }
@@ -149,6 +166,7 @@ public final class ScanSession: Sendable {
 
         await pause()
         emit(.started(.videos))
+        emit(.stepActivity(.videos, done: 0, total: 0, label: "sampling video frames"))
         let videos = (try? await SimilarVideos(policy: policy).scan(entries: index.candidates)) ?? []
         guard !Task.isCancelled else { return }
         emit(.videos(videos))
@@ -156,6 +174,7 @@ public final class ScanSession: Sendable {
 
         await pause()
         emit(.started(.snapshots))
+        emit(.stepActivity(.snapshots, done: 0, total: 0, label: "listing snapshots"))
         let snapshots = (try? Snapshots.list()) ?? []
         guard !Task.isCancelled else { return }
         emit(.snapshots(snapshots))

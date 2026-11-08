@@ -104,28 +104,37 @@ struct DiskMapView: View {
 
     private var measuringPanel: some View {
         VStack(spacing: 14) {
-            if let snap = snapshot ?? model.rootsProgress {
-                ProgressView(value: Double(snap.files), total: Double(max(baseline, snap.files)))
-                    .progressViewStyle(.linear)
-                    .frame(width: 420)
-                VStack(spacing: 4) {
+            if let activity = model.activity {
+                Text(headline(activity))
+                    .font(.headline)
+                    .lineLimit(1)
+                // Determinate only when the phase has a denominator that can actually grow.
+                if activity.total > activity.done, activity.total > 0 {
+                    ProgressView(value: Double(activity.done), total: Double(activity.total))
+                        .progressViewStyle(.linear)
+                        .frame(width: 420)
+                } else {
+                    ProgressView()
+                        .progressViewStyle(.linear)
+                        .frame(width: 420)
+                }
+                Text(detailLine(activity))
+                    .font(.callout)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(activity.label)
+                if let snap = model.rootsProgress {
                     Text(
                         "\(snap.files) files · \(snap.bytes.formatted(.byteCount(style: .file)))"
                             + " · root \(snap.rootsDone + 1) of \(snap.rootsTotal)"
-                            + (model.rate.map { " · \(String(format: "%.1f", $0))k files/s" } ?? "")
-                            + (model.scanStartedAt.map { " · " + Self.elapsed(since: $0) } ?? "")
                     )
+                    .font(.caption)
                     .monospacedDigit()
-                    Text(snap.currentFolder)
-                        .font(.callout)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .help(snap.currentFolder)
+                    .foregroundStyle(.secondary)
                 }
-                // The walk's recent trail: sampled milestones, newest on top.
                 VStack(alignment: .leading, spacing: 2) {
-                    ForEach(Array(model.recentFolders.prefix(5).enumerated()), id: \.offset) { index, folder in
-                        Text(folder)
+                    ForEach(Array(activity.trail.prefix(5).enumerated()), id: \.offset) { index, label in
+                        Text(label)
                             .font(.caption)
                             .monospacedDigit()
                             .foregroundStyle(index == 0 ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
@@ -133,14 +142,13 @@ struct DiskMapView: View {
                             .truncationMode(.middle)
                     }
                 }
-                .frame(width: 480)
+                .frame(width: 480, alignment: .leading)
             } else {
                 ProgressView()
-                Text("Measuring folders")
+                Text(model.currentStep?.title ?? "Starting scan")
             }
             HStack(spacing: 10) {
                 Button(model.isPaused ? "Resume" : "Pause") { model.togglePause() }
-                    .disabled(model.isPaused == false && model.currentStep != .index)
                 Button("Stop", systemImage: "stop.fill") { model.cancel() }
             }
             .controlSize(.regular)
@@ -148,14 +156,27 @@ struct DiskMapView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    /// The active label plus rate, elapsed, and paused state.
+    private func detailLine(_ activity: ScanActivity) -> String {
+        var parts = [activity.label]
+        if let rate = model.rate { parts.append(String(format: "%.1fk files/s", rate)) }
+        if let started = model.scanStartedAt { parts.append(Self.elapsed(since: started)) }
+        if model.isPaused { parts.append("paused") }
+        return parts.joined(separator: " · ")
+    }
+
     static func elapsed(since date: Date) -> String {
         let interval = Int(Date().timeIntervalSince(date))
         return String(format: "%02d:%02d", interval / 60, interval % 60)
     }
 
-    /// The bar's moving baseline: max files seen so far (grows as the walk does).
-    private var baseline: Int {
-        max(model.rootsProgress?.files ?? 0, snapshot?.files ?? 0)
+    /// "<phase title>" plus its fraction when the phase knows one.
+    private func headline(_ activity: ScanActivity) -> String {
+        let phase = activity.phase.title
+        if activity.total > 0 {
+            return "\(phase) — \(activity.done) of \(activity.total)"
+        }
+        return model.isPaused ? "\(phase) — paused" : phase
     }
 
     private var legend: some View {

@@ -14,10 +14,10 @@ struct ScanStatusView: View {
                     .progressViewStyle(.circular)
                     .controlSize(.small)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(model.currentStep?.title ?? "Scanning").font(.callout).lineLimit(1)
+                    Text(phaseTitle).font(.callout).lineLimit(1)
                     Group {
-                        if let folder = model.rootsProgress?.currentFolder, !folder.isEmpty {
-                            Text(folder).lineLimit(1).truncationMode(.middle).help(folder)
+                        if let label = model.activity?.label, !label.isEmpty {
+                            Text(label).lineLimit(1).truncationMode(.middle).help(label)
                         } else {
                             Text("\(model.totalBytes.formatted(.byteCount(style: .file))) found")
                         }
@@ -44,6 +44,15 @@ struct ScanStatusView: View {
             .buttonStyle(.glassProminent)
             .help("Scan this Mac for junk (Command-R)")
         }
+    }
+
+    /// "Rules — 4 of 12" when the phase knows its total, otherwise just its name.
+    private var phaseTitle: String {
+        guard let activity = model.activity else { return model.currentStep?.title ?? "Scanning" }
+        let paused = model.isPaused ? " — paused" : ""
+        return activity.total > 0
+            ? "\(activity.phase.title) — \(activity.done) of \(activity.total)\(paused)"
+            : "\(activity.phase.title)\(paused)"
     }
 
     static func elapsed(since date: Date) -> String {
