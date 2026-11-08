@@ -4,11 +4,39 @@ import QuickLookThumbnailing
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// Group sort order: by reclaimable size or name, ascending or descending.
+enum GroupSort: String, CaseIterable, Identifiable {
+    case sizeDesc, sizeAsc, nameAsc, nameDesc
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .sizeDesc: "Largest First"
+        case .sizeAsc: "Smallest First"
+        case .nameAsc: "Name A–Z"
+        case .nameDesc: "Name Z–A"
+        }
+    }
+
+    func sorted(_ groups: [ItemGroup]) -> [ItemGroup] {
+        func size(_ g: ItemGroup) -> Int64 { g.items.reduce(0) { $0 + $1.reclaimableBytes } }
+        switch self {
+        case .sizeDesc: return groups.sorted { size($0) > size($1) }
+        case .sizeAsc: return groups.sorted { size($0) < size($1) }
+        case .nameAsc: return groups.sorted { $0.keeper.lastPathComponent.localizedStandardCompare($1.keeper.lastPathComponent) == .orderedAscending }
+        case .nameDesc: return groups.sorted { $0.keeper.lastPathComponent.localizedStandardCompare($1.keeper.lastPathComponent) == .orderedDescending }
+        }
+    }
+}
+
 /// Duplicates and similar media. Photos and videos show as cards; other files as a list.
 /// Each group shows the copy that stays, then the copies that may go.
 struct GroupedItemsView: View {
     @Environment(ScanModel.self) private var model
     let groups: [ItemGroup]
+    @State private var sort: GroupSort = .sizeDesc
+
+    private var sorted: [ItemGroup] { sort.sorted(groups) }
 
     private var isMedia: Bool {
         groups.allSatisfy { group in
@@ -18,13 +46,28 @@ struct GroupedItemsView: View {
     }
 
     var body: some View {
-        if isMedia { cards } else { list }
+        VStack(spacing: 0) {
+            HStack {
+                Spacer()
+                Picker("Sort", selection: $sort) {
+                    ForEach(GroupSort.allCases) { option in
+                        Text(option.label).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .fixedSize()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+            if isMedia { cards } else { list }
+        }
     }
 
     private var cards: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 24) {
-                ForEach(groups) { group in
+                ForEach(sorted) { group in
                     VStack(alignment: .leading, spacing: 10) {
                         header(group)
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 200), spacing: 12)], spacing: 12)
@@ -43,7 +86,7 @@ struct GroupedItemsView: View {
 
     private var list: some View {
         List {
-            ForEach(groups) { group in
+            ForEach(sorted) { group in
                 Section {
                     HStack(spacing: 10) {
                         Image(nsImage: NSWorkspace.shared.icon(forFile: group.keeper.path))

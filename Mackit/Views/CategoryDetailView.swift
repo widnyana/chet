@@ -9,6 +9,10 @@ struct CategoryDetailView: View {
     let onClean: () -> Void
     @State private var rows = Set<URL>()
     @State private var preview: URL?
+    /// Clickable column headers; largest-first is the useful default.
+    @State private var sortOrder: [KeyPathComparator<ScanItem>] = [
+        KeyPathComparator(\.reclaimableBytes, order: .reverse),
+    ]
 
     private var urls: [URL] { category.items.map(\.url) }
     private var categorySelected: [ScanItem] { category.items.filter { model.selected.contains($0.url) } }
@@ -47,23 +51,23 @@ struct CategoryDetailView: View {
     }
 
     private var table: some View {
-        Table(category.items, selection: $rows) {
+        Table(category.items.sorted(using: sortOrder), selection: $rows, sortOrder: $sortOrder) {
             TableColumn("") { item in
                 Toggle("Clean", isOn: model.isSelected(item.url))
                     .toggleStyle(.checkbox)
                     .labelsHidden()
             }
             .width(22)
-            TableColumn("Name") { item in
+            TableColumn("Name", value: \.url.lastPathComponent) { item in
                 ItemNameCell(item: item)
             }
-            TableColumn("Size") { item in
+            TableColumn("Size", value: \.reclaimableBytes) { item in
                 Text(item.reclaimableBytes.formatted(.byteCount(style: .file)))
                     .monospacedDigit()
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .width(min: 70, ideal: 90, max: 120)
-            TableColumn("Modified") { item in
+            TableColumn("Modified", value: \.stamp.modified) { item in
                 Text(item.stamp.modified, format: .relative(presentation: .named))
                     .foregroundStyle(.secondary)
                     .help(item.stamp.modified.formatted(date: .long, time: .shortened))
