@@ -250,11 +250,13 @@ public final class FlightRecorder: Sendable {
         let target = inactive == 0 ? mirror.a : mirror.b
         var offset = 0
         // Newest first: walk backwards from writeIndex - 1.
-        for k in 0..<lastCount {
-            let index = (s.writeIndex - 1 - k + ringSlotsLimit * 2) % ringSlotsLimit
-            let len = s.slotLen[index]
-            _ = memcpy(target + offset, UnsafeRawPointer(s.slotData) + index * Self.slotBytes, len)
-            offset += len
+        s.slotData.withUnsafeBytes { (src: UnsafeRawBufferPointer) in
+            for k in 0..<lastCount {
+                let index = (s.writeIndex - 1 - k + ringSlotsLimit * 2) % ringSlotsLimit
+                let len = s.slotLen[index]
+                _ = memcpy(target + offset, src.baseAddress! + index * Self.slotBytes, len)
+                offset += len
+            }
         }
         if inactive == 0 {
             mirror.lenA.store(offset, ordering: .releasing)

@@ -84,7 +84,7 @@ struct ScanFinishedToast: View {
             content.title = "Scan finished"
             content.body = "\(bytes) can be cleaned"
             let request = UNNotificationRequest(identifier: "scan-finished", content: content, trigger: nil)
-            try? UNUserNotificationCenter.current().add(request)
+            UNUserNotificationCenter.current().add(request)
         }
     }
 }
