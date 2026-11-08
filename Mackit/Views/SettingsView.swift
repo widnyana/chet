@@ -1,6 +1,21 @@
 import MackitCore
 import SwiftUI
 
+/// SwiftUI's `Settings` scene titles its window "<AppName> Settings" and offers no
+/// title modifier. The design language wants the plain word, so the hosting window's
+/// title is fixed when the view lands in it.
+struct SettingsWindowTitle: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async { view.window?.title = "Settings" }
+        return view
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        DispatchQueue.main.async { view.window?.title = "Settings" }
+    }
+}
+
 /// The app's Settings page (Cmd+,). One opt-in: the duplicates step skips caches,
 /// project build dirs, and other temporary places unless the user asks for them.
 struct SettingsView: View {
@@ -24,5 +39,6 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 460, height: 140)
+        .background(SettingsWindowTitle())
     }
 }
