@@ -13,6 +13,9 @@ struct OverviewView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 DiskBar(reclaimable: model.totalBytes)
+                    .padding(24)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .glassEffect(.regular, in: .rect(cornerRadius: 22))
                 if model.isScanning {
                     progress
                 } else if model.lastScan == nil {

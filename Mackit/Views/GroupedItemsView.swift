@@ -54,6 +54,10 @@ struct GroupedItemsView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
+                Text("\(groups.count) groups")
+                    .font(.callout)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
                 Spacer()
                 Picker("Sort", selection: $sort) {
                     ForEach(GroupSort.allCases) { option in
@@ -64,8 +68,10 @@ struct GroupedItemsView: View {
                 .labelsHidden()
                 .fixedSize()
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 6)
+            // Same metrics as ListHeaderBar so the table and grouped views read as one surface.
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(.quaternary.opacity(0.4))
             if isMedia { cards } else { list }
         }
     }

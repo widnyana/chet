@@ -33,7 +33,10 @@ struct ContentView: View {
         ) {
             if let report = model.report { SummaryView(report: report) }
         }
-        .overlay(alignment: .top) { ScanFinishedToast().padding(.top, 8) }
+        // Below the toolbar, above the content: an overlay at .top would sit on the
+        // title bar and cover the scan pill.
+        .safeAreaInset(edge: .top, spacing: 0) { ScanFinishedToast() }
+        .overlay(alignment: .bottomLeading) { dryRunBadge }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.refreshAccess()
         }
@@ -52,6 +55,24 @@ struct ContentView: View {
         } else {
             OverviewView(selection: $selection, onClean: { confirming = true })
         }
+    }
+
+    /// Shown only in debug builds while DRY_RUN is engaged — cleaning is simulated.
+    @ViewBuilder private var dryRunBadge: some View {
+        #if DEBUG
+            if DryRun.enabled {
+                Label("DRY RUN ENGAGED", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption.weight(.bold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .foregroundStyle(.orange)
+                    .background(.orange.opacity(0.15), in: .capsule)
+                    .overlay(.orange.opacity(0.4), in: .capsule)
+                    .padding(.bottom, 12)
+                    .padding(.leading, 16)
+                    .help("DRY_RUN is set: cleaning reports success but no files are removed. Debug builds only.")
+            }
+        #endif
     }
 
     @ToolbarContentBuilder private var scanButton: some ToolbarContent {

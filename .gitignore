@@ -27,6 +27,7 @@
 !/.swift-format
 !Mackit/**
 !MackitCore/**
+!docs/DESIGN.md
 !docs/findings.md
 !scripts/**
 

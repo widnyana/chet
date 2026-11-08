@@ -13,8 +13,11 @@ struct ScanStatusView: View {
                 ProgressView(value: Double(model.steps.filter(\.done).count), total: Double(model.steps.count))
                     .progressViewStyle(.circular)
                     .controlSize(.small)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(phaseTitle).font(.callout).lineLimit(1)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(phaseTitle)
+                        .font(.callout.weight(.medium))
+                        .monospacedDigit()
+                        .lineLimit(1)
                     Group {
                         if let label = model.activity?.label, !label.isEmpty {
                             Text(label).lineLimit(1).truncationMode(.middle).help(label)
@@ -22,21 +25,21 @@ struct ScanStatusView: View {
                             Text("\(model.totalBytes.formatted(.byteCount(style: .file))) found")
                         }
                     }
-                    .font(.caption).foregroundStyle(.secondary)
-                    HStack(spacing: 4) {
-                        if let rate = model.rate {
-                            Text(String(format: "%.1fk files/s", rate)).monospacedDigit()
-                        }
-                        if let started = model.scanStartedAt {
-                            Text(Self.elapsed(since: started)).monospacedDigit()
-                        }
-                    }
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .font(.caption).foregroundStyle(.secondary).monospacedDigit()
                 }
-                Button("Stop", systemImage: "stop.fill") { model.cancel() }
-                    .help("Stop the scan (Command-R)")
+                Button {
+                    model.cancel()
+                } label: {
+                    Image(systemName: "stop.fill")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("Stop the scan (Command-R)")
             }
+            .padding(.leading, 14)
+            .padding(.trailing, 8)
+            .padding(.vertical, 6)
+            .glassEffect(.regular, in: .capsule)
         } else {
             Button(model.lastScan == nil ? "Scan" : "Scan Again", systemImage: "magnifyingglass") {
                 model.scan()
@@ -53,11 +56,6 @@ struct ScanStatusView: View {
         return activity.total > 0
             ? "\(activity.phase.title) — \(activity.done) of \(activity.total)\(paused)"
             : "\(activity.phase.title)\(paused)"
-    }
-
-    static func elapsed(since date: Date) -> String {
-        let interval = Int(Date().timeIntervalSince(date))
-        return String(format: "%02d:%02d", interval / 60, interval % 60)
     }
 
     /// Which scan step produces a category; nil for pages that are not categories.

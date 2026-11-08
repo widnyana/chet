@@ -29,6 +29,7 @@ struct ActionBar: View {
         .padding(.trailing, 8)
         .padding(.vertical, 8)
         .glassEffect(.regular, in: .capsule)
+        .frame(maxWidth: .infinity)
         .padding(.bottom, 16)
     }
 }
