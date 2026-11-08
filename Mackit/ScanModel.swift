@@ -42,12 +42,10 @@ struct ScanActivity {
 @Observable
 final class ScanModel {
     var access = FullDiskAccess.status()
-    /// Persists across relaunches: once the user has been sent to Settings (or chose to
-    /// continue), the blocking onboarding never returns. macOS relaunches the app when a
-    /// Full Disk Access grant is applied, and an ad-hoc rebuild can leave the grant
-    /// unmatched to the new binary — re-blocking on that relaunch is what made the user
-    /// grant access twice. The non-blocking banner takes over instead.
-    var hasAttemptedGrant = UserDefaults.standard.bool(forKey: "hasAttemptedGrant")
+    /// Persists across relaunches in an fsync'd marker file, not UserDefaults: macOS
+    /// SIGKILLs the app when a Full Disk Access grant is toggled, before preferences flush.
+    /// Once set, the blocking onboarding never returns — the non-blocking banner takes over.
+    var hasAttemptedGrant = AccessAttempt.hasAttempted()
     /// How many times the user has been sent to Settings; the second attempt unlocks the
     /// "Mackit may be listed twice" hint.
     var grantAttempts = UserDefaults.standard.integer(forKey: "grantAttempts")
@@ -136,10 +134,13 @@ final class ScanModel {
     /// Records that the user is being sent to grant access, before leaving the app, so the
     /// macOS-driven relaunch does not show the blocking onboarding again.
     func recordGrantAttempt() {
+        // Written and fsync'd before the caller opens Settings: the app may be killed
+        // before any in-memory state survives.
+        AccessAttempt.record()
         hasAttemptedGrant = true
         grantAttempts += 1
-        UserDefaults.standard.set(true, forKey: "hasAttemptedGrant")
         UserDefaults.standard.set(grantAttempts, forKey: "grantAttempts")
+        UserDefaults.standard.synchronize()
     }
 
     /// True when the app should show the non-blocking access banner.

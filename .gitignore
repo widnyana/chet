@@ -16,3 +16,5 @@ MackitCore/.swiftpm/
 .DS_Store
 .worktrees/
 ref/
+
+!scripts/**

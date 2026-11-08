@@ -11,10 +11,11 @@ depends = ["gen"]
 run = "xcodebuild -project Mackit.xcodeproj -scheme Mackit -configuration Debug -derivedDataPath .build/xc -quiet build"
 
 [tasks.dev]
-description = "Build and launch the debug app"
+description = "Build and launch the debug app (one LaunchServices registration only)"
 depends = ["build"]
 run = [
   "pkill -x Mackit || true",
+  "./scripts/dedupe-launchservices.sh .build/xc/Build/Products/Debug/Mackit.app",
   "open .build/xc/Build/Products/Debug/Mackit.app",
 ]
 
@@ -60,7 +61,7 @@ run = "tail -f ~/Library/Logs/Mackit/clean.log"
 
 [tasks.clean]
 description = "Remove build output, generated project and dist/"
-run = "rm -rf .build MackitCore/.build Mackit.xcodeproj dist"
+run = "rm -rf .build MackitCore/.build Mackit.xcodeproj dist || true"
 
 [tasks.scan-bench]
 description = "Read-only scan benchmark (pass a folder: mise run scan-bench -- /path)"
