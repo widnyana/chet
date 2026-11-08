@@ -114,6 +114,6 @@ extension Rule {
         Rule(
             id: "dev-garbage", title: "Project build dirs",
             roots: ["Development", "Projects", "Documents", "Desktop"], risk: .review, mode: .trash,
-            recursiveNames: ["target", "node_modules", "vendor", ".build", ".gradle", "DerivedData", "Pods"]),
+            recursiveNames: DuplicateScope.regenerableNames),
     ]
 }

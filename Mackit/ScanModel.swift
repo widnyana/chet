@@ -48,6 +48,14 @@ final class ScanModel {
     /// How many times the user has been sent to Settings; the second attempt unlocks the
     /// "Mackit may be listed twice" hint.
     var grantAttempts = UserDefaults.standard.integer(forKey: "grantAttempts")
+    /// Duplicates opt-in: when true the duplicates step also hashes caches, project build
+    /// dirs, and temporary places. Off by default; the Settings page is the only writer.
+    var includeTempInDuplicates = UserDefaults.standard.bool(forKey: "includeTempInDuplicates") {
+        didSet {
+            guard oldValue != includeTempInDuplicates else { return }
+            UserDefaults.standard.set(includeTempInDuplicates, forKey: "includeTempInDuplicates")
+        }
+    }
     var categories: [CategoryState] = []
     /// Category id -> groups, for duplicates and similar media.
     var groups: [String: [ItemGroup]] = [:]
@@ -175,7 +183,8 @@ final class ScanModel {
         scanStartedAt = Date()
         recentFolders = []
         rate = nil
-        let session = ScanSession(gate: gate)
+        let session = ScanSession(
+            gate: gate, scope: includeTempInDuplicates ? .everything : .standard)
         progress = session.progress
         scanTask = Task {
             for await event in session.events() {

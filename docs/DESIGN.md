@@ -117,6 +117,12 @@ How it draws:
   `Cleaner.dryRun` is a required init parameter, so no composition root can build a
   mutating cleaner without deciding.
 
+- Settings (Cmd+, the standard `Settings` scene): exactly one opt-in toggle, "Include
+  caches and build folders". The duplicates step skips regenerable build dirs
+  (`DuplicateScope.regenerableNames`, shared with the "Project build dirs" rule),
+  caches (`Caches`, `.cache`), and temporary places (`tmp`, `temp`, `.tmp`) by default;
+  the toggle maps to `DuplicateScope.everything`. No other options live on the page.
+
 ## Rules of thumb
 
 1. Reuse `CategoryStyle` — never hardcode a symbol or color for a category.

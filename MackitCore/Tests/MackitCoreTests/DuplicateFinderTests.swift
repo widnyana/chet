@@ -114,4 +114,47 @@ struct DuplicateFinderTests {
         }
         await #expect(throws: CancellationError.self) { try await task.value }
     }
+
+    // MARK: DuplicateScope
+
+    @Test func standardScopeSkipsRegenerableAndTempFolders() throws {
+        let dir = try TempDir()
+        try dir.file("Documents/proj/node_modules/pkg/lib", bytes: size)
+        try dir.file("Documents/proj/target/lib", bytes: size)
+        try dir.file("Documents/.gradle/v1/lib", bytes: size)
+        try dir.file("Pictures/.cache/stuff/lib", bytes: size)
+        try dir.file("Music/tmp/scratch/lib", bytes: size)
+        try dir.file("Pictures/keep/lib", bytes: size)
+        var walked: [WalkEntry] = []
+        try FileWalker(policy: dir.policy).walk(dir.url) { walked.append($0) }
+
+        let standard = DuplicateScope.filter(walked, scope: .standard)
+        #expect(standard.count == 1)
+        #expect(standard[0].url.path.hasSuffix("Pictures/keep/lib"))
+
+        // Opting in is exactly the unfiltered walk.
+        #expect(DuplicateScope.filter(walked, scope: .everything).count == walked.count)
+
+        // The standard walk finds nothing to hash; the everything walk finds the pair
+        // (or more) among the skipped copies.
+        #expect(try DuplicateFinder(policy: dir.policy).find(entries: standard).isEmpty)
+        #expect(try DuplicateFinder(policy: dir.policy).find(entries: walked).count >= 1)
+    }
+
+    @Test func scopeMatchesWholeComponentsOnly() throws {
+        let dir = try TempDir()
+        try dir.file("Documents/temp.txt", bytes: size)
+        try dir.file("Documents/template/lib", bytes: size)
+        var walked: [WalkEntry] = []
+        try FileWalker(policy: dir.policy).walk(dir.url) { walked.append($0) }
+        let standard = DuplicateScope.filter(walked, scope: .standard)
+        // "temp.txt" and the "template" folder share no skipped component; substring
+        // matching would wrongly drop them.
+        #expect(standard.count == walked.count)
+    }
+
+    @Test func buildDirRuleSharesTheRegenerableNames() {
+        let rule = Rule.catalog.first { $0.id == "dev-garbage" }
+        #expect(rule?.recursiveNames == DuplicateScope.regenerableNames)
+    }
 }

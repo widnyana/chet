@@ -48,17 +48,21 @@ public final class ScanSession: Sendable {
     public let progress = ScanProgress()
     /// Optional pause control; nil scans never pause.
     public let gate: ScanPauseGate?
+    /// Which folders the duplicates step may hash. `.standard` (the default) skips
+    /// regenerable build dirs, caches, and temporary places; `.everything` includes them.
+    public let scope: DuplicateScope
     let largeFileMinSize: Int64
     /// Rule folder scans running at once.
     let ruleConcurrency = 4
 
     public init(
         home: URL = FileManager.default.homeDirectoryForCurrentUser, largeFileMinSize: Int64 = 500_000_000,
-        gate: ScanPauseGate? = nil
+        gate: ScanPauseGate? = nil, scope: DuplicateScope = .standard
     ) {
         self.home = home
         self.largeFileMinSize = largeFileMinSize
         self.gate = gate
+        self.scope = scope
     }
 
     /// Top-level folders of the home folder, without Library and hidden folders.
@@ -146,7 +150,10 @@ public final class ScanSession: Sendable {
         await pause()
         emit(.started(.duplicates))
         emit(.stepActivity(.duplicates, done: 0, total: 0, label: "hashing duplicate candidates"))
-        let duplicates = (try? DuplicateFinder(policy: policy).find(entries: index.candidates)) ?? []
+        // The scope drops regenerable and temporary folders before any hashing runs.
+        let duplicates =
+            (try? DuplicateFinder(policy: policy).find(entries: DuplicateScope.filter(index.candidates, scope: scope)))
+            ?? []
         guard !Task.isCancelled else { return }
         emit(.duplicates(duplicates))
         emit(.finished(.duplicates))
