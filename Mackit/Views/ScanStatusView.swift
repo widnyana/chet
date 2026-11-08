@@ -1,79 +1,50 @@
 import MackitCore
 import SwiftUI
-@preconcurrency import UserNotifications
 
-/// Toolbar status: while scanning, a progress ring, the current step, found bytes and Stop;
-/// when idle, the Scan button.
+/// Toolbar scan control. While scanning it is one 24 pt ring with a stop glyph:
+/// the ring is the loading indicator, the glyph is the action. The detailed
+/// progress lives in the Overview and the Disk map, so nothing else is needed here.
 struct ScanStatusView: View {
     @Environment(ScanModel.self) private var model
 
     var body: some View {
         if model.isScanning {
-            // One quiet state, not a sentence: a ring with the coarse scan fraction and
-            // its percent centered. The words live in the tooltip and the disk map's
-            // progress strip, never in the toolbar. Clicking pauses or resumes.
             Button {
-                model.togglePause()
+                model.cancel()
             } label: {
                 ZStack {
                     Circle()
-                        .stroke(.quaternary, lineWidth: 2.5)
+                        .stroke(Theme.hairline, lineWidth: 2.5)
                     Circle()
                         .trim(from: 0, to: progressFraction)
-                        .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                        .stroke(Theme.accent, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
                         .rotationEffect(.degrees(-90))
-                    if model.isPaused {
-                        // Percent and glyph cannot share 24 pt; pausing swaps them.
-                        Image(systemName: "pause.fill")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text("\(Int((progressFraction * 100).rounded()))%")
-                            .font(.system(size: 9, weight: .medium, design: .monospaced))
-                            .monospacedDigit()
-                            .foregroundStyle(.primary)
-                    }
+                    Image(systemName: "stop.fill")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(Theme.ink)
                 }
                 .frame(width: 24, height: 24)
-                .contentShape(.circle)
+                .contentShape(Circle())
             }
-            // Symmetric insets so the ring sits centered in its toolbar slot, clear of the
-            // window's rounded corner, with matching gaps on both sides.
+            .buttonStyle(.plain)
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
-            .buttonStyle(.plain)
-            .accessibilityLabel(model.isPaused ? "Resume scan" : "Pause scan")
-            .help(phaseDescription)
+            .help("Stop the scan")
+            .accessibilityLabel("Stop the scan")
         } else {
-            Button(model.lastScan == nil ? "Scan" : "Scan Again", systemImage: "magnifyingglass") {
+            Button(model.lastScan == nil ? "Scan" : "Scan again", systemImage: "magnifyingglass") {
                 model.scan()
             }
-            .buttonStyle(.glassProminent)
-            .help("Scan this Mac for junk (Command-R)")
+            .buttonStyle(.borderedProminent)
+            .tint(Theme.accent)
+            .help("Scan this Mac for reclaimable data (Command-R)")
         }
     }
 
-    /// Coarse scan-stage fraction: completed steps over the five scan steps. Exact
-    /// counts (6 of 27 roots) exist only on the disk map page; the toolbar stays
-    /// page-independent.
+    /// Coarse scan-stage fraction: completed steps over the scan steps.
     private var progressFraction: Double {
         let total = max(model.steps.count, 1)
         return Double(model.steps.filter(\.done).count) / Double(total)
-    }
-
-    /// Tooltip copy: the words the old glass capsule showed, now out of sight.
-    private var phaseDescription: String {
-        var parts: [String] = []
-        if let activity = model.activity {
-            parts.append(activity.phase.title)
-            if activity.total > 0 { parts.append("\(activity.done) of \(activity.total)") }
-        } else {
-            parts.append(model.currentStep?.title ?? "Scanning")
-        }
-        if model.isPaused {
-            parts.append("paused at \(Int((progressFraction * 100).rounded())) percent")
-        }
-        return parts.joined(separator: ", ")
     }
 
     /// Which scan step produces a category; nil for pages that are not categories.
@@ -87,50 +58,6 @@ struct ScanStatusView: View {
         case "snapshots": .snapshots
         case "tagged-caches": .index
         default: .rules
-        }
-    }
-}
-
-/// Toast shown for 4 seconds after a scan finishes; notifies when the app is backgrounded.
-struct ScanFinishedToast: View {
-    @Environment(ScanModel.self) private var model
-    @State private var text: String?
-
-    var body: some View {
-        VStack {
-            if let text {
-                Label(text, systemImage: "checkmark.circle.fill")
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .glassEffect(.regular, in: .capsule)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-            }
-        }
-        .animation(.easeInOut(duration: 0.25), value: text)
-        .onChange(of: model.isScanning) { was, now in
-            if was, !now, model.didFinishScan { show() }
-        }
-    }
-
-    private func show() {
-        text = "Scan finished: \(model.totalBytes.formatted(.byteCount(style: .file))) can be cleaned"
-        Task {
-            try? await Task.sleep(nanoseconds: 4_000_000_000)
-            text = nil
-        }
-        notifyIfBackgrounded()
-    }
-
-    private func notifyIfBackgrounded() {
-        guard !NSApp.isActive else { return }
-        let bytes = model.totalBytes.formatted(.byteCount(style: .file))
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert]) { granted, _ in
-            guard granted else { return }
-            let content = UNMutableNotificationContent()
-            content.title = "Scan finished"
-            content.body = "\(bytes) can be cleaned"
-            let request = UNNotificationRequest(identifier: "scan-finished", content: content, trigger: nil)
-            UNUserNotificationCenter.current().add(request)
         }
     }
 }

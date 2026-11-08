@@ -1,221 +1,221 @@
-import Charts
 import MackitCore
 import SwiftUI
 
-/// Start screen: disk usage, scan progress, and what can be cleaned per category.
+/// The ledger: capacity, the reclaimable total, the scan state, and the
+/// category rows. No chart, no card stack, no marketing hero.
 struct OverviewView: View {
     @Environment(ScanModel.self) private var model
     @Binding var selection: String?
     let onClean: () -> Void
-    let onUninstall: () -> Void
-    @State private var pickedTitle: String?
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                DiskBar(reclaimable: model.totalBytes)
-                    .padding(24)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .glassEffect(.regular, in: .rect(cornerRadius: 22))
-                uninstallDoor
-                if model.isScanning {
-                    progress
-                } else if model.lastScan == nil {
-                    hero
-                } else {
-                    results
-                }
+            VStack(alignment: .leading, spacing: Spacing.s8) {
+                pageHeader
+                capacity
+                content
             }
-            .padding(28)
-            .frame(maxWidth: 820, alignment: .leading)
-            .frame(maxWidth: .infinity)
+            .padding(.horizontal, Metrics.widePageMargin)
+            .padding(.vertical, Spacing.s8)
+            .frame(maxWidth: Metrics.contentMaxWidth, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .center)
         }
+        .background(Theme.paper)
         .navigationTitle("Overview")
-        .onChange(of: pickedTitle) { _, title in
-            if let id = model.categories.first(where: { $0.title == title })?.id { selection = id }
-        }
+        .safeAreaInset(edge: .bottom) { commandBar }
     }
 
-    /// The one door into the uninstaller. Present in every overview state — removing
-    /// apps does not depend on a scan. Same card grammar as every card here: 24 pt
-    /// padding, 22 pt corners, bare tinted symbol, bold action title, neutral chip.
-    private var uninstallDoor: some View {
-        Button(action: onUninstall) {
-            HStack(spacing: 18) {
-                Image(systemName: "app.dashed")
-                    .font(.system(size: 28))
-                    .foregroundStyle(.tint)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Uninstall apps")
-                        .font(.title3.bold())
-                    Text("Remove an app together with everything it left behind.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 12)
-                Text("Open")
-                    .font(.callout.weight(.semibold))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 7)
-                    .background(.quaternary.opacity(0.9), in: .capsule)
-            }
-            .padding(24)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular, in: .rect(cornerRadius: 22))
-        .help("Open the app uninstaller")
+    private var pageHeader: some View {
+        PageHeader(
+            title: "Overview",
+            subtitle: summaryLine,
+            metric: model.isScanning
+                ? model.totalBytes.formatted(.byteCount(style: .file))
+                : (model.lastScan == nil ? "Not measured" : model.totalBytes.formatted(.byteCount(style: .file))),
+            metricLabel: model.isScanning
+                ? "found so far"
+                : (model.lastScan == nil ? nil : "can be reclaimed"))
     }
 
-    private var hero: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Find what you can safely remove")
-                .font(.title.bold())
-            Text(
-                "Mackit looks through caches, logs, developer data, old installers, duplicates and similar photos. Nothing is removed until you confirm."
-            )
-            .foregroundStyle(.secondary)
-            Button("Scan This Mac", systemImage: "magnifyingglass") { model.scan() }
-                .buttonStyle(.glassProminent)
-                .controlSize(.extraLarge)
-                .padding(.top, 6)
+    private var summaryLine: String {
+        if model.lastScan == nil {
+            return "A clear account of this disk."
         }
-        .padding(24)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular, in: .rect(cornerRadius: 22))
+        if model.totalBytes == 0 {
+            return "Nothing to reclaim. This Mac is tidy."
+        }
+        return "\(model.selectedItems.count) items selected across \(model.categories.count) categories."
     }
 
-    private var progress: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                ProgressView().controlSize(.small)
-                Text("Scanning").font(.title2.bold())
-                Spacer()
-                Text("\(model.totalBytes.formatted(.byteCount(style: .file))) found so far")
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-            }
-            ForEach(model.steps) { step in
-                Label {
-                    Text(step.title).foregroundStyle(step.done ? .primary : .secondary)
-                } icon: {
-                    Image(systemName: step.done ? "checkmark.circle.fill" : "circle.dotted")
-                        .foregroundStyle(step.done ? .green : .secondary)
-                        .contentTransition(.symbolEffect(.replace))
-                }
-            }
-        }
-        .padding(24)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular, in: .rect(cornerRadius: 22))
-    }
-
-    private var results: some View {
-        let rows = model.categories.filter { $0.bytes > 0 }
-        return VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(model.totalBytes.formatted(.byteCount(style: .file)))
-                    .font(.system(size: 44, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                Text("can be cleaned.")
-                    .foregroundStyle(.secondary)
-            }
-            HStack {
-                Text("\(model.selectedBytes.formatted(.byteCount(style: .file))) is selected.")
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button("Clean All Selected") {
-                    model.beginClean()
-                    onClean()
-                }
-                .buttonStyle(.glassProminent)
-                .disabled(model.selectedBytes == 0 || model.isCleaning)
-            }
-            if rows.isEmpty {
-                Label("Nothing to clean. This Mac is tidy.", systemImage: "checkmark.seal.fill")
-                    .foregroundStyle(.green)
-            } else {
-                Chart(rows) { category in
-                    BarMark(
-                        x: .value("Size", category.bytes),
-                        y: .value("Category", category.title)
-                    )
-                    .foregroundStyle(CategoryStyle.of(category.id).color.gradient)
-                    .cornerRadius(6)
-                    .annotation(position: .trailing) {
-                        Text(category.bytes.formatted(.byteCount(style: .file)))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                    }
-                }
-                .chartXAxis(.hidden)
-                .chartYSelection(value: $pickedTitle)
-                .frame(height: CGFloat(rows.count) * 34 + 10)
-                Text("Click a bar to open that category.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(24)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular, in: .rect(cornerRadius: 22))
-    }
-}
-
-/// Startup disk usage, like the Storage page in System Settings: used, can be cleaned, free.
-struct DiskBar: View {
-    let reclaimable: Int64
-
-    var body: some View {
+    private var capacity: some View {
         let values = try? URL(fileURLWithPath: "/").resourceValues(forKeys: [
             .volumeTotalCapacityKey, .volumeAvailableCapacityForImportantUsageKey, .volumeLocalizedNameKey,
         ])
         let total = Int64(values?.volumeTotalCapacity ?? 0)
         let free = values?.volumeAvailableCapacityForImportantUsage ?? 0
-        let used = max(0, total - free)
-        let junk = min(reclaimable, used)
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Label(values?.volumeLocalizedName ?? "Macintosh HD", systemImage: "internaldrive")
-                    .font(.headline)
-                Spacer()
-                Text(
-                    "\(free.formatted(.byteCount(style: .file))) available of \(total.formatted(.byteCount(style: .file)))"
-                )
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-            }
-            GeometryReader { geometry in
-                HStack(spacing: 2) {
-                    Rectangle().fill(Color.gray.opacity(0.6))
-                        .frame(width: Self.share(used - junk, of: total) * geometry.size.width)
-                    Rectangle().fill(Color.orange)
-                        .frame(width: Self.share(junk, of: total) * geometry.size.width)
-                    Rectangle().fill(Color.secondary.opacity(0.2))
+        return CapacityBarView(
+            volumeName: values?.volumeLocalizedName ?? "Startup disk",
+            total: total,
+            free: free,
+            reclaimable: model.totalBytes)
+    }
+
+    @ViewBuilder private var content: some View {
+        if model.isScanning {
+            scanProgress
+        } else if model.lastScan == nil {
+            EmptyStateView(
+                title: "No scan yet",
+                message: "Run a scan to see which folders can be cleaned and which items need review.")
+        } else {
+            categoryLedger
+        }
+    }
+
+    private var categoryLedger: some View {
+        let rows = model.categories.filter {
+            $0.bytes > 0 || ($0.id == "snapshots" && !model.snapshots.isEmpty)
+        }
+        return VStack(alignment: .leading, spacing: Spacing.s3) {
+            SectionHeader(
+                title: "Reclaimable",
+                trailing: rows.isEmpty ? nil : "\(rows.count) categories")
+            if rows.isEmpty {
+                EmptyStateView(
+                    title: "Nothing to reclaim",
+                    message: "The last scan found no reclaimable data. Scan again after you install or use more apps.",
+                    actionTitle: "Scan again",
+                    action: { model.scan() })
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(rows) { category in
+                        categoryRow(category)
+                        if category.id != rows.last?.id { Hairline() }
+                    }
                 }
-                .clipShape(Capsule())
             }
-            .frame(height: 14)
-            HStack(spacing: 14) {
-                legend("Used", Color.gray.opacity(0.6))
-                legend("Can be cleaned", .orange)
-                legend("Free", Color.secondary.opacity(0.2))
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
         }
     }
 
-    private func legend(_ title: String, _ color: Color) -> some View {
-        HStack(spacing: 4) {
-            Circle().fill(color).frame(width: 8, height: 8)
-            Text(title)
+    private func categoryRow(_ category: CategoryState) -> some View {
+        Button {
+            selection = category.id
+        } label: {
+            HStack(spacing: Spacing.s3) {
+                Image(systemName: CategoryStyle.of(category.id).symbol)
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundStyle(Theme.inkSecondary)
+                    .frame(width: 22)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(category.title)
+                        .font(Typography.row)
+                        .foregroundStyle(Theme.ink)
+                        .lineLimit(1)
+                    Text(categorySubtitle(category))
+                        .font(Typography.caption)
+                        .foregroundStyle(Theme.inkSecondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: Spacing.s3)
+                Text(categoryValue(category))
+                    .font(Typography.metric)
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.ink)
+                    .lineLimit(1)
+            }
+            .padding(.vertical, Spacing.s2)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Open \(category.title)")
+    }
+
+    private func categorySubtitle(_ category: CategoryState) -> String {
+        if category.id == "snapshots" {
+            return model.snapshots.count == 1 ? "1 snapshot" : "\(model.snapshots.count) snapshots"
+        }
+        return category.items.count == 1 ? "1 item" : "\(category.items.count) items"
+    }
+
+    private func categoryValue(_ category: CategoryState) -> String {
+        if category.id == "snapshots" {
+            return model.snapshots.count == 1 ? "1" : "\(model.snapshots.count)"
+        }
+        return category.bytes.formatted(.byteCount(style: .file))
+    }
+
+    private var scanProgress: some View {
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            SectionHeader(
+                title: "Scanning",
+                trailing: "\(Int((progressFraction * 100).rounded())) percent")
+            ProgressView(value: progressFraction)
+                .tint(Theme.accent)
+            if let activity = model.activity {
+                Text(activity.label)
+                    .font(Typography.body)
+                    .foregroundStyle(Theme.inkSecondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(activity.label)
+            } else {
+                Text(model.currentStep?.title ?? "Starting scan")
+                    .font(Typography.body)
+                    .foregroundStyle(Theme.inkSecondary)
+            }
+            VStack(spacing: 0) {
+                ForEach(model.steps) { step in
+                    HStack(spacing: Spacing.s2) {
+                        Image(systemName: step.done ? "checkmark.circle" : "circle")
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundStyle(step.done ? Theme.inkSecondary : Theme.inkTertiary)
+                        Text(step.title)
+                            .font(Typography.row)
+                            .foregroundStyle(step.done ? Theme.inkSecondary : Theme.ink)
+                        Spacer()
+                    }
+                    .padding(.vertical, Spacing.s1)
+                }
+            }
         }
     }
 
-    static func share(_ part: Int64, of total: Int64) -> CGFloat {
-        total > 0 ? CGFloat(Double(max(0, part)) / Double(total)) : 0
+    private var progressFraction: Double {
+        let total = max(model.steps.count, 1)
+        return Double(model.steps.filter(\.done).count) / Double(total)
+    }
+
+    private var commandBar: some View {
+        if model.isScanning {
+            return CommandBar(
+                metric: "Scanning",
+                detail: model.activity?.label ?? "Starting",
+                actionTitle: "Stop scan",
+                actionSystemImage: "stop.fill",
+                isEnabled: true,
+                secondaryTitle: model.isPaused ? "Resume" : "Pause",
+                secondaryAction: { model.togglePause() },
+                action: { model.cancel() })
+        }
+        if model.lastScan == nil {
+            return CommandBar(
+                metric: "Not measured",
+                detail: "Run a scan to build the ledger",
+                actionTitle: "Scan this Mac",
+                actionSystemImage: "magnifyingglass",
+                action: { model.scan() })
+        }
+        let count = model.selectedItems.count
+        return CommandBar(
+            metric: model.selectedBytes.formatted(.byteCount(style: .file)),
+            detail: count == 1 ? "1 item selected" : "\(count) items selected",
+            actionTitle: "Clean selected",
+            actionSystemImage: "checkmark",
+            isEnabled: model.selectedBytes > 0 && !model.isCleaning,
+            help: "Review and clean the selected items",
+            action: {
+                model.beginClean()
+                onClean()
+            })
     }
 }

@@ -2,165 +2,144 @@ import AppKit
 import MackitCore
 import SwiftUI
 
-/// The review surface for one app: header, related files, floating action bar.
-/// Reached only by pushing from the app browser, so `app` is always present.
+/// The review surface for one app: the app bundle, its related files, and one
+/// command bar. Reached by pushing from the app browser.
 struct AppCleanerDetailView: View {
     @Environment(AppCleanerModel.self) private var model
     let app: InstalledApp
 
     var body: some View {
-        detail(app)
-            .navigationTitle(app.name)
-            .navigationSubtitle(subtitle)
-            .onAppear { model.refreshRunningState() }
-    }
-
-    private var subtitle: String {
-        "\(app.version.map { "Version \($0)" } ?? "Unknown version") · \(app.bundleID ?? "no bundle ID")"
-    }
-
-    private func detail(_ app: InstalledApp) -> some View {
         @Bindable var model = model
-        return VStack(spacing: 0) {
-            header(app, selected: $model.appSelected)
-            if model.isRunning { runningWarning(app) }
-            if !app.isWritable { adminWarning(app) }
-            Divider()
+        VStack(spacing: 0) {
+            PageHeader(
+                title: app.name,
+                subtitle:
+                    "\(app.version.map { "Version \($0)" } ?? "Unknown version") · \(app.bundleID ?? "no bundle ID")",
+                metric: model.appBytes.formatted(.byteCount(style: .file)),
+                metricLabel: "app bundle",
+                icon: IconCache.icon(for: app.url)
+            )
+            .padding(.horizontal, Metrics.widePageMargin)
+            .padding(.top, Spacing.s6)
+            .padding(.bottom, Spacing.s2)
+            pathRow
+            if model.isRunning {
+                warningRow("Running. Quit the app before removing it.", icon: "bolt.fill", tone: .amber)
+            }
+            if !app.isWritable {
+                warningRow(
+                    "Needs administrator. Mackit cannot move this app.", icon: "lock.fill", tone: .amber)
+            }
+            appBundleRow(selected: $model.appSelected)
             if model.isLoadingDetail {
-                VStack(spacing: 10) {
-                    ProgressView()
-                    Text("Looking for related files…").foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                LoadingStateView(message: "Looking for related files")
+                    .padding(.horizontal, Metrics.widePageMargin)
+                Spacer()
             } else if model.components.isEmpty {
-                ContentUnavailableView(
-                    "No related files",
-                    systemImage: "checkmark.seal",
-                    description: Text(
-                        model.hasFullDiskAccess
-                            ? "Mackit found no Library data for this app. The app bundle can still be removed."
-                            : "Mackit found no Library data. Some folders are hidden without Full Disk Access."))
+                EmptyStateView(
+                    title: "No related files",
+                    message: model.hasFullDiskAccess
+                        ? "The app bundle can still be removed."
+                        : "Some folders are hidden without Full Disk Access. The app bundle can still be removed."
+                )
+                .padding(.horizontal, Metrics.widePageMargin)
+                Spacer()
             } else {
-                componentList
+                relatedFiles
             }
         }
-        .safeAreaInset(edge: .bottom) {
-            ActionBarView()
+        .background(Theme.paper)
+        .safeAreaInset(edge: .bottom) { commandBar }
+        .sheet(
+            isPresented: Binding(
+                get: { model.showConfirm && model.selectedApp != nil },
+                set: { model.showConfirm = $0 })
+        ) {
+            AppUninstallConfirmSheet()
+        }
+        .navigationTitle(app.name)
+        .onAppear { model.refreshRunningState() }
+    }
+
+    private var pathRow: some View {
+        HStack(spacing: Spacing.s3) {
+            Text(app.url.path)
+                .font(Typography.caption)
+                .foregroundStyle(Theme.inkSecondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .textSelection(.enabled)
+            Spacer()
+            Button("Reveal in Finder") {
+                NSWorkspace.shared.activateFileViewerSelecting([app.url])
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+        .padding(.horizontal, Metrics.widePageMargin)
+        .padding(.bottom, Spacing.s2)
+    }
+
+    private func warningRow(_ text: String, icon: String, tone: StatusTone) -> some View {
+        VStack(spacing: 0) {
+            HStack {
+                StatusLabel(text: text, systemImage: icon, tone: tone)
+                Spacer()
+            }
+            .padding(.horizontal, Metrics.widePageMargin)
+            .padding(.vertical, Spacing.s2)
+            Hairline()
         }
     }
 
-    private func header(_ app: InstalledApp, selected: Binding<Bool>) -> some View {
-        HStack(alignment: .top, spacing: 16) {
-            Image(nsImage: IconCache.icon(for: app.url))
-                .resizable()
-                .frame(width: 64, height: 64)
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    Text(app.name).font(.title2.bold())
-                    if model.isRunning {
-                        Label("Running", systemImage: "bolt.fill")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.orange)
-                    }
-                    if !app.isWritable {
-                        Label("Needs administrator", systemImage: "lock.fill")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.orange)
-                    }
-                }
-                Text(app.bundleID ?? "No bundle identifier")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-                Text(app.url.path)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .textSelection(.enabled)
-                HStack(spacing: 14) {
-                    Label(app.version ?? "Unknown version", systemImage: "number")
-                    Label(
-                        model.isLoadingDetail
-                            ? "Measuring…" : model.appBytes.formatted(.byteCount(style: .file)),
-                        systemImage: "internaldrive")
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
-            }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 8) {
+    private func appBundleRow(selected: Binding<Bool>) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: Spacing.s3) {
                 Toggle("Remove app bundle", isOn: selected)
                     .toggleStyle(.checkbox)
                     .disabled(model.isRunning || !app.isWritable)
-                    .help(
-                        app.isWritable
-                            ? "Move the app itself to the Trash"
-                            : "An administrator must remove this app")
-                Button("Reveal in Finder") {
-                    NSWorkspace.shared.activateFileViewerSelecting([app.url])
-                }
-                .buttonStyle(.link)
-                .font(.caption)
+                    .accessibilityLabel("Remove the \(app.name) app bundle")
+                Spacer()
+                Text(model.isLoadingDetail ? "Measuring" : model.appBytes.formatted(.byteCount(style: .file)))
+                    .font(Typography.metric)
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.inkSecondary)
             }
+            .padding(.horizontal, Metrics.widePageMargin)
+            .padding(.vertical, Spacing.s2)
+            Hairline()
         }
-        .padding(20)
     }
 
-    private func runningWarning(_ app: InstalledApp) -> some View {
-        Label(
-            "Quit \(app.name) before removing it. A running app can write its data back after the move.",
-            systemImage: "exclamationmark.triangle.fill"
-        )
-        .font(.callout)
-        .foregroundStyle(.orange)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 10)
-        .background(.orange.opacity(0.12))
-    }
-
-    private func adminWarning(_ app: InstalledApp) -> some View {
-        Label(
-            "Mackit cannot move this app without administrator rights. Related files in your home folder can still be removed.",
-            systemImage: "lock.fill"
-        )
-        .font(.callout)
-        .foregroundStyle(.orange)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 10)
-        .background(.orange.opacity(0.12))
-    }
-
-    private var componentList: some View {
+    private var relatedFiles: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Text(
-                    "\(model.selectedComponentList.count) of \(model.components.count) selected, "
-                        + model.selectedComponentList.reduce(0) { $0 + $1.bytes }
-                        .formatted(.byteCount(style: .file))
-                )
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
+            HStack(spacing: Spacing.s3) {
+                Text("Related files")
+                    .font(Typography.section)
+                    .foregroundStyle(Theme.ink)
+                Text("\(model.selectedComponentList.count) of \(model.components.count) selected")
+                    .font(Typography.caption)
+                    .foregroundStyle(Theme.inkSecondary)
+                    .monospacedDigit()
                 Spacer()
                 Menu {
-                    Button("Exact Matches Only", systemImage: "checkmark.seal") { model.selectExact() }
-                    Button("All Selectable", systemImage: "checklist") { model.selectAllSelectable() }
+                    Button("Exact matches only", systemImage: "checkmark") { model.selectExact() }
+                    Button("All selectable", systemImage: "checklist") { model.selectAllSelectable() }
                     Button("None", systemImage: "circle") { model.clearComponents() }
                 } label: {
                     Label("Select", systemImage: "checklist")
                 }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(.quaternary.opacity(0.4))
+            .padding(.horizontal, Metrics.widePageMargin)
+            .padding(.vertical, Spacing.s2)
+            Hairline()
             List {
                 ForEach(grouped, id: \.kind) { group in
                     Section {
                         ForEach(group.items) { component in
-                            AppComponentRow(component: component)
+                            OwnershipRow(component: component)
                         }
                     } header: {
                         HStack {
@@ -169,10 +148,14 @@ struct AppCleanerDetailView: View {
                             Text(group.items.reduce(0) { $0 + $1.bytes }.formatted(.byteCount(style: .file)))
                                 .monospacedDigit()
                         }
+                        .font(Typography.caption)
+                        .foregroundStyle(Theme.inkSecondary)
                     }
                 }
             }
-            .alternatingRowBackgrounds(.disabled)
+            .listStyle(.inset)
+            .scrollContentBackground(.hidden)
+            .background(Theme.paper)
         }
     }
 
@@ -184,40 +167,56 @@ struct AppCleanerDetailView: View {
                 (order.firstIndex(of: $0.kind) ?? Int.max) < (order.firstIndex(of: $1.kind) ?? Int.max)
             }
     }
+
+    private var commandBar: some View {
+        CommandBar(
+            metric: model.selectedBytes.formatted(.byteCount(style: .file)),
+            detail: model.selectedCount == 1
+                ? "1 item selected" : "\(model.selectedCount) items selected",
+            actionTitle: "Remove",
+            isEnabled: model.canRemove,
+            isWorking: model.isRemoving,
+            help: "Review and move the selected items to the Trash",
+            action: { model.beginRemoval() })
+    }
 }
 
-private struct AppComponentRow: View {
+private struct OwnershipRow: View {
     @Environment(AppCleanerModel.self) private var model
     let component: AppComponent
 
     var body: some View {
         let selected = model.selectedComponents.contains(component.url)
-        HStack(spacing: 10) {
+        HStack(spacing: Spacing.s2) {
             Toggle(
                 "Remove", isOn: Binding(get: { selected }, set: { model.setComponent(component, $0) })
             )
             .toggleStyle(.checkbox)
             .labelsHidden()
             .disabled(!component.isSelectable)
+            .accessibilityLabel("Remove \(component.url.lastPathComponent)")
             Image(nsImage: IconCache.icon(for: component.url))
                 .resizable()
-                .frame(width: 24, height: 24)
-            VStack(alignment: .leading, spacing: 2) {
+                .frame(width: 22, height: 22)
+            VStack(alignment: .leading, spacing: 1) {
                 Text(component.url.lastPathComponent)
+                    .font(Typography.row)
+                    .foregroundStyle(Theme.ink)
                     .lineLimit(1)
-                HStack(spacing: 6) {
+                HStack(spacing: Spacing.s2) {
                     Text(DisplayName.location(of: component.url))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(Typography.caption)
+                        .foregroundStyle(Theme.inkSecondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
-                    AppOwnershipBadge(component: component)
+                    ownershipLabel
                 }
             }
-            Spacer()
+            Spacer(minLength: Spacing.s2)
             Text(component.bytes.formatted(.byteCount(style: .file)))
+                .font(Typography.row)
                 .monospacedDigit()
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.inkSecondary)
         }
         .contextMenu {
             Button("Reveal in Finder") {
@@ -226,66 +225,19 @@ private struct AppComponentRow: View {
         }
         .help(component.url.path)
     }
-}
 
-private struct AppOwnershipBadge: View {
-    let component: AppComponent
-
-    var body: some View {
+    @ViewBuilder private var ownershipLabel: some View {
         switch component.ownership {
-
         case .exclusive:
-            badge("Exact", .green, "checkmark.seal.fill")
+            StatusLabel(text: "Exact match", systemImage: "checkmark", tone: .neutral)
         case .probable:
-            badge("Name match", .orange, "questionmark.circle")
+            StatusLabel(text: "Name match", systemImage: "questionmark.circle", tone: .neutral)
         case .shared:
-            badge("Shared", .secondary, "person.2")
+            StatusLabel(text: "Shared", systemImage: "person.2", tone: .neutral)
         case .privileged:
-            badge("Admin", .orange, "lock.fill")
+            StatusLabel(text: "Needs administrator", systemImage: "lock.fill", tone: .amber)
         case .systemProtected:
-            badge("Protected", .red, "shield.lefthalf.filled")
+            StatusLabel(text: "Protected", systemImage: "shield.lefthalf.filled", tone: .red)
         }
-    }
-
-    private func badge(_ title: String, _ color: Color, _ symbol: String) -> some View {
-        Label(title, systemImage: symbol)
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(color)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 1)
-            .background(color.opacity(0.12), in: Capsule())
-            .help(component.ownership.title)
-    }
-}
-
-private struct ActionBarView: View {
-    @Environment(AppCleanerModel.self) private var model
-
-    var body: some View {
-        HStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 0) {
-                Text(model.selectedBytes.formatted(.byteCount(style: .file)))
-                    .font(.headline)
-                    .monospacedDigit()
-                Text(
-                    model.selectedCount == 1
-                        ? "1 item selected" : "\(model.selectedCount) items selected"
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-            Button("Remove", systemImage: "trash") { model.beginRemoval() }
-                .buttonStyle(.glassProminent)
-                .controlSize(.large)
-                .disabled(!model.canRemove)
-                .keyboardShortcut(.delete, modifiers: .command)
-                .help("Review and move the selected items to the Trash (Command-Delete)")
-        }
-        .padding(.leading, 18)
-        .padding(.trailing, 8)
-        .padding(.vertical, 8)
-        .glassEffect(.regular, in: .capsule)
-        .frame(maxWidth: .infinity)
-        .padding(.bottom, 16)
     }
 }

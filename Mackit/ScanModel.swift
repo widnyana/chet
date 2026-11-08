@@ -291,7 +291,7 @@ final class ScanModel {
     private static let home = FileManager.default.homeDirectoryForCurrentUser
 
     /// Fold a directory rollup into the live home tree (V1: subtree replace by URL). A rollup
-    /// whose parent chain isn't measured yet is dropped — its own parent rollup carries it later.
+    /// whose parent chain isn't measured yet is dropped. Its own parent rollup carries it later.
     private func mergeRollup(_ node: FolderNode) {
         guard node.url != Self.home else {
             liveTree = node
@@ -337,9 +337,10 @@ final class ScanModel {
             currentStep = step
             activity = ScanActivity(phase: step, done: 0, total: 0, label: step.title, trail: [])
         case .rulesProgress(let done, let total, let category):
-            pushActivity(.rules, done: done, total: total, label: category)
+            pushActivity(.rules, done: done, total: total, label: Self.titles[category] ?? category)
         case .stepActivity(let step, let done, let total, let label):
-            pushActivity(step, done: done, total: total, label: label)
+            let human = step == .rules ? (Self.titles[label] ?? label) : label
+            pushActivity(step, done: done, total: total, label: human)
         case .rules(let result): merge(result)
         case .folderTrees(let trees):
             folderTrees = trees

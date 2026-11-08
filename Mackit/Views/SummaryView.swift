@@ -5,7 +5,6 @@ import SwiftUI
 struct SummaryView: View {
     @Environment(ScanModel.self) private var model
     let report: CleanReport
-    @State private var appeared = false
 
     private var problems: [CleanResult] {
         report.results.filter { result in
@@ -17,48 +16,65 @@ struct SummaryView: View {
     }
 
     var body: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 56))
-                .foregroundStyle(report.dryRun ? Color.orange : Color.green)
-                .symbolEffect(.bounce, value: appeared)
-            Text(report.freedBytes.formatted(.byteCount(style: .file)))
-                .font(.system(size: 40, weight: .bold, design: .rounded))
-                .monospacedDigit()
-            Text(
-                report.dryRun
-                    ? "would be freed (dry run). \(report.results.count - problems.count) of \(report.results.count) items would be cleaned. Nothing was deleted."
-                    : "freed. \(report.results.count - problems.count) of \(report.results.count) items cleaned."
-            )
-            .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: Spacing.s4) {
+            VStack(alignment: .leading, spacing: Spacing.s1) {
+                Text(report.dryRun ? "Dry run complete" : "Clean complete")
+                    .font(Typography.title)
+                    .foregroundStyle(Theme.ink)
+                Text(report.freedBytes.formatted(.byteCount(style: .file)))
+                    .font(Typography.display)
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.ink)
+                Text(
+                    report.dryRun
+                        ? "would be freed. \(report.results.count - problems.count) of \(report.results.count) items would be cleaned. Nothing was deleted."
+                        : "freed. \(report.results.count - problems.count) of \(report.results.count) items cleaned."
+                )
+                .font(Typography.body)
+                .foregroundStyle(Theme.inkSecondary)
+            }
             if !problems.isEmpty {
                 DisclosureGroup("\(problems.count) items left alone") {
-                    List(problems, id: \.item.url) { result in
-                        VStack(alignment: .leading) {
-                            Text(result.item.url.lastPathComponent)
-                            Text(Self.reason(result.outcome)).font(.caption).foregroundStyle(.secondary)
+                    VStack(spacing: 0) {
+                        ForEach(problems, id: \.item.url) { result in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(result.item.url.lastPathComponent)
+                                        .font(Typography.row)
+                                        .foregroundStyle(Theme.ink)
+                                    Text(Self.reason(result.outcome))
+                                        .font(Typography.caption)
+                                        .foregroundStyle(Theme.inkSecondary)
+                                }
+                                Spacer()
+                            }
+                            .padding(.vertical, Spacing.s1)
+                            Hairline()
                         }
                     }
-                    .frame(height: 160)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            ForEach(model.snapshotErrors, id: \.self) { error in
-                Text("Snapshot \(error)").font(.caption).foregroundStyle(.red)
+            if !model.snapshotErrors.isEmpty {
+                VStack(alignment: .leading, spacing: Spacing.s1) {
+                    ForEach(model.snapshotErrors, id: \.self) { error in
+                        StatusLabel(text: error, systemImage: "exclamationmark.triangle", tone: .red)
+                    }
+                }
             }
             HStack {
-                Button("Show Audit Log") { NSWorkspace.shared.open(AuditLog().url) }
+                Button("Show audit log") { NSWorkspace.shared.open(AuditLog().url) }
+                    .buttonStyle(.bordered)
                 Spacer()
                 Button("Done") { model.report = nil }
-                    .buttonStyle(.glassProminent)
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.accent)
                     .controlSize(.large)
                     .keyboardShortcut(.defaultAction)
             }
-            .padding(.top, 6)
         }
-        .padding(28)
-        .frame(width: 440)
-        .onAppear { appeared = true }
+        .padding(Spacing.s6)
+        .frame(width: 480)
+        .background(Theme.paper)
     }
 
     static func reason(_ outcome: CleanOutcome) -> String {
@@ -66,7 +82,7 @@ struct SummaryView: View {
         case .skipped(.changed): "Changed since the scan, left alone"
         case .skipped(.missing): "Already gone"
         case .skipped(.policy): "Protected location, left alone"
-        case .skipped(.appRunning): "Its app is running. Quit the app and clean again"
+        case .skipped(.appRunning): "Its app is running. Quit it and clean again"
         case .failed(let message): message
         case .removed, .trashed: "Cleaned"
         }

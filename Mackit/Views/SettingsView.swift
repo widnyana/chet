@@ -28,16 +28,18 @@ struct SettingsView: View {
                 Toggle(isOn: $model.includeTempInDuplicates) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Include caches and build folders")
+                            .font(Typography.body)
                         Text(
                             "Search for duplicates inside caches, project build dirs (node_modules, target, .gradle) and other temporary places. Off by default: these folders regenerate, so duplicates there rarely free real space."
                         )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(Typography.caption)
+                        .foregroundStyle(Theme.inkSecondary)
                     }
                 }
             }
         }
         .formStyle(.grouped)
+        .tint(Theme.accent)
         .frame(width: 460, height: 140)
         .background(SettingsWindowTitle())
     }

@@ -1,329 +1,272 @@
-# Mackit — UI Design
+# Mackit UI design
 
-Reconstructed from the shipped SwiftUI code (`Mackit/Views/`). Native macOS app: a
-`NavigationSplitView` shell — fixed-width sidebar on the left (240–280 pt), detail pane on
-the right — on macOS 26 Liquid Glass.
+Status: canonical design direction.
+Detailed references: [design/README.md](design/README.md),
+[design/principles.md](design/principles.md),
+[design/tokens.md](design/tokens.md),
+[design/components.md](design/components.md),
+[design/screens.md](design/screens.md),
+[design/copy.md](design/copy.md),
+[design/references.md](design/references.md).
 
-## Sidebar
+## The design read
 
-The sidebar is the app's spine and the clean-mode surface: Overview, the Reclaimable
-categories, Disk map under Inspect. Uninstall has no place here — no mode switch, no tab,
-no destination row. It opens from the Overview card (see Uninstall below).
+Reading this as: a native macOS utility for people who want to reclaim disk
+space, in a quiet paper-and-ink ledger language, dial ENERGY 1 / RHYTHM 2 /
+MOTION 1.
 
-In **Clean** mode the list has three visual zones, top to bottom:
+Mackit is a ledger for disk space. It shows what is there, what can be
+reclaimed, and what will happen when you act. It does not decorate the act of
+cleaning. The interface is quiet because the decision is serious.
 
-1. **Overview** — a single root row (`gauge.with.dots.needle.67percent`, blue). Doubles as
-   the scan progress indicator: a mini spinner replaces it while a scan runs.
-1. **Reclaimable** section — one row per cleanable category, each with:
-   - `Project build dirs` (`wrench.and.screwdriver`, purple): a recursive rule over
-     `Development`, `Projects`, `Documents` and `Desktop` that matches regenerable build
-     directories by name — `target/`, `node_modules/`, `vendor/`, `.build/`, `.gradle/`,
-     `DerivedData/`, `Pods/`. Matches are never preselected (risk `.review`, mode
-     `.trash`), a match is a leaf (no nested double-counts), `.git` is never entered, and
-     recursion is capped at 6 levels.
-   - a tinted SF Symbol icon from `CategoryStyle` (the color *is* the category's identity —
-     the same symbol+color pair is reused in the overview grid, detail headers, and sheets),
-   - the category name (single line, truncating),
-   - a right-aligned, monospaced-digit byte count (`42 GB`) in secondary color,
-   - inline state: mini spinner while that category is actively scanning, tertiary text for
-     pending-but-empty categories, a small lock glyph when Full Disk Access is limiting it.
-   - Localized Exception Management Utility for Applications snapshots show their count instead of bytes.
-   - While scanning, the section shows a single "Scanning…" placeholder row; empty
-     categories are dimmed rather than hidden.
-3. **Inspect** section — `Disk map` (`square.grid.3x3.fill`, blue), the browse-everything view.
+## Navigation
 
-Row anatomy is deliberately flat: `Label { title + states + Spacer + trailing value } icon: { tinted symbol }`.
-No custom backgrounds, no disclosure chrome — selection, hover, and focus come from the
-system list.
+```
+NavigationSplitView
+  Sidebar
+    Overview
+    Clean
+      Caches and logs
+      Developer build data
+      Browser caches
+      ...
+    Tools
+      Applications
+      Disk map
+  Detail
+    one destination at a time
+```
 
-The app inventory does not live in the sidebar and the sidebar never changes while the
-uninstaller is open.
-
-## Disk map — live nested treemap
-
-The Disk map is a Metal-rendered treemap (`DiskMapView` + `TreemapMTKView`) of the home
-folder that **grows into its final shape while the scan runs** — the WizTree experience,
-not a wait-then-reveal chart.
-
-How the data gets there:
-
-1. The walker (`FileIndexBuilder`) reports each directory as it finishes measuring
-   (post-order, children before parents) when it is interesting enough to render:
-   depth ≤ 2 or ≥ 32 MB (`onRollup` → `ScanEvent.treeUpdate`).
-2. `ScanModel` folds every rollup into a single **live home tree** (`liveTree`) via
-   `FolderNode.inserting/merging` — subtree replace by URL, ancestors never shrink below
-   their children's sum. A rollup whose parent chain isn't measured yet is dropped; its
-   parent's own rollup carries it later.
-3. The in-flight root gets a live-growing block from the walk's byte counters
-   (`ProgressSnapshot.runningRootBytes`) on every progress tick, so the map exists from the
-   first tick, not the first completed folder.
-4. When the scan finishes, `.folderTrees` replaces the live tree with the full tree in the
-   same canvas — no blank flash.
-
-How it draws:
-
-- **Nested rendering**: each block paints itself, then its children squarified inside it,
-  inset 1 pt so the parent's color shows as a border; recursion goes three levels deep and
-  only into blocks big enough to be legible (≥ 1.5% of the canvas area). Painter's order:
-  ancestors first, descendants on top.
-- **Colors**, two channels: the 1 pt parent border is the category (orange caches and
-  logs, purple developer data, green media, blue other); the block fill carries size.
-  Fill is a quantized four-tier ramp on the block's share of its parent (`sqrt(share)`
-  cut at 0.2/0.45/0.7): lower tiers mix the block's own category hue toward neutral
-  dark, the top tier is the full category color. Bigger blocks read brighter and more
-  colorful; small blocks go gray. Container blocks render dimmed (0.72). Top-tier
-  blocks (84 pt a side) carry direct name + size labels; the legend shows outlined
-  category swatches and the four-tier size scale.
-- **Navigation** is a URL path stack, not node references: the live tree is replaced
-  several times a second, so the current node is re-resolved against the newest tree on
-  every render; stale paths trim the breadcrumb stack instead of crashing.
-- **Hover** shows a glass capsule with the folder name and byte count (monospaced digits);
-  **click** zooms into a folder with children; right-click offers Reveal in Finder.
-- **Two sections.** The treemap owns the top; progress owns the bottom. The bottom strip
-  (quaternary background, top divider) carries the phase headline, the linear bar, the
-  detail line (label, rate, elapsed, paused), file counters, the five-line folder trail,
-  and Pause/Stop. It appears only while scanning and is text-only: its per-tick updates
-  never relayout the Metal canvas.
-- **Throttled snapshots.** Rollups replace `liveTree` several times a second; the UI draws
-  a 250 ms snapshot (`displayTree`, refreshed by a poll task) so the canvas and the path
-  pill relayout at most 4x/s instead of strobing. Hover re-resolves by URL against the
-  newest snapshot.
-
-## Uninstall
-
-Uninstall is a task, not a mode. The Overview page carries the one door: a quiet
-**Uninstall apps** card under the disk bar, present in every overview state. It opens the
-app browser over the detail pane; a leading **Done** toolbar button leaves it and returns
-attention to the Overview. The sidebar never changes. The browser is a searchable
-inventory of installed apps, switchable
-between a **grid** (adaptive cells) and a **list** (dense rows) from the toolbar. Both
-styles render the same model state; the choice persists across launches.
-
-Every app carries its facts: display name, publisher (`vendorLabel`, falling back to the
-bundle ID), size (measured by a background loop after each reload — cells show "—" until
-their measurement lands), and install location (`Applications`, `User Applications`, or
-the parent folder). A running app shows an orange dot; an app only an administrator can
-remove shows a lock. Neither blocks anything — the confirm sheet and the core carry the
-consequences.
-
-Removing in bulk: the corner circle-check (grid) or leading checkbox (list) marks apps;
-a floating glass capsule reports the marked count and total bytes. Its `Remove…` button
-opens the bulk confirm — the marked apps, the total, and the removal policy ("each app
-bundle and its exact-match Library files move to the Trash"; running apps will be
-skipped). The dry-run notice appears here when `DryRun.enabled`. During the pass the
-capsule becomes a progress line ("Removing 3 of 7…") and the grid stays interactive.
-Afterwards a summary sheet reports the total, one row per app, and every skipped or
-failed item with the app it belonged to. The dry run reads `DryRun.enabled` exactly once
-per pass and passes it to every core call — the same gate the single-app flow uses, so
-dry-run bulk removal performs zero trash moves and logs `dry-` audit rows.
-
-The search field filters by display name and bundle ID; the toolbar Reload button
-re-reads the applications folder. Void states: a skeleton in the exact shape of the
-chosen style while reading, "No applications found" when the folder yields nothing, "No
-matches" when the search misses. The context menu on every cell and row offers Show
-Related Files (pushes the review surface), Open, Reveal in Finder, and Mark/Unmark for
-Removal. Opening a cell pushes the review surface:
-
-1. **App header** - 64 pt icon, display name, bundle ID, path, version and measured bundle
-   size. The "Remove app bundle" checkbox is the only control that targets the app itself.
-   It is disabled while the app (or a helper) runs or when the bundle cannot be written. A
-   running app gets an orange warning; an administrator-owned app gets a lock warning. A
-   back button returns to the grid; the confirm and summary sheets attach to the
-   workspace, so the summary survives the automatic pop after a completed removal.
-2. **Related files list** - sections by component kind (Application Support, Preferences,
-   Caches, Logs, Containers, Group Containers, Saved Application State, Cookies, Application
-   Scripts, Launch Agents, WebKit). Each row carries a checkbox, workspace icon, path, size
-   and an ownership badge:
-   - `Exact` (green): bundle ID or embedded helper ID, selected by default;
-   - `Name match` (orange): app name or bundle-ID leaf, unselected until reviewed;
-   - `Shared` (gray): group container or data another installed app claims, unselectable;
-   - `Admin` (orange lock): `/Library` or read-only folder, unselectable;
-   - `Protected` (red shield): a system or private path that is never offered.
-
-The selection header offers "Exact Matches Only", "All Selectable" and "None". A floating
-glass capsule at the bottom reports selected count and bytes; its `Remove` button opens a
-confirmation sheet that names the app, groups the selected items by kind, states that
-everything goes to the Trash, warns when the app runs, and shows the DRY RUN notice when
-engaged. The completion sheet reports moved count and bytes, lists skipped rows with their
-reasons, and links to the audit log.
-
-Everything is checked again in the core before the first move: running app, stamp (inode,
-size, mtime), match still valid, protected path, writability. The app bundle moves last.
+- The sidebar is the route. The detail pane shows one destination.
+- Applications uses its own `NavigationStack` for the inventory and one app.
+- The toolbar carries Scan / Stop on every destination except Applications.
+- Applications owns Done, Search, Layout, and Reload.
+- There are no mode tabs. Applications is a destination, not a mode.
 
 ## Visual language
 
-One grammar, applied everywhere. Every surface speaks it; nothing speaks a second one.
+Paper and ink, one accent, hairlines, tabular numbers.
 
-- **Cards.** One recipe: 24 pt padding, 22 pt corners, `.glassEffect(.regular, in:
-  .rect(cornerRadius: 22))`. Action cards carry a `.title3.bold()` title and may end in
-  a neutral quaternary capsule chip; status strips (disk bar, scan progress) carry a
-  `.headline` label. Nothing else gets a card.
-- **Icons.** Bare, tinted SF Symbols — never inside a filled badge or box. Row scale
-  16-18 pt (sidebar), list scale 20-24 pt (detail rows), card scale 28 pt. Color comes
-  from `CategoryStyle` or `.tint`/`.secondary`; orange is reserved for attention.
-- **Toolbar.** Icon buttons and the search field, nothing else. A mode exit is an
-  icon-only `chevron.left` with a help tag; a view switcher is a segmented icon picker.
-- **Buttons.** Exactly one `.glassProminent` button per surface (the primary act).
-  Neutral secondary actions are plain or quaternary capsules.
-- **Glass everywhere.** Floating chrome is `.glassEffect(.regular, in: .capsule/.rect)`;
-  primary buttons are `.glassProminent`. Glass is used for: the floating ActionBar capsule
-  (bottom of category views), overview cards
-  (22 pt-corner rects), confirmation/summary sheets, and success chips (green-tinted glass).
-- **Color = meaning, not decoration.** Category tints (orange caches, cyan browser, purple
-  package caches, red large files…) are the only saturated color. Orange also signals
-  attention (access banner, DRY RUN badge). System gray means "snapshots/neutral".
-- **Numbers are monospaced.** Every byte count uses `.monospacedDigit()` so totals don't
-  jitter during scans.
-- **Type scale** stays in system text styles: `.title.bold()` hero numbers (rounded design,
-  40–56 pt on summary screens), `.headline` for card titles/selected totals, `.callout` for
-  body, `.caption` for metadata — always `.secondary`/`.tertiary` for hierarchy.
-- **Destructive actions are explicit.** The Clean button is the only prominent glass button
-  per surface (Command-Delete shortcut), and it opens `ConfirmSheet` before touching files.
+| Token | Light | Dark | Use |
+|---|---|---|---|
+| `paper` | `#F6F4EF` | `#121316` | Content background |
+| `paperRaised` | `#FCFBF8` | `#191B1E` | Table header, inset, sheet body |
+| `ink` | `#1B1C1E` | `#F2F0EA` | Primary text |
+| `inkSecondary` | `#63635F` | `#A3A19A` | Supporting text |
+| `inkTertiary` | `#8B8A83` | `#74746F` | Disabled text |
+| `hairline` | `#DDD9D0` | `#2C2E32` | 1 px rules |
+| `accent` | `#244C9A` | `#8FA8E8` | Action, selection, focus, reclaimable |
+| `accentSoft` | `#E8EDF8` | `#1B2436` | Selected row |
+| `onAccent` | `#FFFFFF` | `#101114` | Text on accent |
+| `amber` | `#9A5B00` | `#E0A458` | Review, running, attention |
+| `red` | `#A3231B` | `#F08A82` | Destructive, protected |
+| `capacityUsed` | `#D6D2C8` | `#3A3C41` | Used segment |
+| `capacityFree` | `#E9E6DE` | `#222428` | Free segment |
 
-## Feedback & states
+Rules:
 
-- Scanning: per-row spinners + dimmed pending rows in the sidebar, a 26 pt progress ring
-  in the toolbar (quaternary track, accent arc over the five scan steps, percent centered;
-  click pauses, hover tooltips the phase words, no capsule), and a toast
-  (`ScanFinishedToast`, top center) when done.
-- Access: when Full Disk Access is denied the onboarding screen takes over the window until
-  the grant lands or the user picks "Continue without Full Disk Access" for this launch;
-  a dismissible orange banner (`AccessBanner`) above the detail pane explains limited access
-  after that choice. Onboarding: shield icon, bold title, a three-step glass card, a
-  prominent glass button, and an orange "Waiting for access" dot.
-- Debug: an orange "DRY RUN ENGAGED" capsule floats bottom-left — compile-time
-  `#if DEBUG` plus runtime `DryRun.enabled`, so release builds can't show it. Under dry
-  run the confirm sheet says nothing will be deleted, the summary says "would be freed",
-  and audit rows are prefixed `dry-` — a simulated clean never reads as a real deletion.
-  `Cleaner.dryRun` is a required init parameter, so no composition root can build a
-  mutating cleaner without deciding.
+- No category colors. Category identity is a monochrome SF Symbol and a name.
+- No green. A safe state is a neutral checkmark and plain text.
+- No gradient in the content. The app icon is the only gradient asset.
+- No custom glass, no custom shadow, no glow.
+- The native sidebar material and system sheets are the only materials.
 
-- Settings (Cmd+, the standard `Settings` scene): exactly one opt-in toggle, "Include
-  caches and build folders". The duplicates step skips regenerable build dirs
-  (`DuplicateScope.regenerableNames`, shared with the "Project build dirs" rule),
-  caches (`Caches`, `.cache`), and temporary places (`tmp`, `temp`, `.tmp`) by default;
-  the toggle maps to `DuplicateScope.everything`. No other options live on the page.
+## Type
+
+System font, SF Pro. Numbers use `.monospacedDigit()`.
+
+| Token | Size / line | Weight | Use |
+|---|---|---|---|
+| display | 34 / 40 | semibold | Reclaimable total, app size |
+| title | 22 / 28 | semibold | Page title |
+| section | 15 / 20 | semibold | Section heading |
+| body | 14 / 20 | regular | Paragraphs |
+| row | 13 / 18 | regular | Table cells |
+| caption | 11 / 14 | regular | Locations, metadata |
+| metric | 17 / 22 | medium, tabular | Row size |
+
+No rounded design. No all-caps tracking. No monospace family. The largest text
+on a screen is 34 pt.
+
+## Spacing and shape
+
+Base unit 4 pt. Tokens: 4, 8, 12, 16, 24, 32, 40, 48. Page side margin 24 pt at
+the minimum window, 32 pt at wide widths. Content max width 880 pt.
+
+Radius:
+
+- 0: pages, sections, tables, command bars.
+- 6: native buttons and fields.
+- 8: media thumbnails.
+- No pill shapes created by the app.
+
+No elevation in the content. Sheets use the system shape and shadow. The command
+bar is a real bar with a 1 px top rule, not a floating capsule.
+
+## Motion
+
+160 ms ease-out for the top status strip, 200 ms for a small state change.
+Nothing else. No bounce, pulse, float, shimmer, or symbol effect. Respect
+Reduce Motion. `ProgressView` is the only continuous motion, and only while a
+real operation runs.
+
+## Screen rules
+
+### Overview
+
+One focal point: the reclaimable total and the capacity bar.
+
+Top to bottom:
+
+1. Page header: `Overview`, a one-line subtitle, the reclaimable total.
+2. Capacity bar: volume name, capacity, used, reclaimable, free, text legend.
+3. Scan state:
+   - never scanned: an empty state with `Scan this Mac`;
+   - scanning: the phase list and a linear progress;
+   - finished: `Reclaimable` and the category ledger.
+4. Category ledger: monochrome symbol, name, item count, size. Largest first.
+   Clicking a row opens the category.
+5. Command bar: Scan, Stop, or Clean selected.
+
+No chart. The ledger is the chart. No uninstall card. Applications is in the
+sidebar.
+
+### Category
+
+Page header with the category total and the risk sentence. Then the selection
+header, the ledger table, and the command bar. Safe data says `Apps rebuild this
+data.` Review data says `Review each item. Removed items go to the Trash.`
+
+### Applications
+
+A searchable inventory: list first, grid second. Every row and cell has a mark
+checkbox, name, publisher or bundle ID, location, version, size, and a text
+status for running or admin. The command bar appears only when apps are marked.
+Opening an app is separate from marking it.
+
+### App detail
+
+Document header: icon, name, bundle ID, path, version, app size. The app bundle
+row is the only control that targets the app. Related files are grouped by
+component kind and show a plain status label. The command bar reports selected
+count and bytes and opens the confirmation.
+
+### Disk map
+
+One encoding: size share as a neutral ramp. Plain breadcrumb, four-step legend,
+canvas, hover label. The detailed scan strip lives here and nowhere else. The
+map is readable in both modes.
+
+### Snapshots
+
+A date ledger with a checkbox and a text sort control. No size column, because
+macOS reports the size only when the snapshot is deleted.
+
+### Settings
+
+One grouped form section with the duplicate-scope toggle.
+
+### Permission page
+
+A sentence, three plain steps, one primary button, one link, and a native
+spinner while checking. No glass card and no pulsing dot.
+
+## Components
+
+- `PageHeader`: title, subtitle, optional metric, hairline.
+- `SectionHeader`: sentence-case title, optional text action, hairline.
+- `CapacityBar`: used, reclaimable, free, text legend.
+- `LedgerTable`: checkbox, name and location, size, modified, risk.
+- `CommandBar`: full width, top hairline, selection summary, one primary action.
+- `StatusLabel`: icon plus text, semantic color, no pill.
+- `EmptyState`: title, cause, next action.
+- `TopStatusStrip`: access, scan result, dry run. In flow, below the toolbar.
+- `AppCell` and `AppRow`: flat surface, hairline, text statuses.
+- `OwnershipRow`: checkbox, name, location, plain ownership label.
+- `ConfirmationSheet` and `SummarySheet`: ledger sheets, no celebration.
+- `PermissionPage`: plain page, one action.
+
+Detailed anatomy and states are in [design/components.md](design/components.md).
+
+## Copy
+
+Verb first. Say what will happen. One sentence per idea. No em dash. No
+sparkle, magic, AI, seamless, powerful, or revolutionary. No invented numbers
+or claims. Empty and error states name the cause and the next action. Full copy
+is in [design/copy.md](design/copy.md).
+
+## Anti-slop commitments
+
+- No em dash in app copy or new design documents.
+- No sparkle, star, magic, or orb icon.
+- No gradient, glow, glass, or shadow as a default.
+- No card grid, no bento, no chart that repeats the ledger.
+- No pill for every small fact.
+- No decorative dot and no endless pulse.
+- No invented data.
+- No dead controls.
+- Every empty, loading, and error state is designed.
+- Light and dark mode, keyboard, and 960 x 600 are all checked.
 
 ## Rules of thumb
 
-1. Reuse `CategoryStyle` — never hardcode a symbol or color for a category.
-2. New floating chrome = glass capsule/rect with the established paddings (16–18 pt
-   horizontal, 8–10 pt vertical), not opaque backgrounds.
-3. Anything countable renders monospaced-digit, secondary, right-aligned.
-4. State is communicated in the row it belongs to (spinner/lock/dim) — not with new UI.
+1. Reuse a component. Do not restyle a row in place.
+2. A new color, radius, shadow, or motion needs a one-line reason and a token.
+3. Anything countable uses tabular digits and a stable column.
+4. State lives in the row it belongs to: text plus an icon, never a bare dot.
+5. The command bar is always full width and always at the bottom.
+6. The primary action is the only accent on the screen.
+7. If a screen needs two focal points, the screen is doing two jobs. Split it.
+8. The app icon is the only asset with a gradient.
 
 ## Layout registry
 
-Fixed chrome and its coordinates, tracked so pieces never overlap. `scripts/layout_check.py`
-reads this block, verifies the Swift code still matches, and lays the floating pieces on the
-minimum window (960 x 600) to check for intersections. Estimated sizes are minimums, not
-measured pixels: they catch structural collisions, not kerning. If you move chrome, update
-this registry in the same commit, then run `mise run layout`.
+The registry tracks persistent chrome. It is read by `scripts/layout_check.py`
+and `mise run layout`. The redesign removes floating chrome, so the entries are
+in-flow or toolbar-level and cannot overlap the content.
 
 Rules the script enforces:
 
-1. Nothing floats over the title bar: no `.overlay(alignment: .top)` anywhere in `Mackit/`.
-   The toast is a top safe-area inset, so it sits below the toolbar, above the banner.
-2. Bottom capsules hug their content and center, so the bottom corners stay free for the
-   DRY RUN badge. A full-width bottom bar would collide with it.
-3. Floating chrome anchored to the same corner must stay mutually clear at minimum size.
+1. Nothing floats over the title bar. No `.overlay(alignment: .top)`.
+2. No bottom floating capsule. The command bar is in flow.
+3. The top status strip is a safe-area inset, not an overlay.
+4. Every chrome entry names a real Swift file and a snippet that exists.
 
 ```layout-registry
 {
   "window": {"width": 960, "height": 600, "titlebar": 52},
   "chrome": [
     {
-      "id": "toast",
+      "id": "top-status-strip",
       "file": "Mackit/Views/ContentView.swift",
       "mechanism": "safeAreaInset-top",
-      "height": 40,
+      "height": 56,
       "verify": {
-        "contains": ["safeAreaInset(edge: .top, spacing: 0) {\n            if !showingUninstaller { ScanFinishedToast() }"],
+        "contains": ["safeAreaInset(edge: .top, spacing: 0) {", "TopStatusStrip()"],
         "not-contains": [".overlay(alignment: .top)"]
       }
     },
     {
-      "id": "dry-run-badge",
-      "file": "Mackit/Views/ContentView.swift",
-      "mechanism": "overlay-bottomLeading",
-      "width": 190,
-      "height": 26,
-      "insets": {"leading": 16, "bottom": 12},
-      "verify": {"contains": [".overlay(alignment: .bottomLeading) { dryRunBadge }"]}
+      "id": "command-bar",
+      "file": "Mackit/Views/CommandBar.swift",
+      "mechanism": "in-flow-bottom",
+      "height": 52,
+      "verify": {"contains": ["struct CommandBar"]}
     },
     {
-      "id": "category-action-bar",
-      "file": "Mackit/Views/ActionBar.swift",
-      "surface": "category-detail",
-      "mechanism": "safeAreaInset-bottom-centered-capsule",
-      "width": 340,
-      "height": 50,
-      "insets": {"bottom": 16},
-      "verify": {"contains": ["glassEffect(.regular, in: .capsule)\n        .frame(maxWidth: .infinity)"]}
-    },
-    {
-      "id": "app-uninstall-action-bar",
-      "file": "Mackit/Views/AppCleanerDetailView.swift",
-      "surface": "app-uninstaller",
-      "mechanism": "safeAreaInset-bottom-centered-capsule",
-      "width": 340,
-      "height": 50,
-      "insets": {"bottom": 16},
-      "verify": {
-        "contains": ["glassEffect(.regular, in: .capsule)\n        .frame(maxWidth: .infinity)"]
-      }
-    },
-    {
-      "id": "app-browser-bulk-bar",
-      "file": "Mackit/Views/AppBrowserView.swift",
-      "surface": "app-browser",
-      "mechanism": "safeAreaInset-bottom-centered-capsule",
-      "width": 420,
-      "height": 50,
-      "insets": {"bottom": 16},
-      "verify": {
-        "contains": ["glassEffect(.regular, in: .capsule)\n                .frame(maxWidth: .infinity)"]
-      }
-    },
-    {
-      "id": "snapshots-action-bar",
-      "file": "Mackit/Views/SnapshotsView.swift",
-      "surface": "snapshots",
-      "mechanism": "safeAreaInset-bottom-centered-capsule",
-      "width": 420,
-      "height": 50,
-      "insets": {"bottom": 16},
-      "verify": {"contains": ["glassEffect(.regular, in: .capsule)\n            Spacer()"]}
-    },
-    {
-      "id": "scan-status-ring",
+      "id": "scan-toolbar",
       "file": "Mackit/Views/ScanStatusView.swift",
-      "mechanism": "toolbar-ring",
-      "height": 26,
-      "verify": {"contains": ["rotationEffect(.degrees(-90))"]}
+      "mechanism": "toolbar-inline",
+      "height": 28,
+      "verify": {"contains": ["struct ScanStatusView"]}
     },
     {
-      "id": "disk-map-path-pill",
+      "id": "disk-map-chrome",
       "file": "Mackit/Views/DiskMapView.swift",
       "mechanism": "in-flow-header",
-      "height": 30,
-      "verify": {"contains": ["glassEffect(.regular, in: .capsule)"]}
-    },
-    {
-      "id": "disk-map-progress-strip",
-      "file": "Mackit/Views/DiskMapView.swift",
-      "mechanism": "in-flow-bottom-of-page",
-      "height": 150,
-      "verify": {"contains": ["background(.quaternary.opacity(0.4))"]}
-    },
-    {
-      "id": "access-banner",
-      "file": "Mackit/Views/AccessBanner.swift",
-      "mechanism": "in-flow-top-of-detail",
-      "height": 56,
-      "verify": {"contains": [".padding(.horizontal, 16)", ".padding(.vertical, 10)"]}
+      "height": 44,
+      "verify": {"contains": ["DiskMapChrome"]}
     }
   ]
 }
 ```
-

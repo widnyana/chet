@@ -41,53 +41,39 @@ struct ItemNameCell: View {
 
     var body: some View {
         let app = DisplayName.sourceBundleID(for: item.url, owner: item.ownerBundleID).flatMap(AppInfo.lookup)
-        // A cache folder named after a bundle ID: show the app's name instead of the ID.
         let titledByApp = item.ownerBundleID == nil && app != nil
-        // Unresolved bundle-ID folder: split "com.apple.HomeKit" -> "HomeKit" + vendor "Apple".
         let bundleName =
             item.ownerBundleID == nil && app == nil
             ? DisplayName.sourceBundleID(for: item.url, owner: item.ownerBundleID)
             : nil
         let split = bundleName.flatMap { DisplayName.bundleIDParts($0) }
         let location = DisplayName.location(of: item.url)
-        HStack(spacing: 10) {
+        HStack(spacing: Spacing.s2) {
             Image(nsImage: app?.icon ?? IconCache.icon(for: item.url))
                 .resizable()
-                .frame(width: 28, height: 28)
+                .frame(width: 22, height: 22)
             VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 6) {
-                    Text(
-                        titledByApp
-                            ? (app?.name ?? "")
-                            : (split.map { $0.title } ?? DisplayName.title(for: item.url))
-                    )
-                    .lineLimit(1)
-                    if item.risk == .review { ReviewBadge() }
-                }
+                Text(
+                    titledByApp
+                        ? (app?.name ?? "")
+                        : (split.map { $0.title } ?? DisplayName.title(for: item.url))
+                )
+                .font(Typography.row)
+                .foregroundStyle(Theme.ink)
+                .lineLimit(1)
                 Text(
                     item.ownerBundleID != nil && app != nil
                         ? "\(app?.name ?? "") · \(location)"
                         : (split.map { "\($0.vendor) · \(location)" } ?? location)
                 )
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(Typography.caption)
+                .foregroundStyle(Theme.inkSecondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
             }
         }
         .padding(.vertical, 2)
         .help(item.url.path)
-    }
-}
-
-struct ReviewBadge: View {
-    var body: some View {
-        Text("Review")
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(.orange)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 1)
-            .background(.orange.opacity(0.15), in: Capsule())
-            .help("Check this item before cleaning. It goes to the Trash.")
+        .accessibilityElement(children: .combine)
     }
 }

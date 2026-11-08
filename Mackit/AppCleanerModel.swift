@@ -3,7 +3,7 @@ import Foundation
 import MackitCore
 import Observation
 
-/// How the app browser lays out the inventory. Layout only — both styles read the
+/// How the app browser lays out the inventory. Layout only. Both styles read the
 /// same model state.
 enum AppBrowserStyle: String, CaseIterable, Identifiable {
     case grid, list
@@ -17,16 +17,9 @@ enum AppBrowserStyle: String, CaseIterable, Identifiable {
         }
     }
 
-    var symbol: String {
-        switch self {
-        case .grid: "square.grid.2x2"
-        case .list: "list.bullet"
-        }
-    }
-
     static let `default` =
         AppBrowserStyle(
-            rawValue: UserDefaults.standard.string(forKey: "appBrowserStyle") ?? "") ?? .grid
+            rawValue: UserDefaults.standard.string(forKey: "appBrowserStyle") ?? "") ?? .list
 }
 
 /// One app's result inside a bulk pass. The report is the same per-app report the
@@ -77,7 +70,9 @@ final class AppCleanerModel {
     var isMeasuringSizes = false
     var isBulkRemoving = false
     var bulkProgress: (done: Int, total: Int, current: String?)?
-    var style = AppBrowserStyle.default
+    var style = AppBrowserStyle.default {
+        didSet { UserDefaults.standard.set(style.rawValue, forKey: "appBrowserStyle") }
+    }
 
     private let home = FileManager.default.homeDirectoryForCurrentUser
     private var detailTask: Task<Void, Never>?
@@ -167,7 +162,7 @@ final class AppCleanerModel {
     func clearMarks() { markedApps.removeAll() }
 
     /// Sizes arrive live, one app at a time, lowest-cost first (alphabetical). A cell
-    /// shows "—" until its app's measurement lands. Unreadable apps simply get none.
+    /// shows "n/a" until its app's measurement lands. Unreadable apps simply get none.
     private func startMeasuringSizes() {
         sizeTask?.cancel()
         let queue = apps.filter { appSizes[$0.url] == nil }
@@ -191,8 +186,8 @@ final class AppCleanerModel {
         showBulkConfirm = true
     }
 
-    /// One pass over the marked apps. The dry-run gate is read exactly once here — the
-    /// same rule the single-app path follows — and every core call receives it. A
+    /// One pass over the marked apps. The dry-run gate is read exactly once here, the
+    /// same rule the single-app path follows, and every core call receives it. A
     /// running app is never scanned: the core reports it as skipped(appRunning) from
     /// the plan alone, so the batch never waits on it.
     func removeMarked() {

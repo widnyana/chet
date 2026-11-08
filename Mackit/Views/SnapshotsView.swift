@@ -6,67 +6,109 @@ struct SnapshotsView: View {
     let onClean: () -> Void
     @State private var newestFirst = true
 
-    var body: some View {
-        Group {
-            if model.snapshots.isEmpty && !model.isScanning {
-                ContentUnavailableView {
-                    Label("No local snapshots", systemImage: "clock.arrow.circlepath")
-                } description: {
-                    Text(
-                        "Time Machine keeps local snapshots on the disk when it has room. Run a scan to check for them."
-                    )
-                } actions: {
-                    Button("Scan Now") { model.scan() }
-                        .buttonStyle(.glassProminent)
-                        .controlSize(.large)
-                }
-            } else {
-                List(model.snapshots.sorted { newestFirst ? $0.date > $1.date : $0.date < $1.date }, id: \.self) {
-                    snapshot in
-                    Toggle(snapshot.date, isOn: model.isSelected(snapshot))
-                }
-            }
-        }
-        .safeAreaInset(edge: .bottom) { selectionBar }
-        .navigationTitle("Time Machine local snapshots")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    newestFirst.toggle()
-                } label: {
-                    Image(systemName: "arrow.up.arrow.down")
-                }
-                .help(newestFirst ? "Sorted newest first" : "Sorted oldest first")
-            }
-        }
+    private var ordered: [LocalSnapshot] {
+        model.snapshots.sorted { newestFirst ? $0.date > $1.date : $0.date < $1.date }
     }
 
-    /// Same centered-capsule grammar as the category ActionBar; macOS reports snapshot
-    /// sizes only when they are deleted, so the bar shows counts, not bytes.
-    private var selectionBar: some View {
-        let count = model.selectedSnapshots.count
-        return HStack {
-            Spacer()
-            HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(count == 1 ? "1 snapshot selected" : "\(count) snapshots selected")
-                        .font(.headline)
-                        .monospacedDigit()
-                    Text("macOS reports their size only when they are deleted")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Button("Clean Selected", systemImage: "sparkles") { onClean() }
-                    .buttonStyle(.glassProminent)
-                    .controlSize(.large)
-                    .disabled(count == 0 || model.isCleaning)
+    var body: some View {
+        VStack(spacing: 0) {
+            PageHeader(
+                title: "Local snapshots",
+                subtitle: "Time Machine keeps these on the startup disk while it has room.",
+                metric: "\(model.snapshots.count)",
+                metricLabel: model.snapshots.count == 1 ? "snapshot" : "snapshots"
+            )
+            .padding(.horizontal, Metrics.widePageMargin)
+            .padding(.top, Spacing.s6)
+            .padding(.bottom, Spacing.s3)
+            if !model.snapshotErrors.isEmpty {
+                ErrorStateView(
+                    title: "Snapshot command failed",
+                    message: model.snapshotErrors.joined(separator: "\n")
+                )
+                .padding(.horizontal, Spacing.s6)
             }
-            .padding(.leading, 18)
-            .padding(.trailing, 8)
-            .padding(.vertical, 8)
-            .glassEffect(.regular, in: .capsule)
-            Spacer()
+            if model.snapshots.isEmpty {
+                if model.isScanning {
+                    LoadingStateView(message: "Checking snapshots")
+                        .padding(.horizontal, Spacing.s6)
+                } else {
+                    EmptyStateView(
+                        title: "No local snapshots",
+                        message: "Time Machine keeps local snapshots only while it has room on the disk.",
+                        actionTitle: "Scan this Mac",
+                        action: { model.scan() }
+                    )
+                    .padding(.horizontal, Spacing.s6)
+                }
+                Spacer()
+            } else {
+                sectionHeader
+                List(ordered, id: \.self) { snapshot in
+                    HStack(spacing: Spacing.s3) {
+                        Toggle("Select snapshot", isOn: model.isSelected(snapshot))
+                            .toggleStyle(.checkbox)
+                            .labelsHidden()
+                            .accessibilityLabel("Select \(Self.label(snapshot.date))")
+                        Text(Self.label(snapshot.date))
+                            .font(Typography.row)
+                            .monospacedDigit()
+                            .foregroundStyle(Theme.ink)
+                        Spacer()
+                        Text("Local snapshot")
+                            .font(Typography.caption)
+                            .foregroundStyle(Theme.inkSecondary)
+                    }
+                    .padding(.vertical, 2)
+                }
+                .listStyle(.inset)
+                .scrollContentBackground(.hidden)
+                .background(Theme.paper)
+            }
         }
-        .padding(.bottom, 16)
+        .background(Theme.paper)
+        .safeAreaInset(edge: .bottom) {
+            CommandBar(
+                metric: "\(model.selectedSnapshots.count)",
+                detail: model.selectedSnapshots.count == 1
+                    ? "1 snapshot selected" : "\(model.selectedSnapshots.count) snapshots selected",
+                actionTitle: "Clean selected",
+                actionSystemImage: "checkmark",
+                isEnabled: !model.selectedSnapshots.isEmpty && !model.isCleaning,
+                help: "Review and clean the selected snapshots",
+                action: onClean)
+        }
+        .navigationTitle("Local snapshots")
+    }
+
+    /// `2026-11-03-101500` -> `2026-11-03 10:15`.
+    static func label(_ raw: String) -> String {
+        let parts = raw.split(separator: "-")
+        guard parts.count == 4, parts[3].count >= 4 else { return raw }
+        let time = parts[3]
+        let hour = time.prefix(2)
+        let minute = time.dropFirst(2).prefix(2)
+        return "\(parts[0])-\(parts[1])-\(parts[2]) \(hour):\(minute)"
+    }
+
+    private var sectionHeader: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Snapshots")
+                    .font(Typography.section)
+                    .foregroundStyle(Theme.ink)
+                Spacer()
+                Button(newestFirst ? "Newest first" : "Oldest first") {
+                    newestFirst.toggle()
+                }
+                .buttonStyle(.plain)
+                .font(Typography.caption)
+                .foregroundStyle(Theme.accent)
+                .help("Change the sort order")
+            }
+            .padding(.horizontal, Spacing.s6)
+            .padding(.vertical, Spacing.s2)
+            Hairline()
+        }
     }
 }

@@ -6,51 +6,49 @@ struct OnboardingView: View {
     @Environment(ScanModel.self) private var model
 
     var body: some View {
-        VStack(spacing: 22) {
-            Image(systemName: "lock.shield.fill")
-                .font(.system(size: 52))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(.tint)
-            VStack(spacing: 6) {
-                Text("Give Mackit Full Disk Access")
-                    .font(.title.bold())
-                Text(
-                    "macOS hides caches, Mail downloads and browser data from apps. Mackit needs access to measure and clean them. Nothing leaves your Mac."
-                )
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: 440)
+        VStack(alignment: .leading, spacing: Spacing.s4) {
+            Image(systemName: "lock.shield")
+                .font(.system(size: 28, weight: .regular))
+                .foregroundStyle(Theme.inkSecondary)
+            Text("Mackit needs access to the folders it measures.")
+                .font(Typography.title)
+                .foregroundStyle(Theme.ink)
+            Text(
+                "macOS hides caches, Mail downloads, browser data, and some app containers from apps. Mackit reads them on this Mac. Nothing is uploaded."
+            )
+            .font(Typography.body)
+            .foregroundStyle(Theme.inkSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+            VStack(spacing: 0) {
+                step(1, "Open Privacy and Security settings.")
+                Hairline()
+                step(2, "Turn on Mackit under Full Disk Access.")
+                Hairline()
+                step(3, "Come back here. Mackit checks by itself.")
             }
-            VStack(alignment: .leading, spacing: 14) {
-                step(1, "Open Privacy & Security settings")
-                step(2, "Turn on Mackit under Full Disk Access")
-                step(3, "Come back here. Mackit notices by itself")
-            }
-            .padding(20)
-            .frame(maxWidth: 440, alignment: .leading)
-            .glassEffect(.regular, in: .rect(cornerRadius: 20))
-            Button("Open Settings", systemImage: "gearshape") {
-                // Persist before leaving: macOS relaunches the app when the grant applies,
-                // and that relaunch must not lose the grantAttempts count.
+            Button("Open System Settings") {
                 model.recordGrantAttempt()
                 NSWorkspace.shared.open(FullDiskAccess.settingsURL)
             }
-            .buttonStyle(.glassProminent)
-            .controlSize(.extraLarge)
-            HStack(spacing: 6) {
-                Circle().fill(.orange).frame(width: 8, height: 8)
-                Text("Waiting for access")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Button("Continue Without Access") { model.accessSkipped = true }
+            .buttonStyle(.borderedProminent)
+            .tint(Theme.accent)
+            .controlSize(.large)
+            .padding(.top, Spacing.s2)
+            Button("Continue without access") { model.accessSkipped = true }
                 .buttonStyle(.link)
+            HStack(spacing: Spacing.s2) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Checking for access")
+                    .font(Typography.caption)
+                    .foregroundStyle(Theme.inkSecondary)
+            }
         }
-        .padding(40)
+        .padding(Spacing.s12)
+        .frame(maxWidth: 520, alignment: .leading)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.paper)
         .task {
-            // The probe is the only truth about what this process can read; poll it so
-            // the screen dismisses itself the moment access works, no restart needed.
             while model.access == .denied && !model.accessSkipped {
                 try? await Task.sleep(for: .seconds(1))
                 model.refreshAccess()
@@ -59,12 +57,17 @@ struct OnboardingView: View {
     }
 
     private func step(_ number: Int, _ text: String) -> some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .firstTextBaseline, spacing: Spacing.s3) {
             Text("\(number)")
-                .font(.headline)
-                .frame(width: 28, height: 28)
-                .background(.tint.opacity(0.15), in: Circle())
+                .font(Typography.caption)
+                .monospacedDigit()
+                .foregroundStyle(Theme.inkSecondary)
+                .frame(width: 18, alignment: .leading)
             Text(text)
+                .font(Typography.body)
+                .foregroundStyle(Theme.ink)
+            Spacer()
         }
+        .padding(.vertical, Spacing.s2)
     }
 }

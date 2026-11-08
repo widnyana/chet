@@ -14,65 +14,59 @@ struct AppUninstallConfirmSheet: View {
                 (AppComponentKind.allCases.firstIndex(of: $0.kind) ?? Int.max)
                     < (AppComponentKind.allCases.firstIndex(of: $1.kind) ?? Int.max)
             }
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 14) {
-                Image(systemName: "trash")
-                    .font(.system(size: 34))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.tint)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Remove \(app?.name ?? "this app")?")
-                        .font(.title2.bold())
-                    Text(
-                        "\(model.selectedCount) items · "
-                            + model.selectedBytes.formatted(.byteCount(style: .file))
-                    )
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-                }
+        VStack(alignment: .leading, spacing: Spacing.s4) {
+            VStack(alignment: .leading, spacing: Spacing.s1) {
+                Text("Remove \(app?.name ?? "this app")?")
+                    .font(Typography.title)
+                    .foregroundStyle(Theme.ink)
+                Text(
+                    "\(model.selectedCount) items · \(model.selectedBytes.formatted(.byteCount(style: .file)))"
+                )
+                .font(Typography.body)
+                .monospacedDigit()
+                .foregroundStyle(Theme.inkSecondary)
             }
             ScrollView {
                 VStack(spacing: 0) {
                     if model.appSelected, let app {
-                        row(
-                            symbol: "app.dashed", title: app.name,
-                            detail: "App bundle", bytes: model.appBytes)
-                        Divider()
+                        confirmRow(
+                            symbol: "app.dashed", title: app.name, detail: "App bundle",
+                            bytes: model.appBytes)
+                        Hairline()
                     }
                     ForEach(rows) { row in
-                        self.row(
+                        confirmRow(
                             symbol: "folder", title: row.kind.title,
                             detail: row.count == 1 ? "1 item" : "\(row.count) items", bytes: row.bytes)
-                        if row.kind != rows.last?.kind { Divider() }
+                        if row.kind != rows.last?.kind { Hairline() }
                     }
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
+                .padding(.horizontal, Spacing.s3)
+                .padding(.vertical, Spacing.s2)
             }
             .frame(maxHeight: 220)
-            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
-            VStack(alignment: .leading, spacing: 6) {
-                Label("The app and selected files move to the Trash", systemImage: "trash")
-                Label("Each item is checked again before it moves", systemImage: "checkmark.shield")
+            .background(Theme.paperRaised, in: RoundedRectangle(cornerRadius: 6))
+            VStack(alignment: .leading, spacing: Spacing.s2) {
+                labeled("The app and selected files move to the Trash.", icon: "trash")
+                labeled("Each item is checked again before it moves.", icon: "checkmark.shield")
                 if let app, !model.appSelected, app.isWritable, !model.isRunning {
-                    Label("The app bundle stays installed", systemImage: "app.dashed")
+                    labeled("The app bundle stays installed.", icon: "app.dashed")
                 }
             }
-            .font(.callout)
             Text("Nothing is deleted permanently. You can restore items from the Trash.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(Typography.caption)
+                .foregroundStyle(Theme.inkSecondary)
             if model.isRunning {
-                Label(
-                    "Quit the app before removing it.", systemImage: "exclamationmark.triangle.fill"
-                )
-                .font(.callout.weight(.medium))
-                .foregroundStyle(.orange)
+                StatusLabel(
+                    text: "Quit the app before removing it.",
+                    systemImage: "exclamationmark.triangle",
+                    tone: .amber)
             }
             if DryRun.enabled {
-                Label("DRY RUN: nothing will be moved", systemImage: "exclamationmark.triangle.fill")
-                    .font(.callout.weight(.medium))
-                    .foregroundStyle(.orange)
+                StatusLabel(
+                    text: "Dry run. Nothing will be moved.",
+                    systemImage: "exclamationmark.triangle",
+                    tone: .amber)
             }
             HStack {
                 Spacer()
@@ -83,14 +77,16 @@ struct AppUninstallConfirmSheet: View {
                     model.remove()
                     dismiss()
                 }
-                .buttonStyle(.glassProminent)
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.red)
                 .controlSize(.large)
                 .keyboardShortcut(.defaultAction)
                 .disabled(!model.canRemove)
             }
         }
-        .padding(24)
-        .frame(width: 480)
+        .padding(Spacing.s6)
+        .frame(width: 500)
+        .background(Theme.paper)
     }
 
     private struct ConfirmRow: Identifiable {
@@ -100,25 +96,41 @@ struct AppUninstallConfirmSheet: View {
         var id: String { kind.rawValue }
     }
 
-    private func row(symbol: String, title: String, detail: String, bytes: Int64) -> some View {
-        HStack {
-            Image(systemName: symbol).foregroundStyle(.secondary).frame(width: 22)
+    private func confirmRow(symbol: String, title: String, detail: String, bytes: Int64) -> some View {
+        HStack(spacing: Spacing.s2) {
+            Image(systemName: symbol)
+                .foregroundStyle(Theme.inkSecondary)
+                .frame(width: 22)
             Text(title)
+                .font(Typography.row)
+                .foregroundStyle(Theme.ink)
             Spacer()
-            Text(detail).font(.caption).foregroundStyle(.secondary)
+            Text(detail)
+                .font(Typography.caption)
+                .foregroundStyle(Theme.inkSecondary)
             Text(bytes.formatted(.byteCount(style: .file)))
+                .font(Typography.row)
                 .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .frame(width: 90, alignment: .trailing)
+                .foregroundStyle(Theme.inkSecondary)
+                .frame(width: 88, alignment: .trailing)
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, Spacing.s1)
+    }
+
+    private func labeled(_ text: String, icon: String) -> some View {
+        HStack(spacing: Spacing.s2) {
+            Image(systemName: icon)
+                .foregroundStyle(Theme.inkSecondary)
+            Text(text)
+                .font(Typography.body)
+                .foregroundStyle(Theme.ink)
+        }
     }
 }
 
 struct UninstallSummaryView: View {
     @Environment(AppCleanerModel.self) private var model
     let report: UninstallReport
-    @State private var appeared = false
 
     private var problems: [UninstallResult] {
         report.results.filter { result in
@@ -130,47 +142,58 @@ struct UninstallSummaryView: View {
     }
 
     var body: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 56))
-                .foregroundStyle(report.dryRun ? Color.orange : Color.green)
-                .symbolEffect(.bounce, value: appeared)
-            Text(report.trashedBytes.formatted(.byteCount(style: .file)))
-                .font(.system(size: 40, weight: .bold, design: .rounded))
-                .monospacedDigit()
-            Text(
-                report.dryRun
-                    ? "would be moved to the Trash (dry run). \(report.trashedCount) of \(report.results.count) items would be moved. Nothing was moved."
-                    : "moved to the Trash. \(report.trashedCount) of \(report.results.count) items moved."
-            )
-            .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: Spacing.s4) {
+            VStack(alignment: .leading, spacing: Spacing.s1) {
+                Text(report.dryRun ? "Dry run complete" : "Uninstall complete")
+                    .font(Typography.title)
+                    .foregroundStyle(Theme.ink)
+                Text(report.trashedBytes.formatted(.byteCount(style: .file)))
+                    .font(Typography.display)
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.ink)
+                Text(
+                    report.dryRun
+                        ? "would be moved to the Trash. \(report.trashedCount) of \(report.results.count) items would be moved. Nothing was moved."
+                        : "moved to the Trash. \(report.trashedCount) of \(report.results.count) items moved."
+                )
+                .font(Typography.body)
+                .foregroundStyle(Theme.inkSecondary)
+            }
             if !problems.isEmpty {
                 DisclosureGroup("\(problems.count) items left alone") {
-                    List(problems) { result in
-                        VStack(alignment: .leading) {
-                            Text(result.name)
-                            Text(Self.reason(result.outcome))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                    VStack(spacing: 0) {
+                        ForEach(problems) { result in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(result.name)
+                                        .font(Typography.row)
+                                        .foregroundStyle(Theme.ink)
+                                    Text(Self.reason(result.outcome))
+                                        .font(Typography.caption)
+                                        .foregroundStyle(Theme.inkSecondary)
+                                }
+                                Spacer()
+                            }
+                            .padding(.vertical, Spacing.s1)
+                            Hairline()
                         }
                     }
-                    .frame(height: 160)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
             HStack {
-                Button("Show Audit Log") { NSWorkspace.shared.open(AuditLog().url) }
+                Button("Show audit log") { NSWorkspace.shared.open(AuditLog().url) }
+                    .buttonStyle(.bordered)
                 Spacer()
                 Button("Done") { model.report = nil }
-                    .buttonStyle(.glassProminent)
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.accent)
                     .controlSize(.large)
                     .keyboardShortcut(.defaultAction)
             }
-            .padding(.top, 6)
         }
-        .padding(28)
-        .frame(width: 460)
-        .onAppear { appeared = true }
+        .padding(Spacing.s6)
+        .frame(width: 480)
+        .background(Theme.paper)
     }
 
     static func reason(_ outcome: UninstallOutcome) -> String {
@@ -182,85 +205,79 @@ struct UninstallSummaryView: View {
     }
 }
 
-/// Bulk confirm: the marked apps, the total, and the removal policy. Per-app
-/// related-file counts are deliberately not pre-scanned here — the summary sheet
-/// reports exactly what moved, per app, after the pass.
 struct BulkUninstallConfirmSheet: View {
     @Environment(AppCleanerModel.self) private var model
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         let apps = model.markedAppsList
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 14) {
-                Image(systemName: "trash")
-                    .font(.system(size: 34))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.tint)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(apps.count == 1 ? "Remove 1 app?" : "Remove \(apps.count) apps?")
-                        .font(.title2.bold())
-                    Text("\(model.markedBytes.formatted(.byteCount(style: .file))) total")
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
+        VStack(alignment: .leading, spacing: Spacing.s4) {
+            VStack(alignment: .leading, spacing: Spacing.s1) {
+                Text(apps.count == 1 ? "Remove 1 app?" : "Remove \(apps.count) apps?")
+                    .font(Typography.title)
+                    .foregroundStyle(Theme.ink)
+                Text("\(model.markedBytes.formatted(.byteCount(style: .file))) total")
+                    .font(Typography.body)
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.inkSecondary)
             }
             ScrollView {
                 VStack(spacing: 0) {
                     ForEach(apps) { app in
-                        HStack(spacing: 10) {
+                        HStack(spacing: Spacing.s2) {
                             Image(nsImage: IconCache.icon(for: app.url))
                                 .resizable()
-                                .frame(width: 24, height: 24)
-                            Text(app.name).lineLimit(1)
+                                .frame(width: 22, height: 22)
+                            Text(app.name)
+                                .font(Typography.row)
+                                .foregroundStyle(Theme.ink)
+                                .lineLimit(1)
                             Spacer()
                             Text(model.locationLabel(app))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .font(Typography.caption)
+                                .foregroundStyle(Theme.inkSecondary)
                                 .lineLimit(1)
                             Text(
                                 model.appSizes[app.url].map {
                                     $0.formatted(.byteCount(style: .file))
-                                } ?? "—"
+                                } ?? "n/a"
                             )
+                            .font(Typography.row)
                             .monospacedDigit()
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.inkSecondary)
                             .frame(width: 84, alignment: .trailing)
                         }
-                        .padding(.vertical, 6)
-                        if app.id != apps.last?.id { Divider() }
+                        .padding(.vertical, Spacing.s1)
+                        if app.id != apps.last?.id { Hairline() }
                     }
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
+                .padding(.horizontal, Spacing.s3)
+                .padding(.vertical, Spacing.s2)
             }
             .frame(maxHeight: 220)
-            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
-            VStack(alignment: .leading, spacing: 6) {
-                Label(
-                    "Each app bundle and its exact-match Library files move to the Trash",
-                    systemImage: "trash")
-                Label(
-                    "Name matches and shared data stay; each item is checked again before it moves",
-                    systemImage: "checkmark.shield")
+            .background(Theme.paperRaised, in: RoundedRectangle(cornerRadius: 6))
+            VStack(alignment: .leading, spacing: Spacing.s2) {
+                labeled("Each app bundle and its exact-match Library files move to the Trash.", icon: "trash")
+                labeled(
+                    "Name matches and shared data stay. Each item is checked again before it moves.",
+                    icon: "checkmark.shield")
                 if model.markedRunningCount > 0 {
-                    Label(
-                        model.markedRunningCount == 1
-                            ? "1 running app will be skipped"
-                            : "\(model.markedRunningCount) running apps will be skipped",
-                        systemImage: "exclamationmark.triangle.fill"
-                    )
-                    .foregroundStyle(.orange)
+                    StatusLabel(
+                        text: model.markedRunningCount == 1
+                            ? "1 running app will be skipped."
+                            : "\(model.markedRunningCount) running apps will be skipped.",
+                        systemImage: "exclamationmark.triangle",
+                        tone: .amber)
                 }
             }
-            .font(.callout)
             Text("Nothing is deleted permanently. You can restore items from the Trash.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(Typography.caption)
+                .foregroundStyle(Theme.inkSecondary)
             if DryRun.enabled {
-                Label("DRY RUN: nothing will be moved", systemImage: "exclamationmark.triangle.fill")
-                    .font(.callout.weight(.medium))
-                    .foregroundStyle(.orange)
+                StatusLabel(
+                    text: "Dry run. Nothing will be moved.",
+                    systemImage: "exclamationmark.triangle",
+                    tone: .amber)
             }
             HStack {
                 Spacer()
@@ -271,23 +288,32 @@ struct BulkUninstallConfirmSheet: View {
                     model.removeMarked()
                     dismiss()
                 }
-                .buttonStyle(.glassProminent)
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.red)
                 .controlSize(.large)
                 .keyboardShortcut(.defaultAction)
                 .disabled(!model.canBulkRemove)
             }
         }
-        .padding(24)
-        .frame(width: 480)
+        .padding(Spacing.s6)
+        .frame(width: 500)
+        .background(Theme.paper)
+    }
+
+    private func labeled(_ text: String, icon: String) -> some View {
+        HStack(spacing: Spacing.s2) {
+            Image(systemName: icon)
+                .foregroundStyle(Theme.inkSecondary)
+            Text(text)
+                .font(Typography.body)
+                .foregroundStyle(Theme.ink)
+        }
     }
 }
 
-/// Bulk summary: one total, one row per app, and every skipped or failed item with
-/// the app it belonged to. Dry run keeps the orange "nothing was moved" contract.
 struct BulkUninstallSummaryView: View {
     @Environment(AppCleanerModel.self) private var model
     let report: BulkUninstallReport
-    @State private var appeared = false
 
     private var problems: [(app: InstalledApp, result: UninstallResult)] {
         report.items.flatMap { item in
@@ -303,54 +329,65 @@ struct BulkUninstallSummaryView: View {
     }
 
     var body: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 56))
-                .foregroundStyle(report.dryRun ? Color.orange : Color.green)
-                .symbolEffect(.bounce, value: appeared)
-            Text(report.trashedBytes.formatted(.byteCount(style: .file)))
-                .font(.system(size: 40, weight: .bold, design: .rounded))
-                .monospacedDigit()
-            Text(summaryLine)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+        VStack(alignment: .leading, spacing: Spacing.s4) {
+            VStack(alignment: .leading, spacing: Spacing.s1) {
+                Text(report.dryRun ? "Dry run complete" : "Uninstall complete")
+                    .font(Typography.title)
+                    .foregroundStyle(Theme.ink)
+                Text(report.trashedBytes.formatted(.byteCount(style: .file)))
+                    .font(Typography.display)
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.ink)
+                Text(summaryLine)
+                    .font(Typography.body)
+                    .foregroundStyle(Theme.inkSecondary)
+            }
             if !problems.isEmpty {
                 DisclosureGroup("\(problems.count) items left alone") {
-                    List(problems, id: \.result.id) { problem in
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(problem.app.name)
-                            Text(
-                                problem.result.name + " · "
-                                    + UninstallSummaryView.reason(problem.result.outcome)
-                            )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    VStack(spacing: 0) {
+                        ForEach(problems.indices, id: \.self) { index in
+                            let problem = problems[index]
+                            HStack {
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(problem.app.name)
+                                        .font(Typography.row)
+                                        .foregroundStyle(Theme.ink)
+                                    Text(
+                                        problem.result.name + " · "
+                                            + UninstallSummaryView.reason(problem.result.outcome)
+                                    )
+                                    .font(Typography.caption)
+                                    .foregroundStyle(Theme.inkSecondary)
+                                }
+                                Spacer()
+                            }
+                            .padding(.vertical, Spacing.s1)
+                            Hairline()
                         }
                     }
-                    .frame(height: 160)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
             HStack {
-                Button("Show Audit Log") { NSWorkspace.shared.open(AuditLog().url) }
+                Button("Show audit log") { NSWorkspace.shared.open(AuditLog().url) }
+                    .buttonStyle(.bordered)
                 Spacer()
                 Button("Done") { model.bulkReport = nil }
-                    .buttonStyle(.glassProminent)
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.accent)
                     .controlSize(.large)
                     .keyboardShortcut(.defaultAction)
             }
-            .padding(.top, 6)
         }
-        .padding(28)
-        .frame(width: 460)
-        .onAppear { appeared = true }
+        .padding(Spacing.s6)
+        .frame(width: 480)
+        .background(Theme.paper)
     }
 
     private var summaryLine: String {
         let apps = report.items.count == 1 ? "1 app" : "\(report.items.count) apps"
         if report.dryRun {
             return
-                "would be moved to the Trash (dry run). \(report.trashedCount) of \(report.resultCount) items across \(apps) would be moved. Nothing was moved."
+                "would be moved to the Trash. \(report.trashedCount) of \(report.resultCount) items across \(apps) would be moved. Nothing was moved."
         }
         return "moved to the Trash. \(report.trashedCount) of \(report.resultCount) items across \(apps) moved."
     }

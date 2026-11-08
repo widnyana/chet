@@ -29,6 +29,8 @@
 !MackitCore/**
 !docs/DESIGN.md
 !docs/findings.md
+!docs/design/
+!docs/design/**
 !scripts/**
 
 # --- 4. Explicit re-ignores inside committable trees ---

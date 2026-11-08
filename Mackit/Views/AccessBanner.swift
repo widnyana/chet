@@ -1,36 +1,53 @@
 import AppKit
 import MackitCore
 import SwiftUI
+@preconcurrency import UserNotifications
 
-/// Non-blocking Full Disk Access notice. Shown once the user has already been sent to
-/// Settings, so a macOS relaunch (or a rebuild that voids the ad-hoc grant) never blocks
-/// the app behind onboarding again. It re-checks every second and disappears on its own.
-struct AccessBanner: View {
+/// One full-width strip under the toolbar for global states: dry run, limited
+/// access, and the scan result. It pushes content down; it never floats over it.
+struct TopStatusStrip: View {
     @Environment(ScanModel.self) private var model
+    @State private var finishedText: String?
 
     var body: some View {
-        if model.showsAccessBanner {
-            HStack(spacing: 12) {
-                Image(systemName: "lock.shield.fill")
-                    .foregroundStyle(.orange)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Limited access: caches, Mail downloads and browser data are hidden")
-                        .font(.callout)
-                    if model.grantAttempts >= 2 {
-                        Text(
-                            "Mackit may appear more than once in the Full Disk Access list — "
-                                + "remove the stale entries, or run: tccutil reset All id.web.widnyana.mackit"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                    }
-                }
-                Spacer()
-                Button("Fix") {
+        Group {
+            if DryRun.enabled {
+                strip(
+                    icon: "exclamationmark.triangle",
+                    text: "Dry run. No files will be moved.",
+                    tone: .amber,
+                    actionTitle: nil,
+                    action: nil,
+                    dismiss: nil)
+            } else if model.showsAccessBanner {
+                accessStrip
+            } else if let finishedText {
+                strip(
+                    icon: "checkmark.circle",
+                    text: finishedText,
+                    tone: .neutral,
+                    actionTitle: nil,
+                    action: nil,
+                    dismiss: { self.finishedText = nil })
+            }
+        }
+        .modifier(ScanFinishedObserver(text: $finishedText))
+    }
+
+    private var accessStrip: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: Spacing.s3) {
+                StatusLabel(
+                    text: "Limited access. Some folders are hidden.",
+                    systemImage: "lock.shield",
+                    tone: .amber)
+                Spacer(minLength: Spacing.s3)
+                Button("Open Settings") {
                     model.recordGrantAttempt()
                     NSWorkspace.shared.open(FullDiskAccess.settingsURL)
                 }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
                 Button {
                     model.bannerDismissed = true
                 } label: {
@@ -39,16 +56,93 @@ struct AccessBanner: View {
                 .buttonStyle(.plain)
                 .help("Hide until the next launch")
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(.orange.opacity(0.12))
-            .overlay(alignment: .bottom) { Divider() }
-            .task {
-                while !Task.isCancelled && model.showsAccessBanner {
-                    try? await Task.sleep(for: .seconds(1))
-                    model.refreshAccess()
+            if model.grantAttempts >= 2 {
+                Text(
+                    "Mackit may appear more than once in the Full Disk Access list. Remove the stale entries, or run tccutil reset All id.web.widnyana.mackit."
+                )
+                .font(Typography.caption)
+                .foregroundStyle(Theme.inkSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
+            }
+            Hairline()
+        }
+        .padding(.horizontal, Spacing.s6)
+        .padding(.vertical, Spacing.s2)
+        .background(Theme.paperRaised)
+        .task {
+            while !Task.isCancelled && model.showsAccessBanner {
+                try? await Task.sleep(for: .seconds(1))
+                model.refreshAccess()
+            }
+        }
+    }
+
+    private func strip(
+        icon: String,
+        text: String,
+        tone: StatusTone,
+        actionTitle: String?,
+        action: (() -> Void)?,
+        dismiss: (() -> Void)?
+    ) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: Spacing.s3) {
+                StatusLabel(text: text, systemImage: icon, tone: tone)
+                Spacer(minLength: Spacing.s3)
+                if let actionTitle, let action {
+                    Button(actionTitle, action: action)
+                        .buttonStyle(.bordered)
+                        .controlSize(.regular)
+                }
+                if let dismiss {
+                    Button(action: dismiss) {
+                        Image(systemName: "xmark")
+                    }
+                    .buttonStyle(.plain)
+                    .help("Dismiss")
                 }
             }
+            .padding(.horizontal, Spacing.s6)
+            .padding(.vertical, Spacing.s3)
+            .background(Theme.paperRaised)
+            Hairline()
+        }
+    }
+}
+
+struct ScanFinishedObserver: ViewModifier {
+    @Environment(ScanModel.self) private var model
+    @Binding var text: String?
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: model.isScanning) { was, now in
+                if was, !now, model.didFinishScan {
+                    show()
+                }
+            }
+    }
+
+    private func show() {
+        text = "Scan finished. \(model.totalBytes.formatted(.byteCount(style: .file))) can be reclaimed."
+        Task {
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            text = nil
+        }
+        notifyIfBackgrounded()
+    }
+
+    private func notifyIfBackgrounded() {
+        guard !NSApp.isActive else { return }
+        let bytes = model.totalBytes.formatted(.byteCount(style: .file))
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert]) { granted, _ in
+            guard granted else { return }
+            let content = UNMutableNotificationContent()
+            content.title = "Scan finished"
+            content.body = "\(bytes) can be reclaimed"
+            let request = UNNotificationRequest(identifier: "scan-finished", content: content, trigger: nil)
+            UNUserNotificationCenter.current().add(request)
         }
     }
 }

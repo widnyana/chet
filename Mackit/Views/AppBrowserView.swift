@@ -2,10 +2,9 @@ import AppKit
 import MackitCore
 import SwiftUI
 
-/// The uninstall destination: the inventory (grid or list, searchable) plus the bulk
-/// flow. Opening one app pushes the review surface; marking several apps opens the
-/// bulk pass. The confirm and summary sheets attach here — not to the pushed detail —
-/// so the summary survives the pop that follows a completed removal.
+/// The uninstall destination: the inventory (list or grid) plus the bulk flow.
+/// Opening one app pushes the review surface; marking several apps opens the
+/// bulk pass. The sheets attach here so the summary survives the pop.
 struct UninstallWorkspace: View {
     @Environment(AppCleanerModel.self) private var model
     let onDone: () -> Void
@@ -20,9 +19,6 @@ struct UninstallWorkspace: View {
                 }
         }
         .onAppear { model.load() }
-        .sheet(isPresented: selectionConfirmBinding) {
-            AppUninstallConfirmSheet()
-        }
         .sheet(
             isPresented: Binding(
                 get: { model.report != nil },
@@ -54,20 +50,12 @@ struct UninstallWorkspace: View {
         }
     }
 
-    /// The push edge. Selecting an app loads its components; popping clears the
-    /// selection through the model, cancelling any in-flight scan.
     private var selectionBinding: Binding<URL?> {
         Binding(
             get: { model.selectedAppID },
             set: { id in
                 model.select(id.flatMap { id in model.apps.first { $0.url == id } })
             })
-    }
-
-    private var selectionConfirmBinding: Binding<Bool> {
-        Binding(
-            get: { model.showConfirm && model.selectedApp != nil },
-            set: { model.showConfirm = $0 })
     }
 
     private var bulkConfirmBinding: Binding<Bool> {
@@ -77,69 +65,80 @@ struct UninstallWorkspace: View {
     }
 }
 
-/// The app inventory: every installed app as a grid cell or list row, searchable by
-/// name and bundle ID. Void states: skeleton while reading, empty when nothing was
-/// found, filtered empty when the search misses.
 struct AppBrowserView: View {
     @Environment(AppCleanerModel.self) private var model
     let onDone: () -> Void
 
-    private let columns = [GridItem(.adaptive(minimum: 170), spacing: 14)]
+    private let columns = [GridItem(.adaptive(minimum: 164), spacing: Spacing.s3)]
 
     var body: some View {
         @Bindable var model = model
-        Group {
+        VStack(spacing: 0) {
+            PageHeader(
+                title: "Applications",
+                subtitle: subtitle,
+                metric: nil
+            )
+            .padding(.horizontal, Metrics.widePageMargin)
+            .padding(.top, Spacing.s6)
+            .padding(.bottom, Spacing.s3)
             if model.isLoadingApps {
-                skeleton
+                LoadingStateView(message: "Reading applications")
+                    .padding(.horizontal, Metrics.widePageMargin)
+                Spacer()
             } else if model.apps.isEmpty {
-                ContentUnavailableView(
-                    "No applications found",
-                    systemImage: "app.badge.minus",
-                    description: Text("Grant Full Disk Access, then reload."))
+                EmptyStateView(
+                    title: "No applications found",
+                    message: "Check that the Applications folder is readable, then reload.",
+                    actionTitle: "Reload",
+                    action: { model.load() }
+                )
+                .padding(.horizontal, Metrics.widePageMargin)
+                Spacer()
             } else if model.filteredApps.isEmpty {
-                ContentUnavailableView(
-                    "No matches",
-                    systemImage: "magnifyingglass",
-                    description: Text("No application matches \"\(model.query)\"."))
+                EmptyStateView(
+                    title: "No matches",
+                    message: "No application matches \"\(model.query)\".",
+                    actionTitle: "Clear search",
+                    action: { model.query = "" }
+                )
+                .padding(.horizontal, Metrics.widePageMargin)
+                Spacer()
             } else {
                 switch model.style {
-                case .grid: browserGrid
-                case .list: browserList
+                case .grid: grid
+                case .list: list
                 }
             }
         }
+        .background(Theme.paper)
         .navigationTitle("Applications")
-        .navigationSubtitle(appSubtitle)
         .searchable(text: $model.query, placement: .toolbar, prompt: "Search apps")
         .safeAreaInset(edge: .bottom) {
             if model.isBulkRemoving || !model.markedApps.isEmpty {
-                BulkActionBarView()
+                bulkBar
             }
         }
         .toolbar {
             ToolbarItem(placement: .navigation) {
-                Button {
-                    onDone()
-                } label: {
-                    Label("Back to the Overview", systemImage: "chevron.left")
-                }
-                .help("Back to the Overview")
+                Button("Done", action: onDone)
+                    .help("Back to the Overview")
             }
             ToolbarItem(placement: .primaryAction) {
                 Picker("Layout", selection: $model.style) {
                     ForEach(AppBrowserStyle.allCases) { style in
-                        Image(systemName: style.symbol).tag(style)
+                        Text(style.title).tag(style)
                     }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .help("Show the inventory as a grid or a list")
+                .help("Show the inventory as a list or a grid")
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     model.load()
                 } label: {
-                    Label("Reload Apps", systemImage: "arrow.clockwise")
+                    Label("Reload applications", systemImage: "arrow.clockwise")
                 }
                 .disabled(model.isLoadingApps)
                 .help("Read the applications folder again")
@@ -147,256 +146,260 @@ struct AppBrowserView: View {
         }
     }
 
-    private var appSubtitle: String {
-        model.apps.isEmpty ? "Installed apps" : "\(model.apps.count) installed"
+    private var subtitle: String {
+        if model.apps.isEmpty {
+            return model.hasFullDiskAccess
+                ? "Installed applications"
+                : "Installed applications. Some related files may be hidden without Full Disk Access."
+        }
+        if model.markedApps.isEmpty {
+            return "\(model.apps.count) installed"
+        }
+        return "\(model.apps.count) installed, \(model.markedApps.count) marked"
     }
 
-    private var browserGrid: some View {
+    private var grid: some View {
         ScrollView {
-            LazyVGrid(columns: columns, spacing: 14) {
+            LazyVGrid(columns: columns, spacing: Spacing.s3) {
                 ForEach(model.filteredApps) { app in
                     AppCell(app: app)
                 }
             }
-            .padding(20)
+            .padding(.horizontal, Metrics.widePageMargin)
+            .padding(.bottom, Spacing.s6)
         }
     }
 
-    private var browserList: some View {
-        List {
-            ForEach(model.filteredApps) { app in
-                AppRow(app: app)
+    private var list: some View {
+        VStack(spacing: 0) {
+            AppListHeader()
+            List {
+                ForEach(model.filteredApps) { app in
+                    AppRow(app: app)
+                }
             }
+            .listStyle(.inset)
+            .scrollContentBackground(.hidden)
+            .background(Theme.paper)
         }
-        .alternatingRowBackgrounds(.disabled)
     }
 
-    /// Loading renders the exact shape the chosen style will occupy — flat skeletons.
-    @ViewBuilder private var skeleton: some View {
-        switch model.style {
-        case .grid:
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 14) {
-                    ForEach(0..<12, id: \.self) { _ in
-                        VStack(spacing: 10) {
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(.quaternary)
-                                .frame(width: 52, height: 52)
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(.quaternary)
-                                .frame(width: 96, height: 9)
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(.quaternary.opacity(0.6))
-                                .frame(width: 64, height: 8)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 18)
-                    }
-                }
-                .padding(20)
-            }
-            .redacted(reason: .placeholder)
-            .allowsHitTesting(false)
-        case .list:
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(0..<10, id: \.self) { _ in
-                        HStack(spacing: 10) {
-                            RoundedRectangle(cornerRadius: 4).fill(.quaternary).frame(width: 14, height: 14)
-                            RoundedRectangle(cornerRadius: 6).fill(.quaternary).frame(width: 24, height: 24)
-                            RoundedRectangle(cornerRadius: 4).fill(.quaternary).frame(width: 180, height: 9)
-                            Spacer()
-                            RoundedRectangle(cornerRadius: 4).fill(.quaternary.opacity(0.6)).frame(width: 70, height: 8)
-                        }
-                        .padding(.vertical, 10)
-                        .padding(.horizontal, 16)
-                    }
-                }
-            }
-            .redacted(reason: .placeholder)
-            .allowsHitTesting(false)
+    private var bulkBar: some View {
+        if let progress = model.bulkProgress {
+            return CommandBar(
+                metric: "Removing \(progress.done) of \(progress.total)",
+                detail: progress.current ?? "Working",
+                actionTitle: "Working",
+                isEnabled: false,
+                isWorking: true,
+                action: {})
         }
+        return CommandBar(
+            metric: model.markedBytes.formatted(.byteCount(style: .file)),
+            detail: model.markedApps.count == 1
+                ? "1 app marked" : "\(model.markedApps.count) apps marked",
+            actionTitle: "Remove",
+            isEnabled: model.canBulkRemove,
+            secondaryTitle: "Clear",
+            secondaryAction: { model.clearMarks() },
+            help: "Review and move the marked apps to the Trash",
+            action: { model.beginBulkRemoval() })
     }
 }
 
-/// One installed app in the grid. A running app shows an orange dot, an admin-only
-/// app a lock, the vendor under the name, and size and location on the last line. A
-/// circle-check in the corner marks the app for bulk removal. Neither the running
-/// state nor the lock blocks marking — the confirm sheet and the core carry the
-/// consequences.
-private struct AppCell: View {
-    @Environment(AppCleanerModel.self) private var model
-    let app: InstalledApp
+/// Stable column metrics shared by the header and the rows.
+private enum AppColumns {
+    static let mark: CGFloat = 20
+    static let icon: CGFloat = 22
+    static let location: CGFloat = 130
+    static let version: CGFloat = 68
+    static let size: CGFloat = 82
+    static let status: CGFloat = 118
+    static let open: CGFloat = 20
+    static let spacing: CGFloat = 10
+}
 
-    @State private var hovering = false
-
-    private var marked: Bool { model.markedApps.contains(app.url) }
-
+private struct AppListHeader: View {
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            Button {
-                model.select(app)
-            } label: {
-                VStack(spacing: 9) {
-                    Image(nsImage: IconCache.icon(for: app.url))
-                        .resizable()
-                        .frame(width: 52, height: 52)
-                        .shadow(color: .black.opacity(0.12), radius: 3, y: 1)
-                    Text(app.name)
-                        .font(.callout)
-                        .lineLimit(2, reservesSpace: true)
-                        .multilineTextAlignment(.center)
-                    Text(app.vendorLabel ?? app.bundleID ?? " ")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1, reservesSpace: true)
-                    HStack(spacing: 5) {
-                        if model.isAppRunning(app) {
-                            Circle()
-                                .fill(.orange)
-                                .frame(width: 6, height: 6)
-                                .help("\(app.name) is running — quit it to remove it")
-                        }
-                        if !app.isWritable {
-                            Image(systemName: "lock.fill")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .help("An administrator must remove this app")
-                        }
-                        Text(sizeLabel)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                            .lineLimit(1)
-                        Text("·")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                        Text(model.locationLabel(app))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                    .lineLimit(1)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 18)
-                .padding(.top, 6)
-                .background(
-                    .quaternary.opacity(hovering ? 0.6 : 0.0001),
-                    in: RoundedRectangle(cornerRadius: 16)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 16)
-                        .strokeBorder(
-                            Color.accentColor.opacity(marked ? 0.55 : 0), lineWidth: 1.5)
-                }
+        VStack(spacing: 0) {
+            HStack(spacing: AppColumns.spacing) {
+                Color.clear.frame(width: AppColumns.mark)
+                Text("Application")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text("Location").frame(width: AppColumns.location, alignment: .leading)
+                Text("Version").frame(width: AppColumns.version, alignment: .trailing)
+                Text("Size").frame(width: AppColumns.size, alignment: .trailing)
+                Text("Status").frame(width: AppColumns.status, alignment: .leading)
+                Color.clear.frame(width: AppColumns.open)
             }
-            .buttonStyle(.plain)
-            .onHover { hovering = $0 }
-            .contextMenu { appContextMenu(for: app, model: model) }
-
-            Button {
-                model.toggleMark(app)
-            } label: {
-                Image(systemName: marked ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 15))
-                    .foregroundStyle(marked ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
-                    .background(.thinMaterial, in: .circle)
-                    .padding(7)
-            }
-            .buttonStyle(.plain)
-            .opacity(marked ? 1 : (hovering ? 0.85 : 0))
-            .help(marked ? "Remove from the bulk selection" : "Mark for bulk removal")
+            .font(Typography.caption)
+            .foregroundStyle(Theme.inkSecondary)
+            .padding(.horizontal, Metrics.widePageMargin)
+            .padding(.vertical, Spacing.s2)
+            Hairline()
         }
-    }
-
-    private var sizeLabel: String {
-        model.appSizes[app.url].map { $0.formatted(.byteCount(style: .file)) } ?? "—"
     }
 }
 
-/// One installed app in the list: marking checkbox, identity, facts right-aligned.
 private struct AppRow: View {
     @Environment(AppCleanerModel.self) private var model
     let app: InstalledApp
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: AppColumns.spacing) {
             Toggle(
-                "Mark for bulk removal",
+                "Mark for removal",
                 isOn: Binding(
                     get: { model.markedApps.contains(app.url) },
                     set: { _ in model.toggleMark(app) })
             )
             .toggleStyle(.checkbox)
             .labelsHidden()
-            .help("Mark for bulk removal")
+            .frame(width: AppColumns.mark)
+            .accessibilityLabel("Mark \(app.name) for removal")
             Image(nsImage: IconCache.icon(for: app.url))
                 .resizable()
-                .frame(width: 24, height: 24)
+                .frame(width: AppColumns.icon, height: AppColumns.icon)
             VStack(alignment: .leading, spacing: 1) {
-                Text(app.name).lineLimit(1)
+                Text(app.name)
+                    .font(Typography.row)
+                    .foregroundStyle(Theme.ink)
+                    .lineLimit(1)
                 Text(app.bundleID ?? "No bundle identifier")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(Typography.caption)
+                    .foregroundStyle(Theme.inkSecondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
-            Spacer(minLength: 12)
-            if model.isAppRunning(app) {
-                Circle()
-                    .fill(.orange)
-                    .frame(width: 7, height: 7)
-                    .help("\(app.name) is running — quit it to remove it")
-            }
-            if !app.isWritable {
-                Image(systemName: "lock.fill")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .help("An administrator must remove this app")
-            }
-            if let vendor = app.vendorLabel {
-                Text(vendor)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .frame(width: 110, alignment: .trailing)
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
             Text(model.locationLabel(app))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(Typography.caption)
+                .foregroundStyle(Theme.inkSecondary)
                 .lineLimit(1)
-                .frame(width: 130, alignment: .trailing)
-            if let version = app.version {
-                Text(version)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-                    .frame(width: 70, alignment: .trailing)
-            }
-            Text(sizeLabel)
+                .frame(width: AppColumns.location, alignment: .leading)
+            Text(app.version ?? " ")
+                .font(Typography.caption)
                 .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .frame(width: 84, alignment: .trailing)
+                .foregroundStyle(Theme.inkSecondary)
+                .lineLimit(1)
+                .frame(width: AppColumns.version, alignment: .trailing)
+            Text(model.appSizes[app.url].map { $0.formatted(.byteCount(style: .file)) } ?? "n/a")
+                .font(Typography.row)
+                .monospacedDigit()
+                .foregroundStyle(Theme.inkSecondary)
+                .lineLimit(1)
+                .frame(width: AppColumns.size, alignment: .trailing)
+            status
+                .frame(width: AppColumns.status, alignment: .leading)
+            Button {
+                model.select(app)
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Theme.inkTertiary)
+            }
+            .buttonStyle(.plain)
+            .frame(width: AppColumns.open)
+            .help("Show related files")
+            .accessibilityLabel("Show related files for \(app.name)")
         }
         .padding(.vertical, 3)
         .contentShape(Rectangle())
-        .onTapGesture { model.select(app) }
+        .onTapGesture(count: 2) { model.select(app) }
         .contextMenu { appContextMenu(for: app, model: model) }
     }
 
-    private var sizeLabel: String {
-        model.appSizes[app.url].map { $0.formatted(.byteCount(style: .file)) } ?? "—"
+    @ViewBuilder private var status: some View {
+        if model.isAppRunning(app) {
+            StatusLabel(
+                text: "Running", systemImage: "bolt.fill", tone: .amber,
+                help: "\(app.name) is running. Quit it before removing.")
+        } else if !app.isWritable {
+            StatusLabel(
+                text: "Admin", systemImage: "lock.fill", tone: .amber,
+                help: "An administrator must remove this app.")
+        } else {
+            Color.clear.frame(height: 1)
+        }
     }
 }
 
-/// Actions available from the cell or row: go deeper, act on the bundle, or queue the
-/// app for the bulk pass.
+private struct AppCell: View {
+    @Environment(AppCleanerModel.self) private var model
+    let app: InstalledApp
+    @State private var hovering = false
+
+    private var marked: Bool { model.markedApps.contains(app.url) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            HStack(spacing: Spacing.s2) {
+                Toggle(
+                    "Mark for removal",
+                    isOn: Binding(
+                        get: { marked },
+                        set: { _ in model.toggleMark(app) })
+                )
+                .toggleStyle(.checkbox)
+                .labelsHidden()
+                .accessibilityLabel("Mark \(app.name) for removal")
+                Spacer()
+                if model.isAppRunning(app) {
+                    StatusLabel(text: "Running", systemImage: "bolt.fill", tone: .amber)
+                } else if !app.isWritable {
+                    StatusLabel(text: "Admin", systemImage: "lock.fill", tone: .amber)
+                }
+            }
+            Button {
+                model.select(app)
+            } label: {
+                VStack(spacing: Spacing.s2) {
+                    Image(nsImage: IconCache.icon(for: app.url))
+                        .resizable()
+                        .frame(width: 48, height: 48)
+                    Text(app.name)
+                        .font(Typography.row)
+                        .foregroundStyle(Theme.ink)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
+                    Text(app.vendorLabel ?? app.bundleID ?? " ")
+                        .font(Typography.caption)
+                        .foregroundStyle(Theme.inkSecondary)
+                        .lineLimit(1)
+                    HStack(spacing: Spacing.s1) {
+                        Text(model.appSizes[app.url].map { $0.formatted(.byteCount(style: .file)) } ?? "n/a")
+                            .monospacedDigit()
+                        Text("·")
+                            .foregroundStyle(Theme.inkTertiary)
+                        Text(model.locationLabel(app))
+                            .lineLimit(1)
+                    }
+                    .font(Typography.caption)
+                    .foregroundStyle(Theme.inkSecondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, Spacing.s3)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(Spacing.s3)
+        .background(Theme.paperRaised, in: RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .strokeBorder(
+                    marked ? Theme.accent : (hovering ? Theme.inkTertiary : Theme.hairline),
+                    lineWidth: marked ? 1.5 : 1)
+        }
+        .onHover { hovering = $0 }
+        .contextMenu { appContextMenu(for: app, model: model) }
+    }
+}
+
 extension View {
     @ViewBuilder
     fileprivate func appContextMenu(for app: InstalledApp, model: AppCleanerModel) -> some View {
         contextMenu {
-            Button("Show Related Files", systemImage: "list.bullet.rectangle") {
+            Button("Show related files", systemImage: "list.bullet.rectangle") {
                 model.select(app)
             }
             Button("Open", systemImage: "arrow.up.forward.app") {
@@ -407,70 +410,10 @@ extension View {
             }
             Divider()
             Button(
-                model.markedApps.contains(app.url) ? "Unmark" : "Mark for Removal",
+                model.markedApps.contains(app.url) ? "Unmark" : "Mark for removal",
                 systemImage: model.markedApps.contains(app.url) ? "minus.circle" : "checkmark.circle"
             ) {
                 model.toggleMark(app)
-            }
-        }
-    }
-}
-
-/// Floating glass bar at the bottom of the browser: what is marked, and the bulk
-/// Remove button. While a bulk pass runs it becomes a progress line instead — the
-/// grid keeps scrolling, the pass never blocks it.
-private struct BulkActionBarView: View {
-    @Environment(AppCleanerModel.self) private var model
-
-    var body: some View {
-        Group {
-            if let progress = model.bulkProgress {
-                HStack(spacing: 10) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Removing \(progress.done) of \(progress.total)…")
-                        .monospacedDigit()
-                    if let current = progress.current {
-                        Text(current)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-                }
-                .padding(.leading, 18)
-                .padding(.trailing, 14)
-                .padding(.vertical, 8)
-                .glassEffect(.regular, in: .capsule)
-                .frame(maxWidth: .infinity)
-                .padding(.bottom, 16)
-            } else {
-                HStack(spacing: 16) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(model.markedBytes.formatted(.byteCount(style: .file)))
-                            .font(.headline)
-                            .monospacedDigit()
-                        Text(
-                            model.markedApps.count == 1
-                                ? "1 app selected" : "\(model.markedApps.count) apps selected"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-                    Button("Clear") { model.clearMarks() }
-                        .disabled(!model.canBulkRemove)
-                    Button("Remove…", systemImage: "trash") { model.beginBulkRemoval() }
-                        .buttonStyle(.glassProminent)
-                        .controlSize(.large)
-                        .disabled(!model.canBulkRemove)
-                        .keyboardShortcut(.delete, modifiers: .command)
-                        .help("Review and move the marked apps to the Trash (Command-Delete)")
-                }
-                .padding(.leading, 18)
-                .padding(.trailing, 8)
-                .padding(.vertical, 8)
-                .glassEffect(.regular, in: .capsule)
-                .frame(maxWidth: .infinity)
-                .padding(.bottom, 16)
             }
         }
     }
