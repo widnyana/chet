@@ -68,6 +68,8 @@ struct AppBrowserView: View {
     @Environment(AppCleanerModel.self) private var model
 
     private let columns = [GridItem(.adaptive(minimum: 164), spacing: Spacing.s3)]
+    @State private var sort: AppSort = .name
+    @State private var ascending = true
 
     var body: some View {
         @Bindable var model = model
@@ -153,10 +155,50 @@ struct AppBrowserView: View {
         return "\(model.apps.count) installed, \(model.markedApps.count) marked"
     }
 
+    /// The filtered inventory in the user's chosen column order. Every column is sortable
+    /// (repo rule); the header toggles the column and the direction.
+    private var sortedApps: [InstalledApp] {
+        let apps = model.filteredApps
+        let ordered: [InstalledApp]
+        switch sort {
+        case .name:
+            ordered = apps.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        case .location:
+            ordered = apps.sorted {
+                model.locationLabel($0).localizedStandardCompare(model.locationLabel($1)) == .orderedAscending
+            }
+        case .lastUsed:
+            ordered = apps.sorted { lastUsedKey($0) < lastUsedKey($1) }
+        case .version:
+            ordered = apps.sorted {
+                ($0.version ?? "").localizedStandardCompare($1.version ?? "") == .orderedAscending
+            }
+        case .size:
+            ordered = apps.sorted { (model.appSizes[$0.url] ?? -1) < (model.appSizes[$1.url] ?? -1) }
+        case .status:
+            ordered = apps.sorted { statusRank($0) < statusRank($1) }
+        }
+        return ascending ? ordered : ordered.reversed()
+    }
+
+    private func lastUsedKey(_ app: InstalledApp) -> TimeInterval {
+        (model.appLastUsed[app.url] ?? nil)?.timeIntervalSince1970 ?? -1
+    }
+
+    private func statusRank(_ app: InstalledApp) -> Int {
+        if model.isAppRunning(app) { return 0 }
+        if !app.isWritable { return 1 }
+        return 2
+    }
+
+    private func toggleSort(_ column: AppSort) {
+        if sort == column { ascending.toggle() } else { sort = column; ascending = true }
+    }
+
     private var grid: some View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: Spacing.s3) {
-                ForEach(model.filteredApps) { app in
+                ForEach(sortedApps) { app in
                     AppCell(app: app)
                 }
             }
@@ -169,14 +211,15 @@ struct AppBrowserView: View {
         ScrollView {
             LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
                 Section {
-                    ForEach(model.filteredApps) { app in
+                    ForEach(sortedApps) { app in
                         AppRow(app: app)
-                        if app.id != model.filteredApps.last?.id {
+                        if app.id != sortedApps.last?.id {
                             Hairline().padding(.horizontal, Metrics.widePageMargin)
                         }
                     }
                 } header: {
-                    AppListHeader().background(Theme.paper)
+                    AppListHeader(sort: sort, ascending: ascending, onSort: toggleSort)
+                        .background(Theme.paper)
                 }
             }
         }
@@ -204,6 +247,11 @@ struct AppBrowserView: View {
             help: "Review and move the marked apps to the Trash",
             action: { model.beginBulkRemoval() })
     }
+}
+
+/// The sortable columns of the Applications list. Every column is sortable (repo rule).
+private enum AppSort {
+    case name, location, lastUsed, version, size, status
 }
 
 /// Stable column metrics shared by the header and the rows.
@@ -242,25 +290,48 @@ private struct LastUsedText: View {
 }
 
 private struct AppListHeader: View {
+    let sort: AppSort
+    let ascending: Bool
+    let onSort: (AppSort) -> Void
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: AppColumns.spacing) {
                 Color.clear.frame(width: AppColumns.mark)
-                Text("Application")
+                sortButton("Application", .name)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                Text("Location").frame(width: AppColumns.location, alignment: .leading)
-                Text("Last used").frame(width: AppColumns.lastUsed, alignment: .leading)
-                Text("Version").frame(width: AppColumns.version, alignment: .trailing)
-                Text("Size").frame(width: AppColumns.size, alignment: .trailing)
-                Text("Status").frame(width: AppColumns.status, alignment: .leading)
+                sortButton("Location", .location)
+                    .frame(width: AppColumns.location, alignment: .leading)
+                sortButton("Last used", .lastUsed)
+                    .frame(width: AppColumns.lastUsed, alignment: .leading)
+                sortButton("Version", .version)
+                    .frame(width: AppColumns.version, alignment: .trailing)
+                sortButton("Size", .size)
+                    .frame(width: AppColumns.size, alignment: .trailing)
+                sortButton("Status", .status)
+                    .frame(width: AppColumns.status, alignment: .leading)
                 Color.clear.frame(width: AppColumns.open)
             }
             .font(Typography.caption)
-            .foregroundStyle(Theme.inkSecondary)
             .padding(.horizontal, Metrics.widePageMargin)
             .padding(.vertical, Spacing.s2)
             Hairline()
         }
+    }
+
+    private func sortButton(_ title: String, _ column: AppSort) -> some View {
+        Button { onSort(column) } label: {
+            HStack(spacing: 2) {
+                Text(title)
+                Image(systemName: ascending ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+                    .opacity(sort == column ? 1 : 0)
+            }
+            .foregroundStyle(sort == column ? Theme.ink : Theme.inkSecondary)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Sort by \(title)")
     }
 }
 
