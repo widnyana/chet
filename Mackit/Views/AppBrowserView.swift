@@ -173,13 +173,16 @@ struct AppBrowserView: View {
     private var list: some View {
         VStack(spacing: 0) {
             AppListHeader()
-            List {
-                ForEach(model.filteredApps) { app in
-                    AppRow(app: app)
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(model.filteredApps) { app in
+                        AppRow(app: app)
+                        if app.id != model.filteredApps.last?.id {
+                            Hairline().padding(.horizontal, Metrics.widePageMargin)
+                        }
+                    }
                 }
             }
-            .listStyle(.inset)
-            .scrollContentBackground(.hidden)
             .background(Theme.paper)
         }
     }
@@ -304,6 +307,7 @@ private struct AppRow: View {
             .accessibilityLabel("Show related files for \(app.name)")
         }
         .padding(.vertical, 3)
+        .padding(.horizontal, Metrics.widePageMargin)
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { model.select(app) }
         .contextMenu { appContextMenu(for: app, model: model) }
