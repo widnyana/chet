@@ -29,9 +29,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Include caches and build folders")
                             .font(Typography.body)
-                        Text(
-                            "Search for duplicates inside caches, project build dirs (node_modules, target, .gradle) and other temporary places. Off by default: these folders regenerate, so duplicates there rarely free real space."
-                        )
+                        Text("Search inside caches and build folders. Off by default.")
                         .font(Typography.caption)
                         .foregroundStyle(Theme.inkSecondary)
                     }
@@ -40,7 +38,7 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .tint(Theme.accent)
-        .frame(width: 460, height: 140)
+        .frame(width: 420, height: 120)
         .background(SettingsWindowTitle())
     }
 }
