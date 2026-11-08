@@ -2,6 +2,8 @@
 
 Mackit finds and removes junk on Apple Silicon Macs: caches, logs, developer build data, old installers, duplicate files, similar photos and videos, leftovers of deleted apps, and more. It removes only data that apps can rebuild, or files you confirm one by one.
 
+The app has two modes, chosen at the top of the sidebar. **Clean** runs the junk scan. **Uninstall** removes an app together with the Library data that belongs to it.
+
 ## Requirements
 
 - A Mac with Apple Silicon (M1 or newer). The app is built for arm64 only and does not run on Intel Macs.
@@ -61,12 +63,38 @@ macOS hides caches, Mail downloads and browser data from apps without Full Disk 
 
 The **Disk map** shows which folders in your home folder take the most space. Click a folder to look inside.
 
+## Uninstall apps
+
+Switch the sidebar to **Uninstall**, search for an app, and select it. Mackit reads the app
+bundle, then looks in the user Library for data that names the app's bundle ID or its helpers:
+Application Support, Preferences (including ByHost), Caches, Logs, Containers, Group
+Containers, Saved Application State, Cookies, Application Scripts, Launch Agents and WebKit.
+
+Each row says why it matched:
+
+- **Exact**: the bundle ID or an embedded helper ID. Selected by default.
+- **Name match**: the folder is named after the app or the last part of its bundle ID. Never
+  selected by default; review it first.
+- **Shared**: a group container, or data another installed app also claims. Cannot be selected.
+- **Admin**: an entry under `/Library` or in a folder the user cannot write. Cannot be selected.
+- **Protected**: system folders, Keychains, Mail, Messages and iCloud Drive. Never listed as
+  removable.
+
+The app bundle is unchecked when it is running, needs an administrator, or cannot be written.
+The Remove button is disabled while the app or one of its helpers runs, and the core checks
+again before the first move. Related files go first and the app bundle goes last, so a failed
+move never hides the app itself. Everything goes to the Trash; nothing is deleted permanently.
+
 ## How Mackit protects your data
 
-- A single safety check runs for every item, at scan time and again right before removal. It refuses system folders, app bundles, iCloud Drive, Keychains, Mail and Messages data, Photos libraries, `.git` folders, symlinks and other volumes.
+- A single safety check runs for every item, at scan time and again right before removal. It refuses system folders, app bundles (the Uninstall mode has its own explicit app-bundle allowlist), iCloud Drive, Keychains, Mail and Messages data, Photos libraries, `.git` folders, symlinks and other volumes.
 - Before removal Mackit compares each file with what the scan saw (inode, size, modification time). If anything changed, the file is left alone.
 - Caches of a running app are skipped. The summary tells you which app to quit.
 - For duplicates and similar media, one copy is always kept. Exact duplicates are compared byte for byte before they are shown.
+- In Uninstall mode, only exact bundle-ID matches and embedded helper matches are selected for
+  you. Name-only matches stay unchecked, shared group containers are unselectable, and
+  administrator-only entries are shown read-only. Every row is checked again right before it
+  moves.
 - Every action is written to `~/Library/Logs/Mackit/clean.log`, one JSON line per item.
 
 ## Metal
@@ -95,3 +123,5 @@ mise.toml      Tool versions and development tasks
 - Caches and logs owned by root (`/Library/Caches`, system logs). This needs a privileged helper.
 - Removing app languages or thinning app binaries. It breaks code signatures.
 - Docker or OrbStack images. Use `docker system prune`.
+- Removing apps or files that need administrator rights. Uninstall mode shows those entries
+  with an Admin badge but does not move them; there is no privileged helper.

@@ -22,11 +22,19 @@ public struct AuditLog: Sendable {
     public func append(
         _ item: ScanItem, _ outcome: CleanOutcome, dryRun: Bool, at date: Date = Date()
     ) {
+        append(
+            path: item.url.path, bytes: item.reclaimableBytes, mode: item.mode, result: outcome.logValue,
+            dryRun: dryRun, at: date)
+    }
+
+    /// One row for a non-scan action, such as an app uninstall row.
+    public func append(
+        path: String, bytes: Int64, mode: DeleteMode, result: String, dryRun: Bool, at date: Date = Date()
+    ) {
         let entry = Entry(
-            time: ISO8601DateFormatter().string(from: date), path: item.url.path, bytes: item.reclaimableBytes,
-            mode: item.mode.rawValue,
+            time: ISO8601DateFormatter().string(from: date), path: path, bytes: bytes, mode: mode.rawValue,
             // "dry-removed" can never be misread as a performed deletion.
-            result: dryRun ? "dry-" + outcome.logValue : outcome.logValue)
+            result: dryRun ? "dry-" + result : result)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         guard var line = try? encoder.encode(entry) else { return }

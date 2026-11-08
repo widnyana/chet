@@ -6,7 +6,11 @@ the right — on macOS 26 Liquid Glass.
 
 ## Sidebar
 
-The sidebar is the app's spine. One `List` with three visual zones, top to bottom:
+The sidebar is the app's spine. A segmented **mode picker** sits above the list:
+`Clean` (the junk scan) and `Uninstall` (the app uninstaller). Each mode has its own
+`List` selection; the picker never changes the window's detail routing on its own.
+
+In **Clean** mode the list has three visual zones, top to bottom:
 
 1. **Overview** — a single root row (`gauge.with.dots.needle.67percent`, blue). Doubles as
    the scan progress indicator: a mini spinner replaces it while a scan runs.
@@ -31,6 +35,11 @@ The sidebar is the app's spine. One `List` with three visual zones, top to botto
 Row anatomy is deliberately flat: `Label { title + states + Spacer + trailing value } icon: { tinted symbol }`.
 No custom backgrounds, no disclosure chrome — selection, hover, and focus come from the
 system list.
+
+In **Uninstall** mode the list is a searchable inventory of app bundles: app icon, display
+name, bundle ID on a second line, the version right-aligned in monospaced digits, and a small
+lock when the app cannot be moved without an administrator. The search field filters by
+display name and bundle ID. Selecting a row loads that app's related files in the detail pane.
 
 ## Disk map — live nested treemap
 
@@ -81,6 +90,35 @@ How it draws:
   a 250 ms snapshot (`displayTree`, refreshed by a poll task) so the canvas and the path
   pill relayout at most 4x/s instead of strobing. Hover re-resolves by URL against the
   newest snapshot.
+
+## Uninstall mode
+
+The uninstaller is a second mode, not a category. The detail pane starts with an empty state
+("Choose an app") and becomes a two-part surface:
+
+1. **App header** - 64 pt icon, display name, bundle ID, path, version and measured bundle
+   size. The "Remove app bundle" checkbox is the only control that targets the app itself.
+   It is disabled while the app (or a helper) runs or when the bundle cannot be written. A
+   running app gets an orange warning; an administrator-owned app gets a lock warning.
+2. **Related files list** - sections by component kind (Application Support, Preferences,
+   Caches, Logs, Containers, Group Containers, Saved Application State, Cookies, Application
+   Scripts, Launch Agents, WebKit). Each row carries a checkbox, workspace icon, path, size
+   and an ownership badge:
+   - `Exact` (green): bundle ID or embedded helper ID, selected by default;
+   - `Name match` (orange): app name or bundle-ID leaf, unselected until reviewed;
+   - `Shared` (gray): group container or data another installed app claims, unselectable;
+   - `Admin` (orange lock): `/Library` or read-only folder, unselectable;
+   - `Protected` (red shield): a system or private path that is never offered.
+
+The selection header offers "Exact Matches Only", "All Selectable" and "None". A floating
+glass capsule at the bottom reports selected count and bytes; its `Remove` button opens a
+confirmation sheet that names the app, groups the selected items by kind, states that
+everything goes to the Trash, warns when the app runs, and shows the DRY RUN notice when
+engaged. The completion sheet reports moved count and bytes, lists skipped rows with their
+reasons, and links to the audit log.
+
+Everything is checked again in the core before the first move: running app, stamp (inode,
+size, mtime), match still valid, protected path, writability. The app bundle moves last.
 
 ## Visual language
 
@@ -157,7 +195,7 @@ Rules the script enforces:
       "mechanism": "safeAreaInset-top",
       "height": 40,
       "verify": {
-        "contains": ["safeAreaInset(edge: .top, spacing: 0) { ScanFinishedToast() }"],
+        "contains": ["safeAreaInset(edge: .top, spacing: 0) {\n            if mode == .clean { ScanFinishedToast() }"],
         "not-contains": [".overlay(alignment: .top)"]
       }
     },
@@ -179,6 +217,18 @@ Rules the script enforces:
       "height": 50,
       "insets": {"bottom": 16},
       "verify": {"contains": ["glassEffect(.regular, in: .capsule)\n        .frame(maxWidth: .infinity)"]}
+    },
+    {
+      "id": "app-uninstall-action-bar",
+      "file": "Mackit/Views/AppCleanerDetailView.swift",
+      "surface": "app-uninstaller",
+      "mechanism": "safeAreaInset-bottom-centered-capsule",
+      "width": 340,
+      "height": 50,
+      "insets": {"bottom": 16},
+      "verify": {
+        "contains": ["glassEffect(.regular, in: .capsule)\n        .frame(maxWidth: .infinity)"]
+      }
     },
     {
       "id": "snapshots-action-bar",
