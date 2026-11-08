@@ -4,6 +4,7 @@ import SwiftUI
 
 struct SummaryView: View {
     @Environment(ScanModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
     let report: CleanReport
 
     private var problems: [CleanResult] {
@@ -65,15 +66,18 @@ struct SummaryView: View {
                 Button("Show audit log") { NSWorkspace.shared.open(AuditLog().url) }
                     .buttonStyle(.bordered)
                 Spacer()
-                Button("Done") { model.report = nil }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Theme.accent)
-                    .controlSize(.large)
-                    .keyboardShortcut(.defaultAction)
+                Button("Done") {
+                    dismiss()
+                    model.report = nil
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.accent)
+                .controlSize(.large)
+                .keyboardShortcut(.defaultAction)
             }
         }
         .padding(Spacing.s6)
-        .frame(width: 480)
+        .frame(width: 520)
         .background(Theme.paper)
     }
 

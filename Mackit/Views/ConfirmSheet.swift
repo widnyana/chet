@@ -101,7 +101,6 @@ struct ConfirmSheet: View {
                     .controlSize(.large)
                 Button("Clean", role: .destructive) {
                     model.clean()
-                    dismiss()
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(Theme.red)

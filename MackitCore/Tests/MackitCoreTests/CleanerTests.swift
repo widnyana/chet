@@ -24,6 +24,38 @@ struct CleanerTests {
         return cleaner
     }
 
+    @Test func reportsLiveProgress() throws {
+        let dir = try TempDir()
+        let first = try dir.file("cache/a", bytes: 1000)
+        let second = try dir.file("cache/b", bytes: 2000)
+        let items = [try item(first), try item(second)]
+        let sink = ProgressRecorder()
+        let report = cleaner(dir, dryRun: true).clean(items) { sink.append($0) }
+        let updates = sink.values
+        #expect(updates.first?.processed == 0)
+        #expect(updates.first?.total == 2)
+        #expect(updates.first?.currentPath.hasSuffix("cache/a") == true)
+        #expect(updates.last?.processed == 2)
+        #expect(updates.last?.processedBytes == 3000)
+        #expect(updates.last?.freedBytes == 3000)
+        #expect(updates.last?.currentPath == "")
+        #expect(updates.last?.isFinal == true)
+        #expect(updates.first?.isFinal == false)
+        #expect(updates.first?.currentIsDirectory == false)
+        #expect(report.freedBytes == 3000)
+    }
+
+    @Test func reportsFolderProgress() throws {
+        let dir = try TempDir()
+        let folder = dir.url.appendingPathComponent("cache/folder")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let scanned = try item(folder)
+        let sink = ProgressRecorder()
+        _ = cleaner(dir, dryRun: true).clean([scanned]) { sink.append($0) }
+        #expect(sink.values.first?.currentIsDirectory == true)
+        #expect(sink.values.first?.currentPath.hasSuffix("cache/folder") == true)
+    }
+
     @Test func permanentItemIsRemoved() throws {
         let dir = try TempDir()
         let file = try dir.file("cache/x", bytes: 1000)
@@ -145,5 +177,22 @@ struct CleanerTests {
         let line = try #require(String(contentsOf: logURL, encoding: .utf8).split(separator: "\n").first)
         let entry = try JSONDecoder().decode(AuditLog.Entry.self, from: Data(line.utf8))
         #expect(entry.result == "dry-removed")
+    }
+}
+
+private final class ProgressRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var items: [CleanProgress] = []
+
+    var values: [CleanProgress] {
+        lock.lock()
+        defer { lock.unlock() }
+        return items
+    }
+
+    func append(_ progress: CleanProgress) {
+        lock.lock()
+        items.append(progress)
+        lock.unlock()
     }
 }

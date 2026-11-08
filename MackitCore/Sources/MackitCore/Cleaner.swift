@@ -28,6 +28,64 @@ public struct CleanResult: Sendable {
     public let dryRun: Bool
 }
 
+/// One live sample of a clean pass. The UI uses it for the progress indicator and
+/// the verbose box; the audit log still owns the durable per-item record.
+public struct CleanProgress: Sendable, Equatable {
+    public let processed: Int
+    public let total: Int
+    public let processedBytes: Int64
+    public let totalBytes: Int64
+    public let freedBytes: Int64
+    public let skipped: Int
+    public let failed: Int
+    public let currentPath: String
+    public let currentBytes: Int64
+    public let currentMode: DeleteMode
+    /// True when the selected item is a folder. The cleaner counts selected
+    /// items, not every file inside a folder.
+    public let currentIsDirectory: Bool
+    /// True for the sample emitted after the last item. It separates "preparing"
+    /// from "finishing snapshots" when the item list is empty.
+    public let isFinal: Bool
+
+    public init(
+        processed: Int, total: Int, processedBytes: Int64, totalBytes: Int64, freedBytes: Int64,
+        skipped: Int, failed: Int, currentPath: String, currentBytes: Int64, currentMode: DeleteMode,
+        currentIsDirectory: Bool = false, isFinal: Bool = false
+    ) {
+        self.processed = processed
+        self.total = total
+        self.processedBytes = processedBytes
+        self.totalBytes = totalBytes
+        self.freedBytes = freedBytes
+        self.skipped = skipped
+        self.failed = failed
+        self.currentPath = currentPath
+        self.currentBytes = currentBytes
+        self.currentMode = currentMode
+        self.currentIsDirectory = currentIsDirectory
+        self.isFinal = isFinal
+    }
+
+    public var itemFraction: Double {
+        total > 0 ? Double(processed) / Double(total) : 0
+    }
+
+    public var byteFraction: Double {
+        totalBytes > 0 ? Double(processedBytes) / Double(totalBytes) : 0
+    }
+
+    public var currentFileNumber: Int {
+        total > 0 ? min(processed + 1, total) : 0
+    }
+
+    public static func preparing(total: Int, totalBytes: Int64) -> CleanProgress {
+        CleanProgress(
+            processed: 0, total: total, processedBytes: 0, totalBytes: totalBytes, freedBytes: 0,
+            skipped: 0, failed: 0, currentPath: "", currentBytes: 0, currentMode: .permanent)
+    }
+}
+
 public struct CleanReport: Sendable {
     public var results: [CleanResult] = []
     /// True when every row was simulated by the dry-run gate; UI and logs must never
@@ -73,17 +131,48 @@ public struct Cleaner: Sendable {
         self.dryRun = dryRun
     }
 
-    public func clean(_ items: [ScanItem]) -> CleanReport {
+    public func clean(
+        _ items: [ScanItem],
+        progress: (@Sendable (CleanProgress) -> Void)? = nil
+    ) -> CleanReport {
         var report = CleanReport()
         report.dryRun = dryRun
+        let totalBytes = items.reduce(0) { $0 + max(0, $1.reclaimableBytes) }
+        var processedBytes: Int64 = 0
+        var freedBytes: Int64 = 0
+        var skipped = 0
+        var failed = 0
+
         for (index, item) in items.enumerated() {
+            progress?(
+                CleanProgress(
+                    processed: index, total: items.count, processedBytes: processedBytes,
+                    totalBytes: totalBytes, freedBytes: freedBytes, skipped: skipped, failed: failed,
+                    currentPath: item.url.path, currentBytes: max(0, item.reclaimableBytes),
+                    currentMode: item.mode, currentIsDirectory: !item.stamp.isRegularFile && !item.stamp.isSymlink))
             let outcome = clean(item)
             log.append(item, outcome, dryRun: dryRun)
             report.results.append(CleanResult(item: item, outcome: outcome, dryRun: dryRun))
+            switch outcome {
+            case .removed(let bytes), .trashed(let bytes):
+                freedBytes += bytes
+            case .skipped:
+                skipped += 1
+            case .failed:
+                failed += 1
+            }
+            processedBytes += max(0, item.reclaimableBytes)
             if let recorder, (index + 1) % 16 == 0 {
                 recorder.record(step: "clean", "progress: \(index + 1)/\(items.count) items")
             }
         }
+
+        progress?(
+            CleanProgress(
+                processed: items.count, total: items.count, processedBytes: totalBytes,
+                totalBytes: totalBytes, freedBytes: freedBytes, skipped: skipped, failed: failed,
+                currentPath: "", currentBytes: 0, currentMode: .permanent, isFinal: true))
+
         if let recorder {
             recorder.record(
                 step: "clean",

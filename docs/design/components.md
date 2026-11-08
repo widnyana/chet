@@ -316,7 +316,7 @@ Each item is checked again before it moves.       (caption)
 
 Rules:
 
-- Width 500 pt. System sheet background.
+- Width 520 pt. System sheet background.
 - No huge icon, no sparkle, no glass.
 - The rows are a ledger, not cards.
 - The destructive button uses the red tint. Cancel is the default focus and
@@ -342,6 +342,49 @@ Clean complete                                    (title)
   freed`, `would be moved`.
 - The problems list is a plain table with the reason in secondary ink.
 - `Done` dismisses.
+
+## CleanProgressSheet
+
+The progress surface for a running clean pass. It replaces the confirmation
+content in the same sheet and is replaced by the summary when the pass ends.
+
+```
+[spinner] Cleaning                             42%
+Item 12 of 34
+[================== item progress ==================]
+
++-----------------------------------------------------+
+| Items      11 of 34                                 |
+| Bytes      2.4 GB of 10.4 GB                        |
+| [============== byte progress ==============]       |
+| Freed      2.3 GB                                   |
+| Skipped    1                                        |
+| Failed     0                                        |
+| Current    ~/Library/Caches/com.example.app/...     |
+|            Folder - Deleting - 18 MB                |
++-----------------------------------------------------+
+
+Each item is checked again before it is removed. An item can be a file or a folder.
+```
+
+Rules:
+
+- The top row is the loading indicator: native spinner, title, item fraction,
+  and a linear item bar.
+- The bordered box is the verbose layer: items, bytes plus a byte bar, freed or
+  would-free bytes, skipped, failed, and the current path with its action.
+- The current row names the exact path being processed, truncated in the middle,
+  with the full path in the tooltip and selectable text.
+- The sheet uses the same 520 pt width as the confirmation and summary.
+- A fast clean holds the progress sheet for at least 0.45 s, so a six-item
+  pass cannot flash past and read as the old instant summary.
+- Interactive dismissal is disabled while `isCleaning` is true. Escape does not
+  close it. The summary is the exit.
+- Dry run changes `Cleaning` to `Simulating clean`, `Freed` to `Would free`, the
+  current action to `Would delete` or `Would move to Trash`, and the skipped and
+  failed labels to `Would skip` and `Would fail`.
+- The update stream buffers the newest sample, so the UI never queues thousands
+  of path updates on the main actor.
 
 ## PermissionPage
 

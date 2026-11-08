@@ -137,6 +137,50 @@ Page header with the category total and the risk sentence. Then the selection
 header, the ledger table, and the command bar. Safe data says `Apps rebuild this
 data.` Review data says `Review each item. Removed items go to the Trash.`
 
+### Clean progress
+
+The clean flow is one sheet, not three separate sheets:
+
+1. **Confirm** shows what will move and what will be deleted.
+2. **Progress** replaces the confirm content as soon as `isCleaning` is true.
+3. **Summary** replaces the progress content when `isCleaning` is false and the
+   report exists.
+
+The progress surface has a loading indicator on top and a bordered details box
+below it:
+
+```
+[spinner] Cleaning                     42%
+Item 12 of 34
+[================== linear progress ==================]
+
++-----------------------------------------------------+
+| Items      11 of 34                                 |
+| Bytes      2.4 GB of 10.4 GB                        |
+| [============== byte progress ==============]       |
+| Freed      2.3 GB                                   |
+| Skipped    1                                        |
+| Current    ~/Library/Caches/com.example.app/...     |
+|            Folder - Deleting - 18 MB                |
++-----------------------------------------------------+
+
+Each item is checked again before it is removed. An item can be a file or a folder.
+```
+
+Rules:
+
+- The count and byte progress use the same `CleanProgress` sample. They cannot
+  disagree.
+- The current row names the item being processed and the action: deleting or
+  moving to Trash. It also says whether the item is a file or a folder.
+- Dry run changes the title to `Simulating clean`, `Freed` to `Would free`, the
+  current action to `Would delete` or `Would move to Trash`, and the skipped and
+  failed labels to `Would skip` and `Would fail`.
+- The sheet cannot be dismissed while cleaning. The summary is the exit.
+- The box is a temporary operation panel, not a card in the normal surface
+  language. It exists because the operation is a foreground, destructive task.
+- No per-item animation. The linear bars and the current path update in place.
+
 ### Applications
 
 A searchable inventory: list first, grid second. Every row and cell has a mark
@@ -184,6 +228,9 @@ spinner while checking. No glass card and no pulsing dot.
 - `AppCell` and `AppRow`: flat surface, hairline, text statuses.
 - `OwnershipRow`: checkbox, name, location, plain ownership label.
 - `ConfirmationSheet` and `SummarySheet`: ledger sheets, no celebration.
+- `CleanProgressSheet`: spinner, item and byte progress, a bordered verbose box
+  held for at least 0.45 s so a fast pass cannot flash past
+  with items, bytes, freed, skipped, failed, current path, and action.
 - `PermissionPage`: plain page, one action.
 
 Detailed anatomy and states are in [design/components.md](design/components.md).

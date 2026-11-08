@@ -62,6 +62,10 @@ final class ScanModel {
     var snapshots: [LocalSnapshot] = []
     var isScanning = false
     var isCleaning = false
+    /// Live per-item progress of the running clean pass.
+    var cleanProgress: CleanProgress?
+    /// Snapshot deletions in the current clean pass; the progress box names them.
+    var cleanSnapshotCount = 0
     /// URLs of the items that will be cleaned. Safe items are preselected, review items never are.
     var selected: Set<URL> = []
     var selectedSnapshots: Set<LocalSnapshot> = []
@@ -244,6 +248,8 @@ final class ScanModel {
     /// Stage what the confirm sheet will clean. No argument: all selected items,
     /// or the selected snapshots when no items are selected (snapshots page).
     func beginClean(_ items: [ScanItem]? = nil) {
+        report = nil
+        cleanProgress = nil
         confirmItems = items ?? selectedItems
         confirmSnapshots = confirmItems.isEmpty ? Array(selectedSnapshots) : []
     }
@@ -251,9 +257,23 @@ final class ScanModel {
     func clean() {
         let items = confirmItems
         let chosenSnapshots = confirmSnapshots
+        let totalBytes = items.reduce(0) { $0 + max(0, $1.reclaimableBytes) }
+        report = nil
+        cleanProgress = CleanProgress.preparing(total: items.count, totalBytes: totalBytes)
+        cleanSnapshotCount = chosenSnapshots.count
+        let started = Date()
         isCleaning = true
         Task {
-            let result = await Self.runClean(items)
+            let (stream, continuation) = AsyncStream<CleanProgress>.makeStream(
+                bufferingPolicy: .bufferingNewest(1))
+            let consumer = Task { @MainActor in
+                for await progress in stream {
+                    self.cleanProgress = progress
+                }
+            }
+            let result = await Self.runClean(items) { continuation.yield($0) }
+            continuation.finish()
+            await consumer.value
             var errors: [String] = []
             var deleted = Set<LocalSnapshot>()
             for snapshot in chosenSnapshots {
@@ -281,9 +301,17 @@ final class ScanModel {
             snapshots.removeAll { deleted.contains($0) }
             selectedSnapshots.subtract(deleted)
             snapshotErrors = errors
+            // Hold the progress surface briefly so a small clean does not flash
+            // past the user and read as the old instant summary.
+            let elapsed = Date().timeIntervalSince(started)
+            if elapsed < 0.45 {
+                try? await Task.sleep(for: .seconds(0.45 - elapsed))
+            }
             report = result
             confirmItems = []
             confirmSnapshots = []
+            cleanProgress = nil
+            cleanSnapshotCount = 0
             isCleaning = false
         }
     }
@@ -426,11 +454,14 @@ final class ScanModel {
             reclaimableBytes: entry.reclaimableBytes, stamp: entry.stamp)
     }
 
-    @concurrent nonisolated static func runClean(_ items: [ScanItem]) async -> CleanReport {
+    @concurrent nonisolated static func runClean(
+        _ items: [ScanItem],
+        progress: @escaping @Sendable (CleanProgress) -> Void
+    ) async -> CleanReport {
         var cleaner = Cleaner(
             policy: SafetyPolicy(), recorder: FlightRecorder.shared, dryRun: DryRun.enabled)
         cleaner.owner = { $0.ownerBundleID }
-        return cleaner.clean(items)
+        return cleaner.clean(items, progress: progress)
     }
 
     @concurrent nonisolated static func deleteSnapshot(_ snapshot: LocalSnapshot) async -> String? {

@@ -135,6 +135,38 @@ Cancel | Clean
 
 Dry run adds one line: `Dry run. No files will be moved.`
 
+## Clean progress copy
+
+```
+Cleaning                      42%
+Item 12 of 34
+
+Items      11 of 34
+Bytes      2.4 GB of 10.4 GB
+Freed      2.3 GB
+Skipped    1
+Failed     0
+Current    ~/Library/Caches/com.example.app/cache.db
+           Folder - Deleting - 18 MB
+```
+
+Dry run:
+
+```
+Simulating clean
+Would free 2.3 GB
+Would skip 1
+```
+
+When the item list is finished and snapshots are still being removed:
+
+```
+Finishing the snapshot removal
+```
+
+No busy word, no apology, no percentage without a denominator. If the total is
+not known yet, the subtitle says `Preparing the clean pass`.
+
 ## Summary copy
 
 Clean:

@@ -32,14 +32,7 @@ struct ContentView: View {
         .environment(appCleaner)
         .tint(Theme.accent)
         .sheet(isPresented: $confirming) {
-            ConfirmSheet()
-        }
-        .sheet(
-            isPresented: Binding(
-                get: { model.report != nil },
-                set: { if !$0 { model.report = nil } })
-        ) {
-            if let report = model.report { SummaryView(report: report) }
+            CleanFlowSheet()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.refreshAccess()

@@ -206,11 +206,23 @@ Top to bottom:
 The page polls the access probe and dismisses itself when access lands. It does
 not pulse.
 
-## Confirmation and summary
+## Clean flow: confirmation, progress, summary
 
-The confirmation sheet and the summary sheet follow the component specs. They
-are used by Clean and by Applications. They never claim success before the
-operation completes. The dry-run state changes every verb.
+The clean flow is one sheet with three states, in order:
+
+1. **Confirmation** repeats the count, categories, permanent versus trashed
+   bytes, and the dry-run notice.
+2. **Progress** starts as soon as the user confirms. It shows a spinner, an item
+   bar, and a bordered box with items, bytes plus a byte bar, freed bytes,
+   skipped and failed counts, and the current path with its action. Interactive
+   dismissal is disabled while cleaning.
+3. **Summary** replaces the progress box when the pass ends. It reports what
+   was cleaned and lists skipped or failed items.
+
+The confirmation and summary sheets follow the component specs. They never
+claim success before the operation completes. The dry-run state changes every
+verb. The Applications uninstall sheets use the same sheet grammar and width;
+they do not use this clean progress.
 
 ## Error and partial states
 
