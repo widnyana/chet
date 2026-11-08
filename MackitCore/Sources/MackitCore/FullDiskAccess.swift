@@ -17,13 +17,19 @@ public enum FullDiskAccess {
         ]
     }
 
-    /// Granted when the first existing probe file can be opened for reading.
+    /// Granted when ANY existing probe file can be opened for reading. Trying all of them
+    /// matters: one probe may be restricted for reasons unrelated to this grant (a
+    /// root-only TCC.db), and failing on it alone would report denied forever despite
+    /// access having been granted.
     public static func status(probing probes: [URL] = defaultProbes) -> Status {
-        guard let probe = probes.first(where: { FileManager.default.fileExists(atPath: $0.path) }) else {
-            return .denied
+        let existing = probes.filter { FileManager.default.fileExists(atPath: $0.path) }
+        guard !existing.isEmpty else { return .denied }
+        for probe in existing {
+            if let handle = try? FileHandle(forReadingFrom: probe) {
+                try? handle.close()
+                return .granted
+            }
         }
-        guard let handle = try? FileHandle(forReadingFrom: probe) else { return .denied }
-        try? handle.close()
-        return .granted
+        return .denied
     }
 }

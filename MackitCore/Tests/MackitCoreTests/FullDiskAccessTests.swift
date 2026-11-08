@@ -19,6 +19,16 @@ struct FullDiskAccessTests {
         #expect(FullDiskAccess.status(probing: [probe]) == .denied)
     }
 
+    @Test func oneRestrictedProbeAmongReadableOnesIsGranted() throws {
+        let dir = try TempDir()
+        let restricted = try dir.file("TCC.db", bytes: 10)
+        let readable = try dir.file("Bookmarks.plist", bytes: 10)
+        #expect(chmod(restricted.path, 0o000) == 0)
+        defer { chmod(restricted.path, 0o644) }
+        // The restricted probe comes first; a later readable one must still grant access.
+        #expect(FullDiskAccess.status(probing: [restricted, readable]) == .granted)
+    }
+
     @Test func noProbeFileIsDenied() {
         #expect(FullDiskAccess.status(probing: [URL(fileURLWithPath: "/nonexistent/mackit/TCC.db")]) == .denied)
     }

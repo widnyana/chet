@@ -9,14 +9,17 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if model.access == .denied && !model.skipAccessCheck {
+            if model.access == .denied && !model.hasAttemptedGrant {
                 OnboardingView()
             } else {
                 NavigationSplitView {
                     SidebarView(selection: $selection)
                 } detail: {
-                    detail
-                        .toolbar { scanButton }
+                    VStack(spacing: 0) {
+                        AccessBanner()
+                        detail
+                    }
+                    .toolbar { scanButton }
                 }
             }
         }

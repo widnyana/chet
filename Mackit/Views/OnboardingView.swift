@@ -30,6 +30,9 @@ struct OnboardingView: View {
             .frame(maxWidth: 440, alignment: .leading)
             .glassEffect(.regular, in: .rect(cornerRadius: 20))
             Button("Open Settings", systemImage: "gearshape") {
+                // Persist before leaving: macOS relaunches the app when the grant applies,
+                // and that relaunch must not show this screen again.
+                model.recordGrantAttempt()
                 NSWorkspace.shared.open(FullDiskAccess.settingsURL)
             }
             .buttonStyle(.glassProminent)
@@ -40,15 +43,14 @@ struct OnboardingView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if waited > 10 {
-                    Text("· enabled but still asking? Quit and reopen Mackit — macOS applies Full Disk Access on relaunch")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text(
+                        "· enabled but still asking? Quit and reopen Mackit — macOS applies Full Disk Access on relaunch"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
             }
-            Button("Continue Without Access") {
-                    model.skipAccessCheck = true
-                    UserDefaults.standard.set(true, forKey: "skipAccessCheck")
-                }
+            Button("Continue Without Access") { model.recordGrantAttempt() }
                 .buttonStyle(.link)
         }
         .padding(40)
@@ -57,7 +59,7 @@ struct OnboardingView: View {
             // The probe is the only truth about what this process can read; poll it so
             // the onboarding self-dismisses the moment access works — no restart needed
             // when macOS applies the grant live.
-            while model.access == .denied && !model.skipAccessCheck {
+            while model.access == .denied && !model.hasAttemptedGrant {
                 try? await Task.sleep(for: .seconds(1))
                 waited += 1
                 model.refreshAccess()

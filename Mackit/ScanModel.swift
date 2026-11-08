@@ -30,10 +30,15 @@ struct ItemGroup: Identifiable {
 @Observable
 final class ScanModel {
     var access = FullDiskAccess.status()
-    /// Persists across relaunches: a rebuild voids the FDA grant (ad-hoc signing), so the
-    /// onboarding must not re-block the app every rebuild — the sidebar shows which
-    /// categories need access instead.
-    var skipAccessCheck = UserDefaults.standard.bool(forKey: "skipAccessCheck")
+    /// Persists across relaunches: once the user has been sent to Settings (or chose to
+    /// continue), the blocking onboarding never returns. macOS relaunches the app when a
+    /// Full Disk Access grant is applied, and an ad-hoc rebuild can leave the grant
+    /// unmatched to the new binary — re-blocking on that relaunch is what made the user
+    /// grant access twice. The non-blocking banner takes over instead.
+    var hasAttemptedGrant = UserDefaults.standard.bool(forKey: "hasAttemptedGrant")
+    /// How many times the user has been sent to Settings; the second attempt unlocks the
+    /// "Mackit may be listed twice" hint.
+    var grantAttempts = UserDefaults.standard.integer(forKey: "grantAttempts")
     var categories: [CategoryState] = []
     /// Category id -> groups, for duplicates and similar media.
     var groups: [String: [ItemGroup]] = [:]
@@ -108,7 +113,27 @@ final class ScanModel {
 
     func refreshAccess() {
         access = FullDiskAccess.status()
+        if access == .granted {
+            // Access landed: the banner and any stale "attempted" state are done.
+            bannerDismissed = true
+        }
     }
+
+    /// Records that the user is being sent to grant access, before leaving the app, so the
+    /// macOS-driven relaunch does not show the blocking onboarding again.
+    func recordGrantAttempt() {
+        hasAttemptedGrant = true
+        grantAttempts += 1
+        UserDefaults.standard.set(true, forKey: "hasAttemptedGrant")
+        UserDefaults.standard.set(grantAttempts, forKey: "grantAttempts")
+    }
+
+    /// True when the app should show the non-blocking access banner.
+    var showsAccessBanner: Bool {
+        access == .denied && hasAttemptedGrant && !bannerDismissed
+    }
+
+    var bannerDismissed = false
 
     func scan() {
         scanTask?.cancel()
