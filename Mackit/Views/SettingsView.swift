@@ -16,8 +16,8 @@ struct SettingsWindowTitle: NSViewRepresentable {
     }
 }
 
-/// The app's Settings page (Cmd+,): which steps run, which folders are skipped, and the
-/// thresholds the steps read. Values apply to the next scan, never to one already running.
+/// The app's Settings page (Cmd+,): what a scan looks at, in the order the scan uses it.
+/// Values apply to the next scan, never to one already running.
 struct SettingsView: View {
     @Environment(ScanModel.self) private var model
     @State private var newExclusion = ""
@@ -25,122 +25,220 @@ struct SettingsView: View {
     /// Steps the user may switch off. Rules and the folder index always run.
     private let optionalSteps: [ScanStep] = [.largeFiles, .duplicates, .leftovers, .photos, .videos, .snapshots]
 
+    private var enabledStepCount: Int {
+        optionalSteps.filter(model.isStepEnabled).count
+    }
+
     var body: some View {
         @Bindable var model = model
-        Form {
-            Section {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Spacing.s6) {
+                PageHeader(
+                    title: "Settings",
+                    subtitle: "What a scan looks at. Changes apply to the next scan.")
+
+                if DryRun.enabled {
+                    StatusLabel(
+                        text: "Dry run is on. Cleaning only simulates.",
+                        systemImage: "eye.slash",
+                        tone: .amber,
+                        help: "DRY_RUN is set in the environment or a .env file")
+                }
+
+                stepsSection
+                scopeSection(model: model)
+                excludedSection
+                thresholdsSection(model: model)
+                speedSection(model: model)
+            }
+            .padding(.horizontal, Metrics.pageMargin)
+            .padding(.vertical, Spacing.s6)
+            .frame(maxWidth: 560, alignment: .leading)
+        }
+        .background(Theme.paper)
+        .tint(Theme.accent)
+        .frame(width: 560, height: 760)
+        .background(SettingsWindowTitle())
+    }
+
+    private var stepsSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            SectionHeader(title: "Scan steps", trailing: "\(enabledStepCount) of \(optionalSteps.count) on")
+            HStack(alignment: .firstTextBaseline, spacing: Spacing.s3) {
+                VStack(alignment: .leading, spacing: Spacing.s1) {
+                    Text("Rules and folder index")
+                        .font(Typography.body)
+                        .foregroundStyle(Theme.ink)
+                    Text("Always run: they feed the sidebar and the disk map.")
+                        .font(Typography.caption)
+                        .foregroundStyle(Theme.inkSecondary)
+                }
+                Spacer(minLength: Spacing.s3)
+                StatusLabel(text: "Always on", systemImage: "lock", tone: .neutral)
+            }
+            Hairline()
+            LazyVGrid(
+                columns: [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)],
+                spacing: Spacing.s2
+            ) {
                 ForEach(optionalSteps, id: \.rawValue) { step in
                     Toggle(
                         step.title,
                         isOn: Binding(
                             get: { model.isStepEnabled(step) },
                             set: { model.setStep(step, enabled: $0) }))
+                    .font(Typography.body)
+                    .foregroundStyle(Theme.ink)
+                    .accessibilityLabel(step.title)
+                    .accessibilityValue(model.isStepEnabled(step) ? "On" : "Off")
                 }
-            } header: {
-                Text("Scan steps")
-            } footer: {
-                Text("The rules step and the folder index always run: they feed the sidebar and the disk map.")
-                    .font(Typography.caption)
-                    .foregroundStyle(Theme.inkSecondary)
             }
+        }
+    }
 
-            Section {
-                Toggle(isOn: $model.scanOutsideHome) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Read folders outside your home folder")
-                            .font(Typography.body)
-                        Text("Scan and clean paths outside ~, such as VirtualBox machines on another disk. Off by default.")
-                            .font(Typography.caption)
-                            .foregroundStyle(Theme.inkSecondary)
-                    }
-                }
-                if model.excludedPaths.isEmpty {
-                    Text("No excluded folders. Add one below and every scan skips it.")
+    private func scopeSection(model: ScanModel) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            SectionHeader(title: "Where to look")
+            Toggle(isOn: Binding(get: { model.scanOutsideHome }, set: { model.scanOutsideHome = $0 })) {
+                VStack(alignment: .leading, spacing: Spacing.s1) {
+                    Text("Read folders outside your home folder")
+                        .font(Typography.body)
+                        .foregroundStyle(Theme.ink)
+                    Text("For VirtualBox machines or projects kept on another disk. Off by default.")
                         .font(Typography.caption)
                         .foregroundStyle(Theme.inkSecondary)
                 }
-                ForEach(model.excludedPaths, id: \.self) { path in
-                    HStack(spacing: Spacing.s2) {
-                        Text(path)
-                            .font(Typography.caption)
-                            .foregroundStyle(Theme.inkSecondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                        Spacer(minLength: Spacing.s2)
-                        Button {
-                            model.removeExcludedPath(path)
-                        } label: {
-                            Image(systemName: "minus.circle")
+            }
+            .accessibilityLabel("Read folders outside your home folder")
+            .accessibilityValue(model.scanOutsideHome ? "On" : "Off")
+        }
+    }
+
+    private var excludedSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            SectionHeader(
+                title: "Excluded folders",
+                trailing: model.excludedPaths.isEmpty ? "none" : "\(model.excludedPaths.count) excluded")
+            if model.excludedPaths.isEmpty {
+                EmptyStateView(
+                    title: "Nothing excluded yet",
+                    message: "Add a folder below and every scan skips it. Write ~ for your home folder.")
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(model.excludedPaths, id: \.self) { path in
+                        HStack(spacing: Spacing.s2) {
+                            Text(path)
+                                .font(Typography.row)
+                                .foregroundStyle(Theme.inkSecondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Spacer(minLength: Spacing.s2)
+                            Button("Remove") { model.removeExcludedPath(path) }
+                                .buttonStyle(.link)
+                                .font(Typography.caption)
+                                .accessibilityLabel("Stop excluding \(path)")
                         }
-                        .buttonStyle(.borderless)
-                        .help("Stop excluding this folder")
-                        .accessibilityLabel("Stop excluding \(path)")
+                        .padding(.vertical, Spacing.s2)
+                        Hairline()
                     }
                 }
+            }
+            VStack(alignment: .leading, spacing: Spacing.s2) {
                 HStack(spacing: Spacing.s2) {
-                    TextField("Add a folder, for example ~/Downloads/keep", text: $newExclusion)
+                    TextField("~/Downloads/keep", text: $newExclusion)
                         .textFieldStyle(.roundedBorder)
+                        .accessibilityLabel("Folder to exclude")
                     Button("Add") {
                         if model.addExcludedPath(newExclusion) { newExclusion = "" }
                     }
                     .disabled(newExclusion.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .accessibilityLabel("Add excluded folder")
                 }
                 if !newExclusion.isEmpty, ScanModel.normalizedPath(newExclusion) == nil {
-                    Text("Write ~/folder or /folder. A relative path excludes nothing.")
-                        .font(Typography.caption)
-                        .foregroundStyle(Theme.inkSecondary)
-                }
-            } header: {
-                Text("Scan scope")
-            } footer: {
-                Text("Excluded folders are never scanned and never cleaned. Write ~ for your home folder.")
-                    .font(Typography.caption)
-                    .foregroundStyle(Theme.inkSecondary)
-            }
-
-            Section("Duplicate files") {
-                Toggle(isOn: $model.includeTempInDuplicates) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Include caches, build folders, and tool state")
-                            .font(Typography.body)
-                        Text("Search inside caches, build folders, and Terraform or Terragrunt dirs. Off by default.")
-                            .font(Typography.caption)
-                            .foregroundStyle(Theme.inkSecondary)
-                    }
-                }
-                Stepper(value: $model.duplicateMinSizeMB, in: 1...100) {
-                    Text("Smallest file worth hashing: \(model.duplicateMinSizeMB) MB")
-                        .font(Typography.body)
+                    StatusLabel(
+                        text: "Write ~/folder or /folder. A relative path excludes nothing.",
+                        systemImage: "exclamationmark.circle",
+                        tone: .red)
                 }
             }
+        }
+    }
 
-            Section("Large files") {
-                Stepper(value: $model.largeFileMinSizeMB, in: 50...2000, step: 50) {
-                    Text("List files of at least \(model.largeFileMinSizeMB) MB")
-                        .font(Typography.body)
-                }
-                Stepper(value: $model.largeFileOldAgeDays, in: 30...730, step: 30) {
-                    Text("Treat files untouched for \(model.largeFileOldAgeDays) days as old")
-                        .font(Typography.body)
-                }
-            }
+    private func thresholdsSection(model: ScanModel) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            SectionHeader(title: "Thresholds")
+            SliderRow(
+                title: "Duplicate files at least",
+                valueText: "\(model.duplicateMinSizeMB) MB",
+                value: Binding(get: { Double(model.duplicateMinSizeMB) }, set: { model.duplicateMinSizeMB = Int($0) }),
+                range: 1...100, step: 1)
+            Hairline()
+            SliderRow(
+                title: "Large files at least",
+                valueText: "\(model.largeFileMinSizeMB) MB",
+                value: Binding(get: { Double(model.largeFileMinSizeMB) }, set: { model.largeFileMinSizeMB = Int($0) }),
+                range: 50...2000, step: 50)
+            Hairline()
+            SliderRow(
+                title: "Old after",
+                valueText: "\(model.largeFileOldAgeDays) days",
+                value: Binding(get: { Double(model.largeFileOldAgeDays) }, set: { model.largeFileOldAgeDays = Int($0) }),
+                range: 30...730, step: 30)
+        }
+    }
 
-            Section("Performance") {
-                Picker("Folder walk threads", selection: $model.scanThreads) {
+    private func speedSection(model: ScanModel) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            SectionHeader(title: "Speed")
+            HStack(alignment: .firstTextBaseline, spacing: Spacing.s3) {
+                Text("Folder walk threads")
+                    .font(Typography.body)
+                    .foregroundStyle(Theme.ink)
+                Spacer(minLength: Spacing.s3)
+                Picker("Folder walk threads", selection: Binding(get: { model.scanThreads }, set: { model.scanThreads = $0 })) {
                     Text("Auto").tag(0)
                     Text("1").tag(1)
                     Text("2").tag(2)
                     Text("4").tag(4)
                     Text("8").tag(8)
                 }
-                Text("Auto uses one thread per core. Fewer threads finish slower and keep the fan quiet.")
-                    .font(Typography.caption)
-                    .foregroundStyle(Theme.inkSecondary)
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(width: 220)
             }
+            Text("Auto uses one thread per core. Fewer threads finish slower and keep the fan quiet.")
+                .font(Typography.caption)
+                .foregroundStyle(Theme.inkSecondary)
         }
-        .formStyle(.grouped)
-        .tint(Theme.accent)
-        .frame(width: 480, height: 660)
-        .background(SettingsWindowTitle())
+    }
+}
+
+/// A labelled slider with its value on the same line, so the number and the control cannot
+/// disagree. The value is tabular: it does not shift while the thumb moves.
+private struct SliderRow: View {
+    let title: String
+    let valueText: String
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let step: Double
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s1) {
+            HStack(alignment: .firstTextBaseline, spacing: Spacing.s3) {
+                Text(title)
+                    .font(Typography.body)
+                    .foregroundStyle(Theme.ink)
+                Spacer(minLength: Spacing.s3)
+                Text(valueText)
+                    .font(Typography.metric)
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.ink)
+            }
+            Slider(value: $value, in: range, step: step)
+                .controlSize(.small)
+                .accessibilityLabel(title)
+                .accessibilityValue(valueText)
+        }
+        .padding(.vertical, Spacing.s2)
     }
 }
