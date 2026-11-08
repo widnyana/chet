@@ -17,13 +17,13 @@ struct ScanStatusView: View {
             } label: {
                 ZStack {
                     Circle()
-                        .stroke(.quaternary, lineWidth: 3)
+                        .stroke(.quaternary, lineWidth: 2.5)
                     Circle()
                         .trim(from: 0, to: progressFraction)
-                        .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                        .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                     if model.isPaused {
-                        // Percent and glyph cannot share 26 pt; pausing swaps them.
+                        // Percent and glyph cannot share 24 pt; pausing swaps them.
                         Image(systemName: "pause.fill")
                             .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(.secondary)
@@ -34,13 +34,12 @@ struct ScanStatusView: View {
                             .foregroundStyle(.primary)
                     }
                 }
-                .frame(width: 26, height: 26)
+                .frame(width: 24, height: 24)
                 .contentShape(.circle)
             }
-            // The capsule used to carry these insets; without them the toolbar gives the
-            // ring none and the window's rounded corner clips it.
-            .padding(.leading, 4)
-            .padding(.trailing, 8)
+            // Symmetric insets so the ring sits centered in its toolbar slot, clear of the
+            // window's rounded corner, with matching gaps on both sides.
+            .padding(.horizontal, 8)
             .padding(.vertical, 6)
             .buttonStyle(.plain)
             .accessibilityLabel(model.isPaused ? "Resume scan" : "Pause scan")
