@@ -77,7 +77,7 @@ How it draws:
 
 - **Glass everywhere.** Floating chrome is `.glassEffect(.regular, in: .capsule/.rect)`;
   primary buttons are `.glassProminent`. Glass is used for: the floating ActionBar capsule
-  (bottom of category views), the scan status pill (toolbar), overview cards
+  (bottom of category views), overview cards
   (22 pt-corner rects), confirmation/summary sheets, and success chips (green-tinted glass).
 - **Color = meaning, not decoration.** Category tints (orange caches, cyan browser, purple
   package caches, red large files…) are the only saturated color. Orange also signals
@@ -92,8 +92,10 @@ How it draws:
 
 ## Feedback & states
 
-- Scanning: per-row spinners + dimmed pending rows in the sidebar, a phase-titled status
-  pill in the toolbar, and a toast (`ScanFinishedToast`, top center) when done.
+- Scanning: per-row spinners + dimmed pending rows in the sidebar, a 26 pt progress ring
+  in the toolbar (quaternary track, accent arc over the five scan steps, percent centered;
+  click pauses, hover tooltips the phase words, no capsule), and a toast
+  (`ScanFinishedToast`, top center) when done.
 - Access: when Full Disk Access is denied the onboarding screen takes over the window until
   the grant lands or the user picks "Continue without Full Disk Access" for this launch;
   a dismissible orange banner (`AccessBanner`) above the detail pane explains limited access
@@ -170,11 +172,11 @@ Rules the script enforces:
       "verify": {"contains": ["glassEffect(.regular, in: .capsule)\n            Spacer()"]}
     },
     {
-      "id": "scan-status-pill",
+      "id": "scan-status-ring",
       "file": "Mackit/Views/ScanStatusView.swift",
-      "mechanism": "toolbar-pill",
-      "height": 44,
-      "verify": {"contains": ["glassEffect(.regular, in: .capsule)"]}
+      "mechanism": "toolbar-ring",
+      "height": 26,
+      "verify": {"contains": ["rotationEffect(.degrees(-90))"]}
     },
     {
       "id": "disk-map-path-pill",
