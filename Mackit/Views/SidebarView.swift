@@ -7,9 +7,16 @@ struct SidebarView: View {
 
     var body: some View {
         List(selection: $selection) {
-            row("overview", "Overview")
-            if !model.categories.isEmpty {
+            row("overview", "Overview", running: model.isScanning)
+            if !model.categories.isEmpty || model.isScanning {
                 Section("Reclaimable") {
+                    if model.categories.isEmpty {
+                        HStack(spacing: 6) {
+                            ProgressView().controlSize(.mini)
+                            Text("Scanning…").foregroundStyle(.secondary)
+                        }
+                        .tag("scanning-placeholder")
+                    }
                     ForEach(model.categories) { category in
                         let step = ScanStatusView.step(forCategory: category.id)
                         let running = model.isScanning && model.currentStep == step
