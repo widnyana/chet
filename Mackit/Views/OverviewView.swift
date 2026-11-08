@@ -44,7 +44,7 @@ struct OverviewView: View {
         if model.totalBytes == 0 {
             return "Nothing to reclaim. This Mac is tidy."
         }
-        return "\(model.selectedItems.count) items selected across \(model.categories.count) categories."
+        return "\(model.categories.count) categories, \(model.totalBytes.formatted(.byteCount(style: .file))) can be reclaimed."
     }
 
     private var capacity: some View {
@@ -199,7 +199,7 @@ struct OverviewView: View {
         }
         if model.lastScan == nil {
             return CommandBar(
-                metric: "Not measured",
+                metric: "No ledger yet",
                 detail: "Run a scan to build the ledger",
                 actionTitle: "Scan this Mac",
                 actionSystemImage: "magnifyingglass",
