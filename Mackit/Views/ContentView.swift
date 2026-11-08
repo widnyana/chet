@@ -6,6 +6,7 @@ struct ContentView: View {
     @Environment(ScanModel.self) private var model
     @State private var appCleaner = AppCleanerModel()
     @State private var selection: String? = "overview"
+    @State private var showingUninstaller = false
     @State private var confirming = false
 
     var body: some View {
@@ -21,7 +22,7 @@ struct ContentView: View {
                         detail
                     }
                     .toolbar {
-                        if selection != "apps" {
+                        if !showingUninstaller {
                             scanButton
                         }
                     }
@@ -40,18 +41,15 @@ struct ContentView: View {
             if let report = model.report { SummaryView(report: report) }
         }
         // Below the toolbar, above the content: an overlay at .top would sit on the
-        // title bar and cover the scan pill. Uninstall surfaces never scan, so the
-        // toast stays off them.
+        // title bar and cover the scan pill. The uninstaller never scans, so the
+        // toast stays off it.
         .safeAreaInset(edge: .top, spacing: 0) {
-            if selection != "apps" { ScanFinishedToast() }
+            if !showingUninstaller { ScanFinishedToast() }
         }
         .overlay(alignment: .bottomLeading) { dryRunBadge }
-        .onChange(of: selection) { _, next in
-            if next == "apps" { appCleaner.load() }
-        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.refreshAccess()
-            if selection == "apps" {
+            if showingUninstaller {
                 appCleaner.hasFullDiskAccess = FullDiskAccess.status() == .granted
                 appCleaner.refreshRunningState()
             }
@@ -59,8 +57,8 @@ struct ContentView: View {
     }
 
     @ViewBuilder private var detail: some View {
-        if selection == "apps" {
-            UninstallWorkspace()
+        if showingUninstaller {
+            UninstallWorkspace(onDone: { showingUninstaller = false })
         } else if selection == "disk-map" {
             DiskMapView()
         } else if selection == "snapshots" {
@@ -71,7 +69,10 @@ struct ContentView: View {
         } else if let id = selection, let category = model.categories.first(where: { $0.id == id }) {
             CategoryDetailView(category: category, onClean: { confirming = true })
         } else {
-            OverviewView(selection: $selection, onClean: { confirming = true })
+            OverviewView(
+                selection: $selection,
+                onClean: { confirming = true },
+                onUninstall: { showingUninstaller = true })
         }
     }
 

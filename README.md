@@ -2,7 +2,7 @@
 
 Mackit finds and removes junk on Apple Silicon Macs: caches, logs, developer build data, old installers, duplicate files, similar photos and videos, leftovers of deleted apps, and more. It removes only data that apps can rebuild, or files you confirm one by one.
 
-The sidebar lists two jobs as destinations. **Clean** runs the junk scan. **Uninstall** (under Applications) removes an app together with the Library data that belongs to it.
+**Clean** runs the junk scan. To **uninstall** an app together with the Library data that belongs to it, open **Uninstall apps** from the Overview.
 
 ## Requirements
 

@@ -6,10 +6,9 @@ the right — on macOS 26 Liquid Glass.
 
 ## Sidebar
 
-The sidebar is the app's spine. There is no mode switch: one `List` carries every
-destination. The clean job owns the top (Overview, the Reclaimable categories, Disk map
-under Inspect); a trailing **Uninstall** section holds a single **Applications** row whose
-trailing value is the number of installed apps.
+The sidebar is the app's spine and the clean-mode surface: Overview, the Reclaimable
+categories, Disk map under Inspect. Uninstall has no place here — no mode switch, no tab,
+no destination row. It opens from the Overview card (see Uninstall below).
 
 In **Clean** mode the list has three visual zones, top to bottom:
 
@@ -37,9 +36,8 @@ Row anatomy is deliberately flat: `Label { title + states + Spacer + trailing va
 No custom backgrounds, no disclosure chrome — selection, hover, and focus come from the
 system list.
 
-The app inventory does not live in the sidebar. Selecting **Applications** opens the app
-browser in the detail pane (see Uninstall below); the sidebar stays the clean-mode spine
-the whole time.
+The app inventory does not live in the sidebar and the sidebar never changes while the
+uninstaller is open.
 
 ## Disk map — live nested treemap
 
@@ -93,8 +91,11 @@ How it draws:
 
 ## Uninstall
 
-Uninstall is a destination, not a mode. Selecting **Applications** in the sidebar opens the
-app browser in the detail pane: a searchable inventory of installed apps, switchable
+Uninstall is a task, not a mode. The Overview page carries the one door: a quiet
+**Uninstall apps** card under the disk bar, present in every overview state. It opens the
+app browser over the detail pane; a leading **Done** toolbar button leaves it and returns
+attention to the Overview. The sidebar never changes. The browser is a searchable
+inventory of installed apps, switchable
 between a **grid** (adaptive cells) and a **list** (dense rows) from the toolbar. Both
 styles render the same model state; the choice persists across launches.
 
@@ -224,7 +225,7 @@ Rules the script enforces:
       "mechanism": "safeAreaInset-top",
       "height": 40,
       "verify": {
-        "contains": ["safeAreaInset(edge: .top, spacing: 0) {\n            if selection != \"apps\" { ScanFinishedToast() }"],
+        "contains": ["safeAreaInset(edge: .top, spacing: 0) {\n            if !showingUninstaller { ScanFinishedToast() }"],
         "not-contains": [".overlay(alignment: .top)"]
       }
     },

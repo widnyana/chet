@@ -1,11 +1,10 @@
 import MackitCore
 import SwiftUI
 
-/// One sidebar, every destination. Clean and Uninstall are rows in the same list —
-/// there is no mode switch.
+/// The clean-mode spine: overview, reclaimable categories, inspect. Uninstall is not
+/// here — it opens from the Overview card.
 struct SidebarView: View {
     @Environment(ScanModel.self) private var model
-    @Environment(AppCleanerModel.self) private var appCleaner
     @Binding var selection: String?
 
     var body: some View {
@@ -42,11 +41,6 @@ struct SidebarView: View {
             }
             Section("Inspect") {
                 row("disk-map", "Disk map")
-            }
-            Section("Uninstall") {
-                row(
-                    "apps", "Applications",
-                    trailing: appCleaner.apps.isEmpty ? nil : "\(appCleaner.apps.count)")
             }
         }
     }

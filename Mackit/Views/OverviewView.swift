@@ -7,6 +7,7 @@ struct OverviewView: View {
     @Environment(ScanModel.self) private var model
     @Binding var selection: String?
     let onClean: () -> Void
+    let onUninstall: () -> Void
     @State private var pickedTitle: String?
 
     var body: some View {
@@ -16,6 +17,7 @@ struct OverviewView: View {
                     .padding(24)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .glassEffect(.regular, in: .rect(cornerRadius: 22))
+                uninstallDoor
                 if model.isScanning {
                     progress
                 } else if model.lastScan == nil {
@@ -32,6 +34,40 @@ struct OverviewView: View {
         .onChange(of: pickedTitle) { _, title in
             if let id = model.categories.first(where: { $0.title == title })?.id { selection = id }
         }
+    }
+
+    /// The one door into the uninstaller. Present in every overview state — removing
+    /// apps does not depend on a scan. It carries a feature's presence: icon badge,
+    /// bold title, explicit Open chip.
+    private var uninstallDoor: some View {
+        Button(action: onUninstall) {
+            HStack(spacing: 18) {
+                Image(systemName: "app.dashed")
+                    .font(.system(size: 26, weight: .medium))
+                    .foregroundStyle(.tint)
+                    .frame(width: 56, height: 56)
+                    .background(.tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Uninstall apps")
+                        .font(.title3.bold())
+                    Text("Remove an app together with everything it left behind.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 12)
+                Text("Open")
+                    .font(.callout.weight(.semibold))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(.quaternary.opacity(0.9), in: .capsule)
+            }
+            .padding(24)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffect(.regular, in: .rect(cornerRadius: 22))
+        .help("Open the app uninstaller")
     }
 
     private var hero: some View {

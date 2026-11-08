@@ -8,16 +8,18 @@ import SwiftUI
 /// so the summary survives the pop that follows a completed removal.
 struct UninstallWorkspace: View {
     @Environment(AppCleanerModel.self) private var model
+    let onDone: () -> Void
 
     var body: some View {
         NavigationStack {
-            AppBrowserView()
+            AppBrowserView(onDone: onDone)
                 .navigationDestination(item: selectionBinding) { id in
                     if let app = model.apps.first(where: { $0.url == id }) {
                         AppCleanerDetailView(app: app)
                     }
                 }
         }
+        .onAppear { model.load() }
         .sheet(isPresented: selectionConfirmBinding) {
             AppUninstallConfirmSheet()
         }
@@ -80,6 +82,7 @@ struct UninstallWorkspace: View {
 /// found, filtered empty when the search misses.
 struct AppBrowserView: View {
     @Environment(AppCleanerModel.self) private var model
+    let onDone: () -> Void
 
     private let columns = [GridItem(.adaptive(minimum: 170), spacing: 14)]
 
@@ -114,6 +117,10 @@ struct AppBrowserView: View {
             }
         }
         .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button("Done", action: onDone)
+                    .help("Back to the Overview")
+            }
             ToolbarItem(placement: .primaryAction) {
                 Picker("Layout", selection: $model.style) {
                     ForEach(AppBrowserStyle.allCases) { style in
