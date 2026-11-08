@@ -23,8 +23,14 @@ enum GroupSort: String, CaseIterable, Identifiable {
         switch self {
         case .sizeDesc: return groups.sorted { size($0) > size($1) }
         case .sizeAsc: return groups.sorted { size($0) < size($1) }
-        case .nameAsc: return groups.sorted { $0.keeper.lastPathComponent.localizedStandardCompare($1.keeper.lastPathComponent) == .orderedAscending }
-        case .nameDesc: return groups.sorted { $0.keeper.lastPathComponent.localizedStandardCompare($1.keeper.lastPathComponent) == .orderedDescending }
+        case .nameAsc:
+            return groups.sorted {
+                $0.keeper.lastPathComponent.localizedStandardCompare($1.keeper.lastPathComponent) == .orderedAscending
+            }
+        case .nameDesc:
+            return groups.sorted {
+                $0.keeper.lastPathComponent.localizedStandardCompare($1.keeper.lastPathComponent) == .orderedDescending
+            }
         }
     }
 }

@@ -11,7 +11,7 @@ struct CategoryDetailView: View {
     @State private var preview: URL?
     /// Clickable column headers; largest-first is the useful default.
     @State private var sortOrder: [KeyPathComparator<ScanItem>] = [
-        KeyPathComparator(\.reclaimableBytes, order: .reverse),
+        KeyPathComparator(\.reclaimableBytes, order: .reverse)
     ]
 
     private var urls: [URL] { category.items.map(\.url) }
