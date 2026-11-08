@@ -292,4 +292,21 @@ struct RuleScannerTests {
         #expect(Set(items.map(\.url.lastPathComponent)) == [".next", ".turbo"])
         #expect(items.allSatisfy { $0.risk == .review && $0.mode == .trash })
     }
+
+    @Test func terraformDirHoldingStateIsReviewNotSafe() async throws {
+        let dir = try TempDir()
+        try dir.file("Development/app/.terraform/old/terraform.tfstate", bytes: 4_000)
+        let items = try await RuleScanner(home: dir.url).scan(try rule("terraform-build-dirs")).items
+        #expect(items.map(\.url.lastPathComponent) == [".terraform"])
+        #expect(items.allSatisfy { $0.risk == .review && $0.mode == .trash })
+    }
+
+    @Test func terraformDirWithBackendConfigStaysSafe() async throws {
+        let dir = try TempDir()
+        try dir.file("Development/app/.terraform/terraform.tfstate", bytes: 200)
+        try dir.file("Development/app/.terraform/providers/x/bin", bytes: 900_000)
+        let items = try await RuleScanner(home: dir.url).scan(try rule("terraform-build-dirs")).items
+        #expect(items.map(\.url.lastPathComponent) == [".terraform"])
+        #expect(items.allSatisfy { $0.risk == .safe && $0.mode == .permanent })
+    }
 }

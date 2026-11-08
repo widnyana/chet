@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 
 public enum SkipReason: String, Sendable {
-    case missing, changed, policy, appRunning
+    case missing, changed, policy, appRunning, localState
 }
 
 public enum CleanOutcome: Sendable, Equatable {
@@ -189,6 +189,9 @@ public struct Cleaner: Sendable {
             current.modified == item.stamp.modified
         else { return .skipped(.changed) }
         guard policy.isDeletable(item.url) == .allowed else { return .skipped(.policy) }
+        // Local Terraform / OpenTofu state is user data. Providers and modules re-download;
+        // state does not. Refused in both modes, so a Trash sweep cannot lose it either.
+        if TerraformState.holdsLocalState(item.url) { return .skipped(.localState) }
         if let owner = owner(item), isRunning(owner) { return .skipped(.appRunning) }
         if dryRun {
             return item.mode == .permanent ? .removed(item.reclaimableBytes) : .trashed(item.reclaimableBytes)

@@ -83,6 +83,7 @@ struct SummaryView: View {
         case .skipped(.missing): "Already gone"
         case .skipped(.policy): "Protected location, left alone"
         case .skipped(.appRunning): "Its app is running. Quit it and clean again"
+        case .skipped(.localState): "Holds Terraform state, left alone"
         case .failed(let message): message
         case .removed, .trashed: "Cleaned"
         }

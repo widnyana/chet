@@ -61,9 +61,13 @@ public struct RuleScanner: Sendable {
                 if let minAge = rule.minAge, now.timeIntervalSince(stamp.modified) < minAge { continue }
                 let bytes = await FileIndexBuilder.allocatedSize(of: child)
                 guard bytes > 0 else { continue }
+                // A tool directory holding local Terraform state is never safe: the cleaner
+                // refuses it, so the row must not claim a permanent delete.
+                let holdsState = TerraformState.holdsLocalState(child)
                 found.append(
                     ScanItem(
-                        url: child, categoryID: rule.category, risk: rule.risk, mode: rule.mode,
+                        url: child, categoryID: rule.category, risk: holdsState ? .review : rule.risk,
+                        mode: holdsState ? .trash : rule.mode,
                         reclaimableBytes: bytes, stamp: stamp, ownerBundleID: rule.owningBundleID))
             }
             if rule.keepNewest, let newest = found.max(by: { $0.stamp.modified < $1.stamp.modified }) {

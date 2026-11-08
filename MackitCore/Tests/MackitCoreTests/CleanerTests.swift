@@ -74,6 +74,27 @@ struct CleanerTests {
         #expect(FileManager.default.fileExists(atPath: dir.url.appendingPathComponent("FakeTrash/x.jpg").path))
     }
 
+    @Test func localStateIsNeverRemovedOrTrashed() throws {
+        let dir = try TempDir()
+        let cache = dir.url.appendingPathComponent("Development/app/.terragrunt-cache/a/b")
+        try dir.text("Development/app/.terragrunt-cache/a/b/terraform.tfstate", "{}")
+        for mode in [DeleteMode.permanent, .trash] {
+            let report = cleaner(dir).clean([try item(cache, mode)])
+            #expect(report.results.first?.outcome == .skipped(.localState))
+            #expect(FileManager.default.fileExists(atPath: cache.appendingPathComponent("terraform.tfstate").path))
+        }
+    }
+
+    @Test func backendConfigAloneDoesNotBlockCleanup() throws {
+        let dir = try TempDir()
+        let terraform = dir.url.appendingPathComponent("Development/app/.terraform")
+        try dir.file("Development/app/.terraform/providers/x/bin", bytes: 1000)
+        try dir.text("Development/app/.terraform/terraform.tfstate", "{}")
+        let report = cleaner(dir).clean([try item(terraform)])
+        #expect(report.results.first?.outcome != .skipped(.localState))
+        #expect(!FileManager.default.fileExists(atPath: terraform.path))
+    }
+
     @Test func modifiedFileIsSkipped() throws {
         let dir = try TempDir()
         let file = try dir.file("cache/x", bytes: 1000)
