@@ -93,10 +93,12 @@ struct MackitApp: App {
         }
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+        .commands { AboutCommand() }
         // The standard macOS Settings scene: "Settings…" in the app menu, Cmd+, opens it.
         Settings {
             SettingsView()
                 .environment(model)
         }
+        .commands { AboutCommand() }
     }
 }
