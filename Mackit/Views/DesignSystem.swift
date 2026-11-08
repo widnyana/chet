@@ -209,10 +209,12 @@ struct EmptyStateView: View {
             Text(title)
                 .font(Typography.section)
                 .foregroundStyle(Theme.ink)
+            // No fixedSize(vertical:): measured without a width proposal it reports a
+            // huge ideal height, which NavigationSplitView adopts. On the Disk map page
+            // that pushed the whole split view past the window and blanked the sidebar.
             Text(message)
                 .font(Typography.body)
                 .foregroundStyle(Theme.inkSecondary)
-                .fixedSize(horizontal: false, vertical: true)
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
                     .buttonStyle(.borderedProminent)

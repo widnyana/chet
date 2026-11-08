@@ -148,7 +148,7 @@ struct OverviewView: View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
             SectionHeader(
                 title: "Scanning",
-                trailing: "\(Int((progressFraction * 100).rounded())) percent")
+                trailing: "\(Int((progressFraction * 100).rounded())) %")
             ProgressView(value: progressFraction)
                 .tint(Theme.accent)
             if let activity = model.activity {
