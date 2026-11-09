@@ -58,11 +58,18 @@ public struct RuleScanner: Sendable {
                 try Task.checkCancellation()
                 if child.lastPathComponent == ".DS_Store" { continue }
                 let name = child.lastPathComponent
-                let rel = rule.wholeRoots ? root : (isAbsolute ? String(child.path.dropFirst(rootURL.path.count + 1)) : String(child.path.dropFirst(home.path.count + 1)))
+                let rel =
+                    rule.wholeRoots
+                    ? root
+                    : (isAbsolute
+                        ? String(child.path.dropFirst(rootURL.path.count + 1))
+                        : String(child.path.dropFirst(home.path.count + 1)))
                 if rule.excluded.contains(name) { continue }
                 if claimed.contains(where: { $0 == rel || $0.hasPrefix(rel + "/") }) { continue }
                 if let extensions = rule.extensions, !extensions.contains(child.pathExtension.lowercased()) { continue }
-                guard (rule.listOnly || policy.isDeletable(child) == .allowed), let stamp = FileStamp.read(child) else { continue }
+                guard rule.listOnly || policy.isDeletable(child) == .allowed, let stamp = FileStamp.read(child) else {
+                    continue
+                }
                 if let minAge = rule.minAge, now.timeIntervalSince(stamp.modified) < minAge { continue }
                 let bytes = await FileIndexBuilder.allocatedSize(of: child)
                 guard bytes > 0 else { continue }

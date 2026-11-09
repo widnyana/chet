@@ -1,8 +1,8 @@
+import ChetCore
 // Read-only scan benchmark: per-step wall time, files seen, peak RSS, GPU buffer time.
 // Exits 1 over the limits: peak RSS > 1.5 GB, longest GPU command buffer > 50 ms.
 import Darwin
 import Foundation
-import ChetCore
 
 func peakRSS() -> Int64 {
     var usage = rusage()

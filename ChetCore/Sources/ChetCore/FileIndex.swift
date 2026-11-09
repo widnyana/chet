@@ -463,7 +463,7 @@ final class DirQueue: @unchecked Sendable {
     /// Closes fds of directories never popped (only possible on a cancelled walk).
     func closeRemaining() {
         cond.lock()
-        slots.forEach { close($0.fd) }
+        for slot in slots { close(slot.fd) }
         slots = []
         cond.unlock()
     }
@@ -660,8 +660,9 @@ extension FileIndexBuilder {
         var plainLeaves: [(url: URL, size: Int64)] = []
         var plainCandidates: [PendingCandidate] = []
         var entries = 0
+        let stop: @Sendable () -> Bool = { cancel.isCancelled }
         let bulkErrno =
-            (try? Self.forEachEntry(dir.fd, stop: { cancel.isCancelled }) { entry in
+            (try? Self.forEachEntry(dir.fd, stop: stop) { entry in
                 entries += 1
                 switch entry.kind {
                 case .directory:

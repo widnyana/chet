@@ -34,7 +34,8 @@ struct CategoryDetailView: View {
                 EmptyStateView(
                     title: "Nothing here",
                     message: "This group is empty. Scan again later.",
-                    systemImage: "folder")
+                    systemImage: "folder"
+                )
                 .padding(.horizontal, Metrics.widePageMargin)
                 Spacer()
             } else {

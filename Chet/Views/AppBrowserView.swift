@@ -188,7 +188,12 @@ struct AppBrowserView: View {
     }
 
     private func toggleSort(_ column: AppSort) {
-        if sort == column { ascending.toggle() } else { sort = column; ascending = true }
+        if sort == column {
+            ascending.toggle()
+        } else {
+            sort = column
+            ascending = true
+        }
     }
 
     private var grid: some View {
@@ -311,7 +316,9 @@ private struct AppListHeader: View {
     }
 
     private func sortButton(_ title: String, _ column: AppSort) -> some View {
-        Button { onSort(column) } label: {
+        Button {
+            onSort(column)
+        } label: {
             HStack(spacing: 2) {
                 Text(title)
                 Image(systemName: ascending ? "chevron.up" : "chevron.down")

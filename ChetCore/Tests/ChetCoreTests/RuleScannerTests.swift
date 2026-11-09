@@ -164,7 +164,9 @@ struct RuleScannerTests {
         let dir = try TempDir()
         try dir.file("outside/profiles/gen-1/blobs", bytes: 1_000_000)
         try dir.file("outside/profiles/gen-2/blobs", bytes: 2_000_000)
-        let rule = Rule(id: "test-abs", title: "Test", roots: [dir.url.appendingPathComponent("outside/profiles").path], risk: .safe, mode: .permanent)
+        let rule = Rule(
+            id: "test-abs", title: "Test", roots: [dir.url.appendingPathComponent("outside/profiles").path],
+            risk: .safe, mode: .permanent)
         let result = try await RuleScanner(home: dir.url, rules: [rule]).scan(rule)
         #expect(Set(result.items.map(\.url.lastPathComponent)) == ["gen-1", "gen-2"])
         #expect(result.totalBytes > 2_900_000)
@@ -174,7 +176,9 @@ struct RuleScannerTests {
         let dir = try TempDir()
         try dir.file("outside/nix-profiles/gen-1/blobs", bytes: 1_000_000)
         try dir.file("outside/nix-profiles/gen-2/blobs", bytes: 2_000_000)
-        let rule = Rule(id: "test-abs-whole", title: "Test", roots: [dir.url.appendingPathComponent("outside/nix-profiles").path], risk: .review, mode: .trash, wholeRoots: true)
+        let rule = Rule(
+            id: "test-abs-whole", title: "Test", roots: [dir.url.appendingPathComponent("outside/nix-profiles").path],
+            risk: .review, mode: .trash, wholeRoots: true)
         let result = try await RuleScanner(home: dir.url, rules: [rule]).scan(rule)
         #expect(result.items.map(\.url.lastPathComponent) == ["nix-profiles"])
         #expect(result.totalBytes > 2_900_000)
@@ -191,7 +195,9 @@ struct RuleScannerTests {
 
     @Test func absoluteRootMissingIsEmptyNotError() async throws {
         let dir = try TempDir()
-        let rule = Rule(id: "test-missing", title: "Test", roots: ["/tmp/chet-nonexistent-\(UUID())"], risk: .safe, mode: .permanent)
+        let rule = Rule(
+            id: "test-missing", title: "Test", roots: ["/tmp/chet-nonexistent-\(UUID())"], risk: .safe, mode: .permanent
+        )
         let result = try await RuleScanner(home: dir.url, rules: [rule]).scan(rule)
         #expect(result.items.isEmpty)
         #expect(!result.needsFullDiskAccess)

@@ -91,7 +91,8 @@ struct TweaksView: View {
                     text: TweakCopy.restart(target), systemImage: "arrow.clockwise", tone: .amber)
                 Spacer(minLength: Spacing.s3)
                 if target.processName != nil {
-                    SecondaryActionButton(title: "Restart \(TweakCopy.processName(target))", isEnabled: !model.isGated) {
+                    SecondaryActionButton(title: "Restart \(TweakCopy.processName(target))", isEnabled: !model.isGated)
+                    {
                         model.restart(target)
                     }
                 }

@@ -1,5 +1,5 @@
-import Foundation
 import ChetCore
+import Foundation
 import Observation
 
 /// One sidebar row: every item sharing a category id.
@@ -90,8 +90,9 @@ final class ScanModel {
     }
     nonisolated static let excludedKey = "excludedPaths"
     /// Settings list: folders the user added as rules. Stored as JSON in `userRulesKey`.
-    var userRules = (try? JSONDecoder().decode(
-        [UserRule].self, from: UserDefaults.standard.data(forKey: ScanModel.userRulesKey) ?? Data())) ?? []
+    var userRules =
+        (try? JSONDecoder().decode(
+            [UserRule].self, from: UserDefaults.standard.data(forKey: ScanModel.userRulesKey) ?? Data())) ?? []
     {
         didSet {
             guard oldValue != userRules else { return }

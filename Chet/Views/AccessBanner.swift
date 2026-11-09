@@ -63,7 +63,6 @@ struct TopStatusStrip: View {
     }
 }
 
-
 struct ScanFinishedObserver: ViewModifier {
     @Environment(ScanModel.self) private var model
     @Binding var text: String?

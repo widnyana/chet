@@ -33,7 +33,9 @@ struct SidebarFooter: View {
             Button("Empty Trash", role: .destructive) { status.emptyTrash() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text(DryRun.enabled ? "Preview only. Nothing will be removed." : "This permanently deletes everything in your Trash.")
+            Text(
+                DryRun.enabled
+                    ? "Preview only. Nothing will be removed." : "This permanently deletes everything in your Trash.")
         }
     }
 

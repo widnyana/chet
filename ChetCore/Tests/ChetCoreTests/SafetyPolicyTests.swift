@@ -104,13 +104,17 @@ struct SafetyPolicyTests {
     @Test func allowsPathUnderExternalRoot() throws {
         let dir = try TempDir()
         try dir.file("nix/var/nix/profiles/per-user/wid/a-profile", bytes: 100)
-        let policy = SafetyPolicy(home: dir.url, externalRoots: [dir.url.appendingPathComponent("nix/var/nix/profiles").path])
-        #expect(policy.isDeletable(dir.url.appendingPathComponent("nix/var/nix/profiles/per-user/wid/a-profile")) == .allowed)
+        let policy = SafetyPolicy(
+            home: dir.url, externalRoots: [dir.url.appendingPathComponent("nix/var/nix/profiles").path])
+        #expect(
+            policy.isDeletable(dir.url.appendingPathComponent("nix/var/nix/profiles/per-user/wid/a-profile"))
+                == .allowed)
     }
 
     @Test func deniesPathOutsideExternalRoot() throws {
         let dir = try TempDir()
-        let policy = SafetyPolicy(home: dir.url, externalRoots: [dir.url.appendingPathComponent("nix/var/nix/profiles").path])
+        let policy = SafetyPolicy(
+            home: dir.url, externalRoots: [dir.url.appendingPathComponent("nix/var/nix/profiles").path])
         #expect(policy.isDeletable(dir.url.appendingPathComponent("nix/var")) == .denied("outside home"))
     }
 
@@ -118,8 +122,10 @@ struct SafetyPolicyTests {
         let dir = try TempDir()
         try dir.file("nix/var/nix/profiles/real", bytes: 10)
         let link = dir.url.appendingPathComponent("nix/var/nix/profiles/link")
-        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: dir.url.appendingPathComponent("nix/var/nix/profiles/real"))
-        let policy = SafetyPolicy(home: dir.url, externalRoots: [dir.url.appendingPathComponent("nix/var/nix/profiles").path])
+        try FileManager.default.createSymbolicLink(
+            at: link, withDestinationURL: dir.url.appendingPathComponent("nix/var/nix/profiles/real"))
+        let policy = SafetyPolicy(
+            home: dir.url, externalRoots: [dir.url.appendingPathComponent("nix/var/nix/profiles").path])
         #expect(policy.isDeletable(link) == .denied("symlink"))
     }
 
@@ -127,8 +133,11 @@ struct SafetyPolicyTests {
         let dir = try TempDir()
         try dir.file("nix/var/nix/profiles/Real.app/Contents/Info.plist", bytes: 10)
         try dir.file("nix/var/nix/profiles/Real.app/Contents/MacOS/Real", bytes: 10)
-        let policy = SafetyPolicy(home: dir.url, externalRoots: [dir.url.appendingPathComponent("nix/var/nix/profiles").path])
-        #expect(policy.isDeletable(dir.url.appendingPathComponent("nix/var/nix/profiles/Real.app")) == .denied("app bundle"))
+        let policy = SafetyPolicy(
+            home: dir.url, externalRoots: [dir.url.appendingPathComponent("nix/var/nix/profiles").path])
+        #expect(
+            policy.isDeletable(dir.url.appendingPathComponent("nix/var/nix/profiles/Real.app")) == .denied("app bundle")
+        )
     }
 
     // MARK: - excluded folders
@@ -147,7 +156,8 @@ struct SafetyPolicyTests {
         let dir = try TempDir()
         try dir.file("Development/keeper/main.tf", bytes: 10)
         try dir.file("Development/keep/main.tf", bytes: 10)
-        let policy = SafetyPolicy(home: dir.url, excludedPaths: [dir.url.appendingPathComponent("Development/keep").path])
+        let policy = SafetyPolicy(
+            home: dir.url, excludedPaths: [dir.url.appendingPathComponent("Development/keep").path])
         #expect(
             policy.isDeletable(dir.url.appendingPathComponent("Development/keeper/main.tf")) == .allowed)
         #expect(policy.isDeletable(dir.url.appendingPathComponent("Development/keep/main.tf")) != .allowed)

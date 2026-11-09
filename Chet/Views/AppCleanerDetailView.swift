@@ -38,7 +38,8 @@ struct AppCleanerDetailView: View {
                 EmptyStateView(
                     title: "No files left behind",
                     message: "The app can still be removed.",
-                    systemImage: "folder.badge.questionmark")
+                    systemImage: "folder.badge.questionmark"
+                )
                 .padding(.horizontal, Metrics.widePageMargin)
             } else {
                 relatedFiles
@@ -234,7 +235,8 @@ private struct OwnershipRow: View {
         StatusLabel(
             text: AppCopy.ownership(component.ownership),
             systemImage: ownershipSymbol,
-            tone: component.ownership == .privileged ? .amber : (component.ownership == .systemProtected ? .red : .neutral))
+            tone: component.ownership == .privileged
+                ? .amber : (component.ownership == .systemProtected ? .red : .neutral))
     }
 
     private var ownershipSymbol: String {

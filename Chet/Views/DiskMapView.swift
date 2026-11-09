@@ -117,7 +117,8 @@ struct DiskMapView: View {
                 EmptyStateView(
                     title: "See what uses your space",
                     message: "Click Scan in the toolbar, then click a block to look inside.",
-                    systemImage: "internaldrive")
+                    systemImage: "internaldrive"
+                )
                 .padding(Spacing.s8)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {

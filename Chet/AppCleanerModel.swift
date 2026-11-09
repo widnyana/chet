@@ -1,6 +1,6 @@
 import AppKit
-import Foundation
 import ChetCore
+import Foundation
 import Observation
 
 /// How the app browser lays out the inventory. Layout only. Both styles read the

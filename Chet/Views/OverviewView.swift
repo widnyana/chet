@@ -29,7 +29,8 @@ struct OverviewView: View {
             title: "Clean up your Mac",
             subtitle: subtitle,
             metric: metric,
-            metricLabel: "can be freed")
+            metricLabel: "can be freed"
+        )
         .accessibilityIdentifier("home.header")
     }
 
@@ -95,7 +96,8 @@ struct OverviewView: View {
         EmptyStateView(
             title: "No scan yet",
             message: "A scan measures your folders and shows what takes space.",
-            systemImage: "internaldrive")
+            systemImage: "internaldrive"
+        )
         .accessibilityIdentifier("home.empty")
     }
 
