@@ -210,32 +210,24 @@ macOS reports the size only when the snapshot is deleted.
 
 ### Settings
 
-A settings page, not a report. Each section changes one thing the next scan does. Scan
-results are not repeated here; the Overview already reports them.
+A settings page, not a report. Three panes, one question each, selected from the toolbar:
+`Scan`, `Sizes`, `Folders`. The window title follows the active pane, the macOS preference
+convention. Scan results are not repeated here; the Overview already reports them.
 
-- Header: `Settings`, subtitle `Applies to the next scan.`
-- What to scan: the six optional steps as plain switches under one caption,
-  `Rules and folder index always run.`
-- Sizes and ages: sliders `Duplicate size`, `Large file size`, `Old file age`, plus the
-  duplicate scope switch `Search caches and build folders`. Labels are nouns; no `at least`
-  and no threshold arithmetic in prose.
-- Excluded folders: the list with a text `Remove`, the empty state `No folders are excluded.`,
-  and `Exclude Folder…`, which opens the native folder picker. Paths are never typed.
-- Your rules: one caption stating the effect, `Children of an added folder are listed as
-  Your folders, reviewed, and moved to Trash.` The list removes a rule with a text `Remove`;
-  the empty state is `No folder rules yet.`; `Add Folder Rule…` opens the native picker.
-  Buttons are named after what they do, because a picked folder means the opposite in the
-  section above.
-- Outside your home folder: one switch with its consequence.
-- Footer: `Threads`, a pop-up menu, caption `Auto uses one thread per core.` Five numeric
-  options are a list, not a segmented strip.
+- `Scan`: caption `Rules and folder index always run.`, then the six step switches, then
+  `Speed` with `Threads` as a pop-up menu and the caption `Auto uses one thread per core.`
+- `Sizes`: sliders `Duplicate size`, `Large file size`, `Old file age`, plus the duplicate
+  scope switch `Search caches and build folders`. Labels are nouns; no `at least` and no
+  threshold arithmetic in prose.
+- `Folders`: `Excluded folders` with the list, a text `Remove`, the empty state
+  `No folders are excluded.`, and `Exclude Folder…` opening the native picker; `Your rules`
+  with one caption stating the effect, a text `Remove`, `No folder rules yet.`, and
+  `Add Folder Rule…`; `Outside your home folder` with one switch.
+- A set `DRY_RUN` shows one amber status label above the panes.
 
-A set `DRY_RUN` shows one amber status label under the header. Radius 0, hairlines under
-section headers, no cards, and the accent tints controls only.
-
-Every section is the same shape: header, hairline, then the control that section needs. That
-is a deliberate RHYTHM 1, the System Settings convention, so a reader learns the page once.
-Variety comes from the controls, not from six different layouts.
+Radius 0, hairlines under section headers, no cards, and the accent tints controls only.
+Every pane keeps the same shape, header then hairline then the control it needs. That is a
+deliberate RHYTHM 1, the System Settings convention, so a reader learns the page once.
 
 ### Permission page
 

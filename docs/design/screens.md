@@ -181,23 +181,19 @@ the ink that contrasts with the block. The map does not encode categories.
 
 ## Settings
 
-Job: answer "what will the next scan do?". One fixed 500 x 600 window, scrolling, titled
-`Settings`.
+Job: answer "what will the next scan do?". One fixed 500 x 520 window with three toolbar
+tab panes: `Scan`, `Sizes`, `Folders`. The window title is the active pane name.
 
-Top to bottom:
+1. `Scan`: caption `Rules and folder index always run.`, then the six step switches, then
+   `Speed` with the `Threads` pop-up and the caption `Auto uses one thread per core.`
+2. `Sizes`: sliders `Duplicate size`, `Large file size`, `Old file age`, then the switch
+   `Search caches and build folders`.
+3. `Folders`: `Excluded folders` rows with a text `Remove`, empty state
+   `No folders are excluded.`, and `Exclude Folder…`; `Your rules` with its effect caption,
+   one row per added folder with a text `Remove`, empty state `No folder rules yet.`, and
+   `Add Folder Rule…`; `Outside your home folder` with one switch.
 
-1. `PageHeader`: `Settings`, `Applies to the next scan.`
-2. `What to scan`: caption `Rules and folder index always run.`, then the six step switches.
-3. `Sizes and ages`: sliders `Duplicate size`, `Large file size`, `Old file age`, then the
-   switch `Search caches and build folders`.
-4. `Excluded folders`: rows with a text `Remove`, empty state `No folders are excluded.`,
-   and `Exclude Folder…` opening the native picker.
-5. `Your rules`: one caption on the effect, one row per added folder with a text `Remove`,
-   empty state `No folder rules yet.`, and `Add Folder Rule…` opening the native picker.
-6. `Outside your home folder`: one switch, `Read folders outside your home folder`.
-7. Footer: `Threads`, pop-up menu, caption `Auto uses one thread per core.`
-
-A set `DRY_RUN` adds one amber status label under the header.
+A set `DRY_RUN` adds one amber status label above the panes.
 
 ## About
 

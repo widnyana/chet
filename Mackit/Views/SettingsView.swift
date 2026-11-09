@@ -2,112 +2,113 @@ import AppKit
 import MackitCore
 import SwiftUI
 
-/// SwiftUI's `Settings` scene titles its window "<AppName> Settings" and offers no
-/// title modifier. The design language wants the plain word, so the hosting window's
-/// title is fixed when the view lands in it.
-struct SettingsWindowTitle: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        DispatchQueue.main.async { view.window?.title = "Settings" }
-        return view
-    }
-
-    func updateNSView(_ view: NSView, context: Context) {
-        DispatchQueue.main.async { view.window?.title = "Settings" }
-    }
-}
-
-/// Settings page (Cmd+,). Every value applies to the next scan.
+/// Settings page (Cmd+,). Three tabs, one question each: what the scan looks at, how it
+/// measures sizes, and which folders it reads. Every value applies to the next scan.
+/// The window title follows the active pane, the standard macOS preference-pane behavior.
 struct SettingsView: View {
     @Environment(ScanModel.self) private var model
 
     private let optionalSteps: [ScanStep] = [.largeFiles, .duplicates, .leftovers, .photos, .videos, .snapshots]
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Spacing.s6) {
-                PageHeader(title: "Settings", subtitle: "Applies to the next scan.")
-
-                if DryRun.enabled {
-                    StatusLabel(
-                        text: "Dry run on. Cleaning only simulates.",
-                        systemImage: "eye.slash",
-                        tone: .amber)
-                }
-
-                scanSection
-                sizesSection
-                excludedSection
-                rulesSection
-                outsideSection
-                threadsFooter
+        VStack(spacing: 0) {
+            if DryRun.enabled {
+                StatusLabel(
+                    text: "Dry run on. Cleaning only simulates.",
+                    systemImage: "eye.slash",
+                    tone: .amber)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, Metrics.pageMargin)
+                    .padding(.top, Spacing.s3)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Metrics.pageMargin)
-            .padding(.vertical, Metrics.pageMargin)
+            TabView {
+                scanTab.tabItem { Text("Scan") }
+                sizesTab.tabItem { Text("Sizes") }
+                foldersTab.tabItem { Text("Folders") }
+            }
         }
         .background(Theme.paper)
         .tint(Theme.accent)
-        .frame(width: 500, height: 600)
-        .background(SettingsWindowTitle())
+        .frame(width: 500, height: 520)
     }
 
-    private var scanSection: some View {
-        VStack(alignment: .leading, spacing: Spacing.s3) {
-            SectionHeader(title: "What to scan")
-            Text("Rules and folder index always run.")
-                .font(Typography.caption)
-                .foregroundStyle(Theme.inkSecondary)
-            VStack(alignment: .leading, spacing: Spacing.s2) {
-                ForEach(optionalSteps, id: \.rawValue) { step in
-                    Toggle(
-                        step.title,
-                        isOn: Binding(
-                            get: { model.isStepEnabled(step) },
-                            set: { model.setStep(step, enabled: $0) }))
-                    .font(Typography.body)
-                    .foregroundStyle(Theme.ink)
-                    .accessibilityLabel(step.title)
+    /// One scrolling column per tab, with the page margins applied once.
+    private func page<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Spacing.s6) {
+                content()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(Metrics.pageMargin)
+        }
+    }
+
+    private var scanTab: some View {
+        page {
+            VStack(alignment: .leading, spacing: Spacing.s3) {
+                SectionHeader(title: "Steps")
+                Text("Rules and folder index always run.")
+                    .font(Typography.caption)
+                    .foregroundStyle(Theme.inkSecondary)
+                VStack(alignment: .leading, spacing: Spacing.s2) {
+                    ForEach(optionalSteps, id: \.rawValue) { step in
+                        Toggle(
+                            step.title,
+                            isOn: Binding(
+                                get: { model.isStepEnabled(step) },
+                                set: { model.setStep(step, enabled: $0) }))
+                        .font(Typography.body)
+                        .foregroundStyle(Theme.ink)
+                        .accessibilityLabel(step.title)
+                    }
                 }
+            }
+            threadsSection
+        }
+    }
+
+    private var sizesTab: some View {
+        page {
+            VStack(alignment: .leading, spacing: Spacing.s2) {
+                SectionHeader(title: "Sizes and ages")
+                SliderRow(
+                    title: "Duplicate size",
+                    valueText: "\(model.duplicateMinSizeMB) MB",
+                    value: Binding(
+                        get: { Double(model.duplicateMinSizeMB) },
+                        set: { model.duplicateMinSizeMB = Int($0) }),
+                    range: 1...100, step: 1)
+                Toggle("Search caches and build folders", isOn: Binding(
+                    get: { model.includeTempInDuplicates },
+                    set: { model.includeTempInDuplicates = $0 }))
+                .font(Typography.body)
+                .foregroundStyle(Theme.ink)
+                .accessibilityLabel("Search caches and build folders")
+                Hairline()
+                SliderRow(
+                    title: "Large file size",
+                    valueText: "\(model.largeFileMinSizeMB) MB",
+                    value: Binding(
+                        get: { Double(model.largeFileMinSizeMB) },
+                        set: { model.largeFileMinSizeMB = Int($0) }),
+                    range: 50...2000, step: 50)
+                Hairline()
+                SliderRow(
+                    title: "Old file age",
+                    valueText: "\(model.largeFileOldAgeDays) days",
+                    value: Binding(
+                        get: { Double(model.largeFileOldAgeDays) },
+                        set: { model.largeFileOldAgeDays = Int($0) }),
+                    range: 30...730, step: 30)
             }
         }
     }
 
-    private var sizesSection: some View {
-        VStack(alignment: .leading, spacing: Spacing.s2) {
-            SectionHeader(title: "Sizes and ages")
-            SliderRow(
-                title: "Duplicate size",
-                valueText: "\(model.duplicateMinSizeMB) MB",
-                value: Binding(
-                    get: { Double(model.duplicateMinSizeMB) },
-                    set: { model.duplicateMinSizeMB = Int($0) }),
-                range: 1...100, step: 1)
-            Toggle(isOn: Binding(
-                get: { model.includeTempInDuplicates },
-                set: { model.includeTempInDuplicates = $0 }))
-            {
-                Text("Search caches and build folders")
-                    .font(Typography.body)
-                    .foregroundStyle(Theme.ink)
-            }
-            .accessibilityLabel("Search caches and build folders")
-            Hairline()
-            SliderRow(
-                title: "Large file size",
-                valueText: "\(model.largeFileMinSizeMB) MB",
-                value: Binding(
-                    get: { Double(model.largeFileMinSizeMB) },
-                    set: { model.largeFileMinSizeMB = Int($0) }),
-                range: 50...2000, step: 50)
-            Hairline()
-            SliderRow(
-                title: "Old file age",
-                valueText: "\(model.largeFileOldAgeDays) days",
-                value: Binding(
-                    get: { Double(model.largeFileOldAgeDays) },
-                    set: { model.largeFileOldAgeDays = Int($0) }),
-                range: 30...730, step: 30)
+    private var foldersTab: some View {
+        page {
+            excludedSection
+            rulesSection
+            outsideSection
         }
     }
 
@@ -229,9 +230,9 @@ struct SettingsView: View {
         }
     }
 
-    private var threadsFooter: some View {
+    private var threadsSection: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
-            Hairline()
+            SectionHeader(title: "Speed")
             HStack(alignment: .firstTextBaseline, spacing: Spacing.s3) {
                 Text("Threads")
                     .font(Typography.body)
