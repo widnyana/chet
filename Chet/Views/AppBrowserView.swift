@@ -88,7 +88,7 @@ struct AppBrowserView: View {
                     .pageHorizontalPadding()
                     .padding(.bottom, Spacing.s2)
             }
-            if model.isLoadingApps {
+            if model.isLoadingApps && model.apps.isEmpty {
                 LoadingStateView(message: "Reading applications")
                     .pageHorizontalPadding()
             } else if let error = model.loadError, model.apps.isEmpty {

@@ -24,7 +24,7 @@ app.
 
 The scan button is in the toolbar on every destination except Home, Apps,
 Homebrew, and Tweaks. Home owns the scan action in its command bar. The Apps
-destination owns its own toolbar: Done, search, layout, reload. Homebrew owns
+destination owns its own toolbar: search, layout, reload. Homebrew owns
 search and Reload. Tweaks uses the toolbar search field only.
 
 `Chet > About Chet` opens a separate fixed window. It is not a sidebar
@@ -153,7 +153,7 @@ Job: answer "which Homebrew package should I remove?".
 
 Top to bottom:
 
-1. Toolbar: search field and `Reload`. No scan control.
+1. Toolbar: search field, `Reload`, `Install packages`, and the action menu. No scan control.
 2. `PageHeader`: `Homebrew`, subtitle `N packages, M marked`.
 3. Inventory: checkbox, 22 pt package icon, package name, kind (`formula` or
    `cask`), version, size, and status. Columns use the Apps widths. The list is

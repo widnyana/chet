@@ -14,7 +14,8 @@ and focus, it is being used as decoration.
 | Token | Light | Dark | Use |
 |---|---|---|---|
 | `paper` | `#F6F4EF` | `#121316` | Main content background |
-| `paperRaised` | `#FCFBF8` | `#191B1E` | Table header, inset areas, sheet body |
+| `paperRaised` | `#FCFBF8` | `#191B1E` | Table header, inset areas |
+| Sheet body | `paper` | `paper` | Sheet content; the system draws the sheet window |
 | `ink` | `#1B1C1E` | `#F2F0EA` | Primary text, titles, icons |
 | `inkSecondary` | `#63635F` | `#A3A19A` | Supporting text, row locations |
 | `inkTertiary` | `#8B8A83` | `#74746F` | Disabled text, hints |

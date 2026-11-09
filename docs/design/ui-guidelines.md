@@ -106,11 +106,11 @@ Chet draws the content layer. It does not redraw the control layer.
 |---|---|---|
 | Sidebar | system | No background, no tint, no glass wrapper, no overlay |
 | Toolbar and title bar | system | Standard `ToolbarItem` only. Custom toolbar content is allowed; a custom toolbar background is not |
-| Sheet | system | No background. Paper goes on the sheet body, never on the sheet |
+| Sheet | system window, Chet body | No background on the window. Paper goes on the sheet body. |
 | Alert, popover, menu | system | Use `.alert`, `.confirmationDialog`, `.popover`. No custom overlay that imitates them |
 | Table and list | Chet | `paper`, `paperRaised`, hairline. No row shadows, no card rows |
-| Command bar | Chet | Full width, `paper`, 1 px top hairline, in flow |
-| Status strip | Chet | `paperRaised`, 1 px bottom hairline, in flow, pushes content |
+| Command bar | Chet | Full width via `safeAreaBar`, no painted fill, 1 px top hairline, in flow |
+| Status strip | Chet | System bar material, 1 px bottom hairline, in flow, pushes content |
 | Empty, loading, error | Chet | Text and one action. No illustration, no glass card |
 | About, Settings | Chet | `paperRaised` panels, native controls |
 

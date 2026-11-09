@@ -134,6 +134,7 @@ final class AppCleanerModel {
     func load() {
         guard !isLoadingApps else { return }
         isLoadingApps = true
+        loadError = nil
         hasFullDiskAccess = FullDiskAccess.status() == .granted
         let worker = makeUninstaller()
         Task {

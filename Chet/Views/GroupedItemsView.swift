@@ -104,7 +104,8 @@ struct GroupedItemsView: View {
                     }
                 }
             }
-            .padding(Spacing.s6)
+            .padding(.vertical, Spacing.s6)
+            .pageHorizontalPadding()
         }
     }
 
@@ -129,6 +130,7 @@ struct GroupedItemsView: View {
                         Spacer()
                         StatusLabel(text: "Stays", systemImage: "checkmark", tone: .neutral)
                     }
+                    .frame(minHeight: Metrics.rowHeight)
                     .contextMenu { revealButton(group.keeper) }
                     ForEach(group.items) { item in
                         HStack(spacing: Spacing.s2) {
@@ -164,6 +166,7 @@ struct GroupedItemsView: View {
                                 .monospacedDigit()
                                 .foregroundStyle(Theme.inkSecondary)
                         }
+                        .frame(minHeight: Metrics.rowHeight)
                         .contextMenu { revealButton(item.url) }
                     }
                 } header: {

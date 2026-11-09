@@ -526,7 +526,7 @@ struct ColumnTable<Item: Identifiable, Header: View, Row: View>: View {
 }
 
 /// The geometry every action sheet shares: 520 pt wide, 24 pt padding, and an optional fixed
-/// height. The system supplies the sheet material; a sheet supplies its own stack and footer.
+/// height. The system supplies the sheet window; the frame supplies the paper body.
 struct SheetFrame<Content: View>: View {
     var height: CGFloat?
     @ViewBuilder let content: Content
@@ -535,6 +535,7 @@ struct SheetFrame<Content: View>: View {
         content
             .padding(Spacing.s6)
             .frame(width: 520, height: height)
+            .background(Theme.paper)
     }
 }
 

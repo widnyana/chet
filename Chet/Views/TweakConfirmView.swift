@@ -61,6 +61,7 @@ struct TweakConfirmView: View {
         }
         .padding(Spacing.s6)
         .frame(width: 520, alignment: .leading)
+        .background(Theme.paper)
         .accessibilityIdentifier("tweak.confirm.\(pending.tweak.id)")
     }
 }

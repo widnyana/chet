@@ -235,7 +235,7 @@ disabled until an app is marked. Opening an app is separate from marking it.
 ### Homebrew
 
 A searchable inventory of installed Homebrew packages. No scan control; the
-page owns Refresh. Page header `Homebrew`, subtitle `N packages, M marked`.
+page owns Reload. Page header `Homebrew`, subtitle `N packages, M marked`.
 Rows carry a checkbox, a package icon, package name, kind (formula or cask),
 version, size, and status. The columns use the same widths as Apps so the two
 inventories align. The command bar is disabled until a package is
@@ -373,7 +373,8 @@ Full copy is in [design/copy.md](design/copy.md).
 - No em dash in app copy or new design documents.
 - No sparkle, star, magic, or orb icon.
 - No custom gradient, glow, glass, or shadow. System Liquid Glass on chrome is the only material.
-- No card grid, no bento, no card per preference, no chart that repeats the ledger.
+- No card grid for content pages. The Apps inventory grid is the documented exception.
+- No bento, no card per preference, no chart that repeats the ledger.
 - No pill for every small fact.
 - No decorative dot and no endless pulse.
 - No invented data.

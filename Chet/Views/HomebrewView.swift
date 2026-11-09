@@ -155,6 +155,16 @@ struct HomebrewView: View {
             )
             .pageHorizontalPadding()
         } else {
+            if let error = model.loadError {
+                StatusLabel(
+                    text: "The Homebrew list could not be read.",
+                    systemImage: "exclamationmark.triangle",
+                    tone: .amber,
+                    help: error
+                )
+                .pageHorizontalPadding()
+                .padding(.bottom, Spacing.s2)
+            }
             list
         }
     }
