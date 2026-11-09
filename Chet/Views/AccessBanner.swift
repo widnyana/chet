@@ -12,23 +12,17 @@ struct TopStatusStrip: View {
     var body: some View {
         Group {
             if DryRun.enabled {
-                strip(
-                    icon: "exclamationmark.triangle",
+                StatusStrip(
                     text: "Preview only. Nothing will be removed.",
-                    tone: .amber,
-                    actionTitle: nil,
-                    action: nil,
-                    dismiss: nil)
+                    systemImage: "exclamationmark.triangle",
+                    tone: .amber)
             } else if model.showsAccessBanner {
                 accessStrip
             } else if let finishedText {
-                strip(
-                    icon: "checkmark.circle",
+                StatusStrip(
                     text: finishedText,
-                    tone: .neutral,
-                    actionTitle: nil,
-                    action: nil,
-                    dismiss: { self.finishedText = nil })
+                    systemImage: "checkmark.circle",
+                    dismiss: .init(label: "Dismiss", perform: { self.finishedText = nil }))
             }
         }
         .modifier(ScanFinishedObserver(text: $finishedText))
@@ -36,34 +30,30 @@ struct TopStatusStrip: View {
 
     private var accessStrip: some View {
         VStack(spacing: 0) {
-            HStack(spacing: Spacing.s3) {
-                StatusLabel(
-                    text: "Limited access. Some folders are hidden.",
-                    systemImage: "lock.shield",
-                    tone: .amber)
-                Spacer(minLength: Spacing.s3)
-                SecondaryActionButton(
+            StatusStrip(
+                text: "Limited access. Some folders are hidden.",
+                systemImage: "lock.shield",
+                tone: .amber,
+                action: .init(
                     title: "Open Settings",
-                    action: {
+                    perform: {
                         model.recordGrantAttempt()
                         NSWorkspace.shared.open(FullDiskAccess.settingsURL)
-                    })
-                IconActionButton(
-                    systemImage: "xmark",
+                    }),
+                dismiss: .init(
                     label: "Hide until the next launch",
-                    action: { model.bannerDismissed = true })
-            }
+                    perform: { model.bannerDismissed = true }),
+                showsHairline: false)
             if model.grantAttempts >= 2 {
                 Text("Chet may be listed twice in Full Disk Access. Remove the old entry.")
                     .font(Typography.caption)
                     .foregroundStyle(Theme.inkSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, Metrics.pageMargin)
+                    .padding(.vertical, Spacing.s2)
             }
             Hairline()
         }
-        .padding(.horizontal, Spacing.s6)
-        .padding(.vertical, Spacing.s2)
-        .background(Theme.paperRaised)
         .task {
             while !Task.isCancelled && model.showsAccessBanner {
                 try? await Task.sleep(for: .seconds(1))
@@ -71,33 +61,8 @@ struct TopStatusStrip: View {
             }
         }
     }
-
-    private func strip(
-        icon: String,
-        text: String,
-        tone: StatusTone,
-        actionTitle: String?,
-        action: (() -> Void)?,
-        dismiss: (() -> Void)?
-    ) -> some View {
-        VStack(spacing: 0) {
-            HStack(spacing: Spacing.s3) {
-                StatusLabel(text: text, systemImage: icon, tone: tone)
-                Spacer(minLength: Spacing.s3)
-                if let actionTitle, let action {
-                    SecondaryActionButton(title: actionTitle, action: action)
-                }
-                if let dismiss {
-                    IconActionButton(systemImage: "xmark", label: "Dismiss", action: dismiss)
-                }
-            }
-            .padding(.horizontal, Spacing.s6)
-            .padding(.vertical, Spacing.s3)
-            .background(Theme.paperRaised)
-            Hairline()
-        }
-    }
 }
+
 
 struct ScanFinishedObserver: ViewModifier {
     @Environment(ScanModel.self) private var model

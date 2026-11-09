@@ -126,6 +126,51 @@ struct StatusLabel: View {
     }
 }
 
+/// One-line status bar: a labeled state, an optional action, an optional dismiss, on the
+/// raised surface with a rule below. The inset, height, and surface are fixed here, so the
+/// settings preview note and the top status strip cannot drift apart.
+struct StatusStrip: View {
+    struct Action {
+        let title: String
+        var accessibilityLabel: String? = nil
+        let perform: () -> Void
+    }
+
+    struct Dismiss {
+        let label: String
+        let perform: () -> Void
+    }
+
+    let text: String
+    let systemImage: String
+    var tone: StatusTone = .neutral
+    var action: Action? = nil
+    var dismiss: Dismiss? = nil
+    var showsHairline = true
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: Spacing.s3) {
+                StatusLabel(text: text, systemImage: systemImage, tone: tone)
+                Spacer(minLength: Spacing.s3)
+                if let action {
+                    SecondaryActionButton(
+                        title: action.title,
+                        accessibilityLabel: action.accessibilityLabel,
+                        action: action.perform)
+                }
+                if let dismiss {
+                    IconActionButton(systemImage: "xmark", label: dismiss.label, action: dismiss.perform)
+                }
+            }
+            .padding(.horizontal, Metrics.pageMargin)
+            .padding(.vertical, Spacing.s3)
+            .background(Theme.paperRaised)
+            if showsHairline { Hairline() }
+        }
+    }
+}
+
 struct PageHeader: View {
     let title: String
     var subtitle: String?

@@ -57,7 +57,14 @@ func click(_ el: AXUIElement) -> Bool {
 let args = CommandLine.arguments
 guard args.count > 1 else { print("usage: axdrv dump|texts|press <id>|click <text>|clickid <id>"); exit(2) }
 guard AXIsProcessTrusted() else { print("AX NOT TRUSTED"); exit(3) }
-guard let pid = NSRunningApplication.runningApplications(withBundleIdentifier: "id.web.widnyana.chet").first?.processIdentifier else {
+// More than one build of the app can be running (a `.build/xc` copy and another build).
+// AXDRV_PID picks the target; without it the first instance by bundle id is used.
+let envPID = ProcessInfo.processInfo.environment["AXDRV_PID"].flatMap { Int32($0) }
+guard
+    let pid = envPID
+        ?? NSRunningApplication.runningApplications(withBundleIdentifier: "id.web.widnyana.chet").first?
+        .processIdentifier
+else {
     print("chet not running")
     exit(4)
 }

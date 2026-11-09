@@ -50,12 +50,13 @@ picker, and the text link on the permission screen.
 A screen composes shared components. It does not rebuild a pattern, and it does not set
 spacing on a call site.
 
-- One component per pattern. Settings uses `SettingsPanel`, `SettingsRow`,
-  `SettingsActionRow`, `SettingsNote`, and `SettingsDivider`; nothing else draws a settings
-  row.
-- Geometry lives in the component. `SettingsGrid` owns the control column width, the row
-  height, and the row padding. A pane adds rows, never its own `padding` or `frame` around
-  them, because that is how two rows end up with different rhythm.
+- One component per pattern. Settings uses `SettingsPaneSwitcher`, `SettingsPanel`,
+  `SettingsRow`, `SettingsActionRow`, `SettingsNote`, and `SettingsDivider`; nothing else
+  draws a settings pane or a settings row.
+- Geometry lives in the component. `SettingsGrid` owns the row height and the row padding,
+  and each panel's `Grid` sizes the control column to its widest control. A pane adds rows,
+  never its own `padding` or `frame` around them, because that is how two rows end up with
+  different rhythm.
 - A variant is a parameter, not a copy. `SettingsRow` takes an optional `detail`; it does not
   need a second row type for rows with a subtitle.
 - Tokens only. Sizes come from `Spacing`, `Metrics`, and `Typography`. A literal number next
@@ -108,11 +109,33 @@ the full tree, around 230 elements on Home.
 | `home.header`, `home.empty`, `home.scan` | Home |
 | `apps.header` | Apps |
 | `storage.header` | Storage |
-| `settings.tabs` | Settings pane switcher |
+| `settings.pane.whatToFind`, `settings.pane.limits`, `settings.pane.folders` | Settings pane buttons |
 | `list.selectAll` | category table select-all |
 
 Add a new one with `.accessibilityIdentifier("screen.thing")` on the control, next to its
 `.accessibilityLabel`. Name it `screen.element`, lowercase, one dot.
+
+### Press by identifier, not by coordinate
+
+A label can change and a screen coordinate clicks whatever window happens to be on top. Use
+the identifier.
+
+```sh
+/tmp/axdrv press gate.continue          # Continue with limited results, whatever its label
+/tmp/axdrv press settings.pane.limits   # switch the Settings pane
+/tmp/axdrv press settings.pane.folders
+```
+
+Do not use `System Events ... click at {x, y}` to reach app controls. With two windows or two
+copies of the app it hits the wrong element, and a screenshot of the result proves nothing.
+
+More than one Chet can run at once, for example a `.build/xc` copy and a second build. `axdrv`
+then targets the first instance by bundle id. Pass the pid to choose one:
+
+```sh
+pgrep -f chet.app/Contents/MacOS/chet          # candidate pids
+AXDRV_PID=63481 /tmp/axdrv press gate.continue
+```
 
 ### Recipe
 

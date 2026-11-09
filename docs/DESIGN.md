@@ -215,10 +215,11 @@ macOS reports the size only when the snapshot is deleted.
 
 ### Settings
 
-A settings window in the macOS preference shape: a toolbar pane switcher with an icon and a
-word per pane, then grouped panels on `paperRaised` with the label on the left and its control
-on the right. The words are for someone who has never opened a terminal: no cache jargon, no
-"duplicate scope".
+A settings window in the macOS preference shape: a pane switcher with an icon and a word per
+pane, then grouped panels on `paperRaised` with the label on the left and its control on the
+right. The switcher is a component, not a system `TabView`: every segment takes an equal
+share of the width, so the three headings line up instead of sizing to their own text. The
+words are for someone who has never opened a terminal: no cache jargon, no "duplicate scope".
 
 - `What to find` tab: panel `What to look for` with the note `Chet always checks the usual
   places and measures your folders.`, then the six optional checks as switches. Panel `Speed`
@@ -237,9 +238,10 @@ Panels are the app's only raised surface: radius 8, `paperRaised`, hairline bord
 other page stays flat, so Settings cannot be mistaken for a second Home.
 
 Inside a pane the row shape repeats, because a preference list is scanned, not read. One grid
-owns that shape: a 200 pt control column on the right, a 40 pt minimum row height, 8 pt of
-vertical padding per row, and a 4 pt gap between a label and its detail. Rows never set their
-own padding, so a pane cannot drift into an uneven rhythm.
+owns that shape: a 40 pt minimum row height, 8 pt of vertical padding per row, a 4 pt gap
+between a label and its detail, and a control column sized by the widest control in the panel.
+A rule between rows, and any note, spans both columns. Rows never set their own padding, so a
+pane cannot drift into an uneven rhythm.
 
 ### Permission page
 
@@ -287,9 +289,10 @@ Rules:
 - `PermissionPage`: plain page, one action.
 - `AboutInfoRow` and `AboutPathRow`: label, value or selectable path, optional
   status icon, detail, and secondary action.
+- `SettingsPaneSwitcher`: equal-width pane segments, icon over word, one selected state.
 - `SettingsPanel`, `SettingsRow`, `SettingsActionRow`, `SettingsNote`,
-  `SettingsDivider`: the settings pattern. `SettingsGrid` owns the control
-  column width, the row height, and the row padding. No pane styles a row.
+  `SettingsDivider`: the settings pattern. `SettingsGrid` owns the row height and the row
+  padding, and each panel's `Grid` sizes the control column. No pane styles a row.
 
 Detailed anatomy and states are in [design/components.md](design/components.md).
 

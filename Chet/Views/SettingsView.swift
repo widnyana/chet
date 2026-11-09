@@ -2,52 +2,34 @@ import AppKit
 import ChetCore
 import SwiftUI
 
-/// SwiftUI's `Settings` scene puts the pane buttons in the window toolbar and repeats the
-/// active pane name in the title bar. The toolbar already names the pane, so the title text
-/// is hidden; the window keeps its title for accessibility and the Window menu.
-struct SettingsWindowChrome: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        DispatchQueue.main.async {
-            view.window?.titleVisibility = .hidden
-        }
-        return view
-    }
-
-    func updateNSView(_ view: NSView, context: Context) {
-        DispatchQueue.main.async {
-            view.window?.titleVisibility = .hidden
-        }
-    }
-}
-
 /// Settings page (Cmd+,). Three panes, the macOS preference arrangement: a toolbar pane
 /// switcher, then grouped panels with the label on the left and its control on the right.
 /// The words are for someone who has never opened a terminal. Every value applies to the
-/// next scan.
+/// next scan. The parts live in `SettingsComponents.swift`; this file only composes them.
 struct SettingsView: View {
     @Environment(ScanModel.self) private var model
+    @State private var pane: SettingsPane = .whatToFind
 
     private let optionalSteps: [ScanStep] = [.largeFiles, .duplicates, .leftovers, .photos, .videos, .snapshots]
 
     var body: some View {
         VStack(spacing: 0) {
             if DryRun.enabled {
-                StatusLabel(
+                StatusStrip(
                     text: "Preview only. Nothing will be removed.",
                     systemImage: "eye.slash",
                     tone: .amber)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, Metrics.pageMargin)
-                    .padding(.vertical, Spacing.s2)
-                    .background(Theme.paperRaised)
             }
-            TabView {
-                scanPane.tabItem { Label("What to find", systemImage: "magnifyingglass") }
-                sizesPane.tabItem { Label("Limits", systemImage: "ruler") }
-                foldersPane.tabItem { Label("Folders", systemImage: "folder") }
+            SettingsPaneSwitcher(selection: $pane)
+            Hairline()
+            Group {
+                switch pane {
+                case .whatToFind: scanPane
+                case .limits: sizesPane
+                case .folders: foldersPane
+                }
             }
-            .accessibilityIdentifier("settings.tabs")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Theme.paper)
         .tint(Theme.accent)
@@ -55,36 +37,21 @@ struct SettingsView: View {
         .background(SettingsWindowChrome())
     }
 
-    private func pane<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Spacing.s4) {
-                Text("Changes apply to the next scan.")
-                    .font(Typography.caption)
-                    .foregroundStyle(Theme.inkSecondary)
-                content()
-            }
-            .padding(Spacing.s4)
-        }
-    }
-
     // MARK: - Scan
 
     private var scanPane: some View {
-        pane {
+        SettingsPaneView {
             SettingsPanel(title: "What to look for") {
                 SettingsNote("Chet always checks the usual places and measures your folders.")
                 ForEach(optionalSteps, id: \.rawValue) { step in
                     let copy = optionalCopy(step)
                     SettingsDivider()
-                    SettingsRow(label: copy.title, detail: copy.detail) {
-                        Toggle("", isOn: Binding(
+                    SettingsToggleRow(
+                        label: copy.title,
+                        detail: copy.detail,
+                        isOn: Binding(
                             get: { model.isStepEnabled(step) },
                             set: { model.setStep(step, enabled: $0) }))
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                        .controlSize(.small)
-                        .accessibilityLabel(copy.title)
-                    }
                 }
             }
             SettingsPanel(title: "Speed") {
@@ -120,37 +87,32 @@ struct SettingsView: View {
     }
 
     // MARK: - Sizes
+
     private var sizesPane: some View {
-        pane {
+        SettingsPaneView {
             SettingsPanel(title: "Duplicate files") {
                 SettingsNote("Copies smaller than this are left alone.")
                 SettingsDivider()
-                sliderRow(
-                    title: "Smallest file to compare", value: "\(model.duplicateMinSizeMB) MB",
-                    binding: Binding(
+                SettingsSliderRow(
+                    label: "Smallest file to compare", readout: "\(model.duplicateMinSizeMB) MB",
+                    value: Binding(
                         get: { Double(model.duplicateMinSizeMB) },
                         set: { model.duplicateMinSizeMB = Int($0) }),
                     range: 1...100, step: 1)
                 SettingsDivider()
-                SettingsRow(
+                SettingsToggleRow(
                     label: "Look inside temporary app files",
-                    detail: "Apps rebuild them when they need them."
-                ) {
-                    Toggle("", isOn: Binding(
+                    detail: "Apps rebuild them when they need them.",
+                    isOn: Binding(
                         get: { model.includeTempInDuplicates },
                         set: { model.includeTempInDuplicates = $0 }))
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .accessibilityLabel("Look inside temporary app files")
-                }
             }
             SettingsPanel(title: "Large files") {
                 SettingsNote("Files this large are listed even if you used them today.")
                 SettingsDivider()
-                sliderRow(
-                    title: "Large file size", value: "\(model.largeFileMinSizeMB) MB",
-                    binding: Binding(
+                SettingsSliderRow(
+                    label: "Large file size", readout: "\(model.largeFileMinSizeMB) MB",
+                    value: Binding(
                         get: { Double(model.largeFileMinSizeMB) },
                         set: { model.largeFileMinSizeMB = Int($0) }),
                     range: 50...2000, step: 50)
@@ -158,9 +120,9 @@ struct SettingsView: View {
             SettingsPanel(title: "Old files") {
                 SettingsNote("Large files you have not used for this long are listed.")
                 SettingsDivider()
-                sliderRow(
-                    title: "Unchanged for", value: "\(model.largeFileOldAgeDays) days",
-                    binding: Binding(
+                SettingsSliderRow(
+                    label: "Unchanged for", readout: "\(model.largeFileOldAgeDays) days",
+                    value: Binding(
                         get: { Double(model.largeFileOldAgeDays) },
                         set: { model.largeFileOldAgeDays = Int($0) }),
                     range: 30...730, step: 30)
@@ -168,30 +130,10 @@ struct SettingsView: View {
         }
     }
 
-    private func sliderRow(
-        title: String, value: String, binding: Binding<Double>, range: ClosedRange<Double>,
-        step: Double
-    ) -> some View {
-        SettingsRow(label: title) {
-            HStack(spacing: Spacing.s2) {
-                Slider(value: binding, in: range, step: step)
-                    .frame(maxWidth: .infinity)
-                    .controlSize(.small)
-                    .accessibilityLabel(title)
-                    .accessibilityValue(value)
-                Text(value)
-                    .font(Typography.row)
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.inkSecondary)
-                    .frame(width: 64, alignment: .trailing)
-            }
-        }
-    }
-
     // MARK: - Folders
 
     private var foldersPane: some View {
-        pane {
+        SettingsPaneView {
             SettingsPanel(title: "Folders Chet should not touch") {
                 SettingsNote("Chet never looks inside these and never removes them.")
                 if model.excludedPaths.isEmpty {
@@ -248,18 +190,12 @@ struct SettingsView: View {
                 }
             }
             SettingsPanel(title: "Other disks") {
-                SettingsRow(
+                SettingsToggleRow(
                     label: "Also look on other disks",
-                    detail: "For files kept on an external disk."
-                ) {
-                    Toggle("", isOn: Binding(
+                    detail: "For files kept on an external disk.",
+                    isOn: Binding(
                         get: { model.scanOutsideHome },
                         set: { model.scanOutsideHome = $0 }))
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .accessibilityLabel("Also look on other disks")
-                }
             }
         }
     }
@@ -319,111 +255,5 @@ struct SettingsView: View {
             if !names.contains(name) { names.append(name) }
         }
         model.addUserRule(path: userRule.path, keepNames: names)
-    }
-}
-
-// MARK: - Panel parts
-
-/// A raised settings group: a small title over rows on `paperRaised`, one radius step up
-/// from the page. Settings is the app's only raised surface; every other page stays flat.
-private struct SettingsPanel<Content: View>: View {
-    let title: String
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(title)
-                .font(Typography.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(Theme.inkSecondary)
-                .padding(.horizontal, Spacing.s3)
-                .padding(.top, Spacing.s3)
-                .padding(.bottom, SettingsGrid.rowPadding)
-            content
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.bottom, Spacing.s2)
-        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Theme.paperRaised))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(Theme.hairline))
-    }
-}
-
-/// The row grid every panel uses: one control column on the right, one row height. Nothing
-/// in the page sets its own width or height; if a control needs a size, it fills this column.
-private enum SettingsGrid {
-    static let control: CGFloat = 200
-    static let row = Metrics.rowHeight
-    static let rowPadding = Spacing.s2
-}
-
-/// One setting: label and optional detail on the left, the control in the shared column on
-/// the right. Center alignment, because a 24 point field has no text baseline to match.
-private struct SettingsRow<Control: View>: View {
-    let label: String
-    var detail: String?
-    @ViewBuilder var control: Control
-
-    var body: some View {
-        HStack(alignment: .center, spacing: Spacing.s3) {
-            VStack(alignment: .leading, spacing: Spacing.s1) {
-                Text(label)
-                    .font(Typography.body)
-                    .foregroundStyle(Theme.ink)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                if let detail {
-                    Text(detail)
-                        .font(Typography.caption)
-                        .foregroundStyle(Theme.inkSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            Spacer(minLength: Spacing.s3)
-            control
-                .frame(width: SettingsGrid.control, alignment: .trailing)
-        }
-        .padding(.vertical, SettingsGrid.rowPadding)
-        .padding(.horizontal, Spacing.s3)
-        .frame(minHeight: SettingsGrid.row)
-    }
-}
-
-/// The row used for a panel's own action, aligned to the same control column as a setting.
-private struct SettingsActionRow<Content: View>: View {
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        HStack(spacing: Spacing.s2) {
-            Spacer(minLength: 0)
-            content
-                .frame(width: SettingsGrid.control, alignment: .trailing)
-        }
-        .padding(.vertical, SettingsGrid.rowPadding)
-        .padding(.horizontal, Spacing.s3)
-        .frame(minHeight: SettingsGrid.row)
-    }
-}
-
-private struct SettingsNote: View {
-    let text: String
-    init(_ text: String) { self.text = text }
-
-    var body: some View {
-        Text(text)
-            .font(Typography.caption)
-            .foregroundStyle(Theme.inkSecondary)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Spacing.s3)
-            .padding(.vertical, SettingsGrid.rowPadding)
-    }
-}
-
-private struct SettingsDivider: View {
-    var body: some View {
-        Hairline()
-            .padding(.horizontal, Spacing.s3)
     }
 }
