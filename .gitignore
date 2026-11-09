@@ -37,6 +37,7 @@
 !docs/images/**
 !docs/USER-GUIDE.md
 !docs/findings.md
+!docs/perf-findings.md
 !docs/design/
 !docs/design/**
 !scripts/axdrv.swift
