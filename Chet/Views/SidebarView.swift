@@ -35,6 +35,7 @@ struct SidebarView: View {
             Section("Tools") {
                 row("applications", "Apps", symbol: "app.dashed", emphasis: true)
                 row("disk-map", "Storage", symbol: "internaldrive", emphasis: true)
+                row("homebrew", "Homebrew", symbol: "shippingbox", emphasis: true)
             }
         }
         .navigationSplitViewColumnWidth(min: 220, ideal: 250)

@@ -6,6 +6,7 @@ struct ContentView: View {
     @Environment(ScanModel.self) private var model
     @Environment(TweaksModel.self) private var tweaks
     @State private var appCleaner = AppCleanerModel()
+    @State private var homebrew = HomebrewModel()
     @State private var selection: String? = "overview"
     @State private var confirming = false
     @State private var systemStatus = SystemStatusModel()
@@ -31,7 +32,9 @@ struct ContentView: View {
                         }
                         .background(Theme.paper)
                         .toolbar {
-                            if selection != "applications" && selection != "tweaks" {
+                            if selection != "applications" && selection != "tweaks"
+                                && selection != "homebrew"
+                            {
                                 scanButton
                             }
                         }
@@ -39,6 +42,7 @@ struct ContentView: View {
             }
         }
         .environment(appCleaner)
+        .environment(homebrew)
         .environment(systemStatus)
         .tint(Theme.accent)
         .sheet(isPresented: $confirming) {
@@ -68,6 +72,8 @@ struct ContentView: View {
                 model.beginClean(nil)
                 confirming = true
             })
+        } else if selection == "homebrew" {
+            HomebrewView()
         } else if let id = selection, let category = model.categories.first(where: { $0.id == id }) {
             CategoryDetailView(category: category, onClean: { confirming = true })
         } else {
