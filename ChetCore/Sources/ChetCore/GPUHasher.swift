@@ -24,10 +24,14 @@ public struct GPUHasher: Sendable {
         let out: MTLBuffer
         let chunkBytes: Int
         let blocksPerChunk: Int
+        /// Held for a whole digest: concurrent digests share these buffers.
+        let busy = NSLock()
 
         init(context: GPUContext, chunkBytes: Int) throws {
             let blocksPerChunk = chunkBytes / GPUHasher.blockSize
+            // The kernel takes the byte count as UInt32.
             guard chunkBytes >= GPUHasher.blockSize, chunkBytes % GPUHasher.blockSize == 0,
+                chunkBytes <= Int(UInt32.max),
                 let input = context.device.makeBuffer(length: chunkBytes + 8, options: .storageModeShared),
                 let out = context.device.makeBuffer(length: blocksPerChunk * 16, options: .storageModeShared)
             else { throw GPUError.commandFailed("hash buffers") }
@@ -75,6 +79,9 @@ public struct GPUHasher: Sendable {
         let handle = try FileHandle.uncached(url)
         defer { try? handle.close() }
         let scratch = try store.get(context, chunkBytes: chunkBytes)
+        scratch.busy.lock()
+        defer { scratch.busy.unlock() }
+        let chunkBytes = scratch.chunkBytes
         let blocksPerChunk = scratch.blocksPerChunk
         var blocks: [(UInt64, UInt64)] = []
         var total: UInt64 = 0

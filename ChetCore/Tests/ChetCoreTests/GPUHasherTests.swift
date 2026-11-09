@@ -52,6 +52,39 @@ struct GPUHasherTests {
         #expect(gpu.scratchIdentity != first)
     }
 
+    @Test func concurrentDigestsShareScratchSafely() throws {
+        let dir = try TempDir()
+        var expected: [String] = []
+        var urls: [URL] = []
+        for seed in 1...2 {
+            let data = noise(3_000_000, seed: UInt64(seed))
+            let url = dir.url.appendingPathComponent("f\(seed)")
+            try data.write(to: url)
+            urls.append(url)
+            expected.append(GPUHasher.cpuDigest(data))
+        }
+        let gpu = GPUHasher(context: try GPUContext())
+        let urls = urls
+        nonisolated(unsafe) var results = [String?](repeating: nil, count: 8)
+        let lock = NSLock()
+        DispatchQueue.concurrentPerform(iterations: 8) { i in
+            let digest = try? gpu.digest(urls[i % 2])
+            lock.lock()
+            results[i] = digest
+            lock.unlock()
+        }
+        for (i, digest) in results.enumerated() { #expect(digest == expected[i % 2]) }
+    }
+
+    @Test func chunkAboveUInt32IsRejected() throws {
+        let dir = try TempDir()
+        let url = dir.url.appendingPathComponent("f")
+        try noise(10, seed: 3).write(to: url)
+        var gpu = GPUHasher(context: try GPUContext())
+        gpu.chunkBytes = (1 << 32) + 65_536
+        #expect(throws: GPUError.self) { try gpu.digest(url) }
+    }
+
     @Test func swappingBlocksChangesDigest() {
         let first = noise(65_536, seed: 1)
         let second = noise(65_536, seed: 2)
