@@ -65,6 +65,8 @@ public final class ScanSession: Sendable {
     public let allowOutsideHome: Bool
     /// Settings list: folders never scanned and never cleaned.
     public let excludedPaths: [String]
+    /// Rules the user added in Settings, appended to `Rule.catalog` for the rules step.
+    public let extraRules: [Rule]
     /// Settings opt-out: steps the user turned off. `.rules` and `.index` always run, because
     /// the index feeds the disk map and the candidate list every optional step reads.
     public let enabledSteps: Set<ScanStep>
@@ -81,7 +83,7 @@ public final class ScanSession: Sendable {
     public init(
         home: URL = FileManager.default.homeDirectoryForCurrentUser, largeFileMinSize: Int64 = 500_000_000,
         gate: ScanPauseGate? = nil, scope: DuplicateScope = .standard, scanThreads: Int = 0,
-        allowOutsideHome: Bool = false, excludedPaths: [String] = [],
+        allowOutsideHome: Bool = false, excludedPaths: [String] = [], extraRules: [Rule] = [],
         enabledSteps: Set<ScanStep> = Set(ScanStep.allCases), duplicateMinSize: Int64 = 1_000_000,
         largeFileOldAge: TimeInterval = 365 * 86_400
     ) {
@@ -92,6 +94,7 @@ public final class ScanSession: Sendable {
         self.scanThreads = scanThreads
         self.allowOutsideHome = allowOutsideHome
         self.excludedPaths = excludedPaths
+        self.extraRules = extraRules
         self.enabledSteps = enabledSteps
         self.duplicateMinSize = duplicateMinSize
         self.largeFileOldAge = largeFileOldAge
@@ -124,7 +127,8 @@ public final class ScanSession: Sendable {
 
         emit(.started(.rules))
         let scanner = RuleScanner(
-            home: home, allowOutsideHome: allowOutsideHome, excludedPaths: excludedPaths)
+            home: home, rules: Rule.catalog + extraRules, allowOutsideHome: allowOutsideHome,
+            excludedPaths: excludedPaths)
         let ruleTotal = scanner.rules.count
         emit(.stepActivity(.rules, done: 0, total: ruleTotal, label: "starting"))
         var rulesDone = 0

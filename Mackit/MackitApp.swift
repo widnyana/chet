@@ -99,6 +99,7 @@ struct MackitApp: App {
             SettingsView()
                 .environment(model)
         }
+        .windowResizability(.contentSize)
         .commands { AboutCommand() }
     }
 }

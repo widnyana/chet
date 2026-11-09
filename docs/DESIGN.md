@@ -210,25 +210,25 @@ macOS reports the size only when the snapshot is deleted.
 
 ### Settings
 
-A board for the next scan, not a list of preferences. Every switch sits next to what
-that step found last time, so a step is never just a name.
+A settings page, not a report. Each section changes one thing the next scan does. Scan
+results are not repeated here; the Overview already reports them.
 
-- Header: `Settings`, one line on what changes and when, then one caption line of real
-  state: steps on, and the last scan time, `no scan yet`, or `scanning now`.
-- Steps ledger: column captions `Step`, `Found`, `On`. The always-on base (`Rules and
-  folder index`) is a locked row with a lock label, never a dead switch. Optional rows
-  carry their switch and the last scan's result (`12 files`, `3 groups`). A step switched
-  off reads `off`. Before any scan the column says `not run`, never a zero standing in for
-  a value.
-- Limits: three sliders with tabular readouts.
-- Keep out: the outside-home switch with its consequence, the excluded folders list with a
-  text `Remove`, an empty state that names the next action, and inline correction for a
-  relative path.
-- Footer: the thread picker with the Auto line, without a section header, so the page does
-  not repeat one section shape five times.
-- A set `DRY_RUN` shows one amber status label under the header.
+- Header: `Settings`, subtitle `Applies to the next scan.`
+- What to scan: the six optional steps as plain switches under one caption,
+  `Rules and folder index always run.`
+- Sizes and ages: sliders `Duplicate size`, `Large file size`, `Old file age`, plus the
+  duplicate scope switch `Search caches and build folders`. Labels are nouns; no `at least`
+  and no threshold arithmetic in prose.
+- Excluded folders: the list with a text `Remove`, the empty state `No folders are excluded.`,
+  and `Choose Folder…`, which opens the native folder picker. Paths are never typed.
+- Your rules: folders the user adds with `Add Rule…`. Each picked folder becomes one rule
+  whose direct children a scan may reclaim, shown in the sidebar as `Your folders`, risk
+  Review, mode Trash. The list removes a rule with a text `Remove`.
+- Outside your home folder: one switch with its consequence.
+- Footer: `Threads`, a segmented picker, caption `Auto uses one thread per core.`
 
-Radius stays 0, hairlines separate rows, no cards, and the accent tints controls only.
+A set `DRY_RUN` shows one amber status label under the header. Radius 0, hairlines under
+section headers, no cards, and the accent tints controls only.
 
 ### Permission page
 

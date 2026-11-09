@@ -34,7 +34,13 @@ public struct SafetyPolicy: Sendable {
         excludedPaths: [String] = []
     ) {
         self.home = home.resolvingSymlinksInPath().path
-        self.externalRoots = externalRoots
+        // A root arrives in whichever spelling its caller used: realpath(3) and the folder walk
+        // yield `/private/var/...`, while `resolvingSymlinksInPath` (the spelling `isDeletable`
+        // builds) yields `/var/...`. Keep both so a root matches the path it will be compared to.
+        self.externalRoots = externalRoots.reduce(into: Set<String>()) { roots, root in
+            roots.insert(root)
+            roots.insert(URL(fileURLWithPath: root).resolvingSymlinksInPath().path)
+        }
         self.allowsOutsideHome = allowsOutsideHome
         self.excludedPaths = Self.normalize(excludedPaths, home: home)
         self.realHome =

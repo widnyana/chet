@@ -26,6 +26,7 @@ struct CategoryStyle {
         "large-files": "externaldrive",
         "leftovers": "puzzlepiece.extension",
         "dev-garbage": "wrench.and.screwdriver",
+        "user-rules": "folder",
         "similar-photos": "photo.on.rectangle",
         "blurry-photos": "camera.metering.unknown",
         "similar-videos": "film.stack",

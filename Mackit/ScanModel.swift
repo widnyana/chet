@@ -89,6 +89,16 @@ final class ScanModel {
         }
     }
     nonisolated static let excludedKey = "excludedPaths"
+    /// Settings list: folders the user added as rules. Stored as JSON in `userRulesKey`.
+    var userRules = (try? JSONDecoder().decode(
+        [UserRule].self, from: UserDefaults.standard.data(forKey: ScanModel.userRulesKey) ?? Data())) ?? []
+    {
+        didSet {
+            guard oldValue != userRules else { return }
+            UserDefaults.standard.set(try? JSONEncoder().encode(userRules), forKey: ScanModel.userRulesKey)
+        }
+    }
+    nonisolated static let userRulesKey = "userRules"
     /// Steps the user turned off in Settings. Raw values, so a step added later defaults on.
     var disabledSteps = Set(UserDefaults.standard.stringArray(forKey: ScanModel.disabledStepsKey) ?? []) {
         didSet {
@@ -180,7 +190,7 @@ final class ScanModel {
         "leftovers": "App leftovers", "similar-photos": "Similar photos", "blurry-photos": "Blurry photos",
         "similar-videos": "Similar videos", "tagged-caches": "Tagged cache folders",
         "snapshots": "Time Machine local snapshots", "dev-garbage": "Project build dirs",
-        "nix": "Nix",
+        "nix": "Nix", "user-rules": "Your folders",
     ]
 
     /// Selected items, each URL once (a file can show up in more than one category).
@@ -253,6 +263,7 @@ final class ScanModel {
             largeFileMinSize: Int64(largeFileMinSizeMB) * 1_000_000,
             gate: gate, scope: includeTempInDuplicates ? .everything : .standard, scanThreads: scanThreads,
             allowOutsideHome: scanOutsideHome, excludedPaths: excludedPaths,
+            extraRules: userRules.map(\.rule),
             enabledSteps: enabledScanSteps, duplicateMinSize: Int64(duplicateMinSizeMB) * 1_000_000,
             largeFileOldAge: TimeInterval(largeFileOldAgeDays) * 86_400)
         progress = session.progress
@@ -563,6 +574,16 @@ final class ScanModel {
 
     func removeExcludedPath(_ path: String) {
         excludedPaths.removeAll { $0 == path }
+    }
+
+    func addUserRule(path: String) {
+        let normalized = URL(fileURLWithPath: path).standardizedFileURL.path
+        guard !userRules.contains(where: { $0.path == normalized }) else { return }
+        userRules.append(UserRule(path: normalized))
+    }
+
+    func removeUserRule(_ id: String) {
+        userRules.removeAll { $0.id == id }
     }
 
     /// `~/x` becomes `<home>/x`, `/x` stays absolute. Relative text is rejected: it would

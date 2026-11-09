@@ -181,28 +181,23 @@ the ink that contrasts with the block. The map does not encode categories.
 
 ## Settings
 
-Job: answer "what will the next scan do, and what did each step find last time?".
-One fixed 600 x 680 window, scrolling, titled `Settings`.
+Job: answer "what will the next scan do?". One fixed 500 x 600 window, scrolling, titled
+`Settings`.
 
 Top to bottom:
 
-1. `PageHeader`: `Settings`, `What the next scan looks at. Nothing here changes a scan
-   already running.` Under it one caption line of real state:
-   `6 of 6 steps on · last scan 9 Nov 2026, 01:14`, `· no scan yet`, or `· scanning now`.
-2. `Steps`: a ledger with column captions `Step`, `Found`, `On`. The first row is locked
-   (`Rules and folder index`, `Always on` with a lock). Each optional step is a row with its
-   switch and what it found last scan (`12 files`, `3 groups`, `0 snapshots`). A step that is
-   switched off reads `off`. Before any scan the column reads `not run`, never `0`; while a
-   scan runs it reads `running`.
-3. `Limits`: three sliders with tabular readouts: duplicate floor, large-file size, old age.
-4. `Keep out`: the outside-home switch, the excluded folders list with a text `Remove`, an
-   empty state that names the next action, an add field, and inline correction for a relative
-   path.
-5. Footer: one row for `Folder walk threads` with the segmented picker and the Auto line.
+1. `PageHeader`: `Settings`, `Applies to the next scan.`
+2. `What to scan`: caption `Rules and folder index always run.`, then the six step switches.
+3. `Sizes and ages`: sliders `Duplicate size`, `Large file size`, `Old file age`, then the
+   switch `Search caches and build folders`.
+4. `Excluded folders`: rows with a text `Remove`, empty state `No folders are excluded.`,
+   and `Choose Folder…` opening the native picker.
+5. `Your rules`: one row per added folder with a text `Remove`, empty state
+   `No rules of your own yet.`, and `Add Rule…` opening the native picker.
+6. `Outside your home folder`: one switch, `Read folders outside your home folder`.
+7. Footer: `Threads`, segmented picker, caption `Auto uses one thread per core.`
 
 A set `DRY_RUN` adds one amber status label under the header.
-
-No section boxes, no cards, radius 0, hairlines between rows. The accent tints controls only.
 
 ## About
 

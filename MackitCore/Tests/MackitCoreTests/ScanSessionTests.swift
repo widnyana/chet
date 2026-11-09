@@ -155,6 +155,18 @@ struct ScanSessionTests {
         #expect(Set(started).contains(.rules))
     }
 
+    @Test func extraRuleProducesItsCategory() async throws {
+        let dir = try TempDir()
+        try dir.file("Downloads/old/a.bin", bytes: 1_000_000)
+        let rule = UserRule(path: dir.url.appendingPathComponent("Downloads/old").path).rule
+        var seen: [String: Int] = [:]
+        for await event in ScanSession(home: dir.url, extraRules: [rule]).events() {
+            if case .rules(let result) = event { seen[result.category, default: 0] += result.items.count }
+            if case .done = event { break }
+        }
+        #expect(seen["user-rules"] == 1)
+    }
+
     @Test func leavingTheStreamStopsTheScanAndRestoresIOPolicy() async throws {
         let dir = try TempDir()
         for i in 0..<200 { try dir.file("Documents/f\(i)", bytes: 10) }
