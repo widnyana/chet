@@ -31,7 +31,7 @@ Access and restart. A rebuild also changes the code signature, so a fresh build 
 the gate again.
 
 Status strip precedence: `DryRun.enabled` wins over the access banner. With `DRY_RUN=1` in
-`.env`, Home shows `Preview only. No files will be moved.` and never `Limited access`.
+`.env`, Home shows `Preview only. Nothing will be removed.` and never `Limited access`.
 Remove the flag to see the access banner.
 
 ## Buttons
@@ -44,6 +44,31 @@ used; a hand-styled toolbar button is how the scan control became an unlabeled g
 
 Native styles stay for things that are not buttons: menu items, file pickers, the layout
 picker, and the text link on the permission screen.
+
+## Reuse the components
+
+A screen composes shared components. It does not rebuild a pattern, and it does not set
+spacing on a call site.
+
+- One component per pattern. Settings uses `SettingsPanel`, `SettingsRow`,
+  `SettingsActionRow`, `SettingsNote`, and `SettingsDivider`; nothing else draws a settings
+  row.
+- Geometry lives in the component. `SettingsGrid` owns the control column width, the row
+  height, and the row padding. A pane adds rows, never its own `padding` or `frame` around
+  them, because that is how two rows end up with different rhythm.
+- A variant is a parameter, not a copy. `SettingsRow` takes an optional `detail`; it does not
+  need a second row type for rows with a subtitle.
+- Tokens only. Sizes come from `Spacing`, `Metrics`, and `Typography`. A literal number next
+  to a view is a design change that skipped the token table.
+- Copy has one source. Category names come from `CategoryCopy`, step names from
+  `ScanStepCopy`, app parts and skip reasons from `AppCopy`. Do not retype a category name in
+  a view or in a settings table.
+- When a pattern appears a third time, extract it into `DesignSystem.swift` (generic UI) or
+  the feature's own parts block (single-screen parts). Do not copy the third one.
+
+To change how settings look, change `SettingsGrid` or the row components once. To change a
+category name, change `CategoryCopy` once. If a change needs edits in more than one place,
+the pattern is not yet shared.
 
 ## Drive it by selector
 

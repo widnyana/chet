@@ -107,14 +107,15 @@ struct SettingsView: View {
     }
 
     private func optionalCopy(_ step: ScanStep) -> (title: String, detail: String) {
+        let title = ScanStepCopy.title(step)
         switch step {
-        case .largeFiles: ("Large files", "Files above the size limit, or older than the age limit.")
-        case .duplicates: ("Duplicate files", "Files with identical contents.")
-        case .leftovers: ("Files from removed apps", "Data left after an app was deleted.")
-        case .photos: ("Similar photos", "Copies and near-copies of the same photo.")
-        case .videos: ("Similar videos", "Re-encoded copies of the same video.")
-        case .snapshots: ("Time Machine snapshots", "Local copies Time Machine keeps on this disk.")
-        case .rules, .index: (ScanStepCopy.title(step), "")
+        case .largeFiles: return (title, "Files above the size limit, or older than the age limit.")
+        case .duplicates: return (title, "Files with identical contents.")
+        case .leftovers: return (title, "Data left after an app was deleted.")
+        case .photos: return (title, "Copies and near-copies of the same photo.")
+        case .videos: return (title, "Re-encoded copies of the same video.")
+        case .snapshots: return (title, "Local copies Time Machine keeps on this disk.")
+        case .rules, .index: return (title, "")
         }
     }
 
@@ -336,8 +337,8 @@ private struct SettingsPanel<Content: View>: View {
                 .fontWeight(.semibold)
                 .foregroundStyle(Theme.inkSecondary)
                 .padding(.horizontal, Spacing.s3)
-                .padding(.top, Spacing.s2)
-                .padding(.bottom, Spacing.s1)
+                .padding(.top, Spacing.s3)
+                .padding(.bottom, SettingsGrid.rowPadding)
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -353,7 +354,8 @@ private struct SettingsPanel<Content: View>: View {
 /// in the page sets its own width or height; if a control needs a size, it fills this column.
 private enum SettingsGrid {
     static let control: CGFloat = 200
-    static let row: CGFloat = 34
+    static let row = Metrics.rowHeight
+    static let rowPadding = Spacing.s2
 }
 
 /// One setting: label and optional detail on the left, the control in the shared column on
@@ -365,7 +367,7 @@ private struct SettingsRow<Control: View>: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: Spacing.s3) {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Spacing.s1) {
                 Text(label)
                     .font(Typography.body)
                     .foregroundStyle(Theme.ink)
@@ -375,14 +377,16 @@ private struct SettingsRow<Control: View>: View {
                     Text(detail)
                         .font(Typography.caption)
                         .foregroundStyle(Theme.inkSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             Spacer(minLength: Spacing.s3)
             control
                 .frame(width: SettingsGrid.control, alignment: .trailing)
         }
-        .frame(minHeight: SettingsGrid.row)
+        .padding(.vertical, SettingsGrid.rowPadding)
         .padding(.horizontal, Spacing.s3)
+        .frame(minHeight: SettingsGrid.row)
     }
 }
 
@@ -396,8 +400,9 @@ private struct SettingsActionRow<Content: View>: View {
             content
                 .frame(width: SettingsGrid.control, alignment: .trailing)
         }
-        .frame(minHeight: SettingsGrid.row)
+        .padding(.vertical, SettingsGrid.rowPadding)
         .padding(.horizontal, Spacing.s3)
+        .frame(minHeight: SettingsGrid.row)
     }
 }
 
@@ -409,10 +414,10 @@ private struct SettingsNote: View {
         Text(text)
             .font(Typography.caption)
             .foregroundStyle(Theme.inkSecondary)
+            .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, Spacing.s3)
-            .padding(.top, Spacing.s1)
-            .padding(.bottom, Spacing.s1)
+            .padding(.vertical, SettingsGrid.rowPadding)
     }
 }
 

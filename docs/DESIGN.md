@@ -127,9 +127,10 @@ Top to bottom:
 1. Page header: `Clean up your Mac`, a one-line subtitle, the amount that can be freed.
 2. Capacity bar: volume name, capacity, used, reclaimable, free, text legend.
 3. Scan state:
-   - never scanned: an empty state with `Scan this Mac`;
+   - never scanned: an empty state, `No scan yet`, with the next action;
    - scanning: the phase list and a linear progress;
-   - finished: `Reclaimable` and the category ledger.
+   - finished: the category ledger in two groups, `Safe to remove` and
+     `Check first`.
 4. Category ledger: monochrome symbol, name, item count, size. Largest first.
    Clicking a row opens the category.
 5. Command bar: Scan, Stop, or Clean selected.
@@ -219,21 +220,26 @@ word per pane, then grouped panels on `paperRaised` with the label on the left a
 on the right. The words are for someone who has never opened a terminal: no cache jargon, no
 "duplicate scope".
 
-- `Scan`: panel `What Chet looks for`, note `Two checks always run: Chet's own folder
-  list, and measuring your folders.`, then the six checks as switches. Panel `Speed` holds
-  `Threads` as a pop-up with the note `Auto uses one thread per core.`
-- `Sizes`: panel `Copies` with `Smallest copy` and the switch `Look inside temporary app
-  files`, panel `Big files` with `Big file size`, panel `Old files` with `Unchanged for`.
-  Every note states the effect in one line.
-- `Folders`: panel `Folders to skip` with `Skip a Folder…`, panel `Folders you add` with
-  `Add a Folder…` and a per-folder `Keep…` button that marks items the scan must never
-  remove (shown as `Keeping N items`), panel `Other drives`. Empty states
-  `No folders are skipped.` and `No folders added yet.`
-- A set `DRY_RUN` shows one amber label above the panes: `Preview only. Nothing is deleted.`
+- `What to find` tab: panel `What to look for` with the note `Chet always checks the usual
+  places and measures your folders.`, then the six optional checks as switches. Panel `Speed`
+  holds `Threads` as a pop-up with the note `Auto uses one thread per core.`
+- `Limits` tab: panel `Duplicate files` with `Smallest file to compare` and the switch
+  `Look inside temporary app files`, panel `Large files` with `Large file size`, panel
+  `Old files` with `Unchanged for`. Every note states the effect in one line.
+- `Folders` tab: panel `Folders Chet should not touch` with `Skip a Folder…`, panel
+  `Folders you want checked` with `Add a Folder…` and a per-folder `Keep…` button that marks
+  items the scan must never remove (shown as `Keeping N items`), panel `Other disks`. Empty
+  states `No folders are skipped.` and `No folders added yet.`
+- A set `DRY_RUN` shows one amber label above the panes: `Preview only. Nothing will be
+  removed.`
 
-Panels are the app's only raised surface: radius 10, `paperRaised`, hairline border. Every
-other page stays flat, so Settings cannot be mistaken for a second Home. Inside a pane the
-row shape repeats, because a preference list is scanned, not read.
+Panels are the app's only raised surface: radius 8, `paperRaised`, hairline border. Every
+other page stays flat, so Settings cannot be mistaken for a second Home.
+
+Inside a pane the row shape repeats, because a preference list is scanned, not read. One grid
+owns that shape: a 200 pt control column on the right, a 40 pt minimum row height, 8 pt of
+vertical padding per row, and a 4 pt gap between a label and its detail. Rows never set their
+own padding, so a pane cannot drift into an uneven rhythm.
 
 ### Permission page
 
@@ -281,15 +287,28 @@ Rules:
 - `PermissionPage`: plain page, one action.
 - `AboutInfoRow` and `AboutPathRow`: label, value or selectable path, optional
   status icon, detail, and secondary action.
+- `SettingsPanel`, `SettingsRow`, `SettingsActionRow`, `SettingsNote`,
+  `SettingsDivider`: the settings pattern. `SettingsGrid` owns the control
+  column width, the row height, and the row padding. No pane styles a row.
 
 Detailed anatomy and states are in [design/components.md](design/components.md).
+
+Components own their geometry. A screen composes them and passes content and
+variants; it does not wrap a row in its own padding to fix a look. A component
+that needs different spacing gets a token or a parameter, and the change lands
+for every use at once.
 
 ## Copy
 
 Verb first. Say what will happen. One sentence per idea. No em dash. No
 sparkle, magic, AI, seamless, powerful, or revolutionary. No invented numbers
-or claims. Empty and error states name the cause and the next action. Full copy
-is in [design/copy.md](design/copy.md).
+or claims. Empty and error states name the cause and the next action.
+
+Each noun has one source in code: `CategoryCopy` for category names and
+reasons, `ScanStepCopy` for scan steps, `AppCopy` for app parts, ownership, and
+skip reasons. A view shows those strings; it does not retype them.
+
+Full copy is in [design/copy.md](design/copy.md).
 
 ## Anti-slop commitments
 
@@ -307,13 +326,15 @@ is in [design/copy.md](design/copy.md).
 ## Rules of thumb
 
 1. Reuse a component. Do not restyle a row in place.
-2. A new color, radius, shadow, or motion needs a one-line reason and a token.
-3. Anything countable uses tabular digits and a stable column.
-4. State lives in the row it belongs to: text plus an icon, never a bare dot.
-5. The command bar is always full width and always at the bottom.
-6. The primary action is the only accent on the screen.
-7. If a screen needs two focal points, the screen is doing two jobs. Split it.
-8. The app icon is the only asset with a gradient.
+2. Geometry belongs to the component. Row height, padding, and column width
+   live in one grid, never at a call site.
+3. A new color, radius, shadow, or motion needs a one-line reason and a token.
+4. Anything countable uses tabular digits and a stable column.
+5. State lives in the row it belongs to: text plus an icon, never a bare dot.
+6. The command bar is always full width and always at the bottom.
+7. The primary action is the only accent on the screen.
+8. If a screen needs two focal points, the screen is doing two jobs. Split it.
+9. The app icon is the only asset with a gradient.
 
 ## Layout registry
 
