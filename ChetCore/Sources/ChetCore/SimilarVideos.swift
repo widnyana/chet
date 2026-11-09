@@ -59,7 +59,6 @@ public struct SimilarVideos: Sendable {
                     frameHashes: features.map(\.hash)))
         }
 
-        // ponytail: O(n^2) CPU pair check; videos are few. Move to a GPU kernel if libraries get huge.
         var parent = Array(videos.indices)
         func root(_ i: Int) -> Int {
             var i = i
@@ -69,8 +68,16 @@ public struct SimilarVideos: Sendable {
             }
             return i
         }
-        for i in videos.indices {
-            for j in (i + 1)..<videos.count where matches(videos[i], videos[j]) { parent[root(i)] = root(j) }
+        // `matches` needs durations within 2%, so sweep in duration order and stop each row early.
+        let byDuration = videos.indices.sorted { videos[$0].duration < videos[$1].duration }
+        for a in byDuration.indices {
+            let i = byDuration[a]
+            for b in (a + 1)..<byDuration.count {
+                let j = byDuration[b]
+                let longest = videos[j].duration
+                if longest > 0, (longest - videos[i].duration) / longest >= 0.02 { break }
+                if matches(videos[i], videos[j]) { parent[root(i)] = root(j) }
+            }
         }
         var members: [Int: [VideoInfo]] = [:]
         for index in videos.indices { members[root(index), default: []].append(videos[index]) }
