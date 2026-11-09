@@ -4,6 +4,9 @@ import SwiftUI
 
 struct SummaryView: View {
     @Environment(ScanModel.self) private var model
+    // The sheet is owned by ContentView, so clearing the report alone leaves it on screen
+    // showing the confirmation again. Done has to dismiss it.
+    @Environment(\.dismiss) private var dismiss
     let report: CleanReport
 
     private var problems: [CleanResult] {
@@ -84,7 +87,10 @@ struct SummaryView: View {
                 Button("Show activity log") { NSWorkspace.shared.open(AuditLog().url) }
                     .buttonStyle(.bordered)
                 Spacer()
-                Button("Done") { model.report = nil }
+                Button("Done") {
+                    model.report = nil
+                    dismiss()
+                }
                     .buttonStyle(.borderedProminent)
                     .tint(Theme.accent)
                     .controlSize(.large)

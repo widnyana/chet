@@ -16,7 +16,7 @@ struct SidebarView: View {
                         ProgressView().controlSize(.mini)
                         Text("Scanning").foregroundStyle(Theme.inkSecondary)
                     }
-                    .tag("scanning-placeholder")
+                    .selectionDisabled()
                 }
             }
             if !safeRows.isEmpty {
