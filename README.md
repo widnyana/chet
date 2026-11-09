@@ -137,6 +137,19 @@ move never hides the app itself. Everything goes to the Trash; nothing is delete
   category, path, bytes, mode, and result.
 - Every tweak write is read back and verified, then recorded in the tweak log.
 
+## Accessibility
+
+- Text meets WCAG AA contrast in both themes. The dimmest body and caption pairing is amber on
+  paper at 4.94:1. The third, dimmer text tier (3.15:1) is used only for disabled controls,
+  the loading ellipsis, non-text glyphs, and decorative separators.
+- Status is an icon plus words. Color never carries a state on its own.
+- Icon-only buttons take their name from the shared button components, where the label is a
+  required parameter. That label is what VoiceOver reads.
+- Confirmation and uninstall sheets close with Escape. Scan is Command-R, Settings is
+  Command-comma, and selection is Command-A, Command-Shift-A, and Command-Option-I.
+- The interface has no custom animation. The only motion is the system progress spinner while
+  a real scan or clean runs.
+
 ## Engines
 
 Chet removes things through three engines. They share filesystem primitives and nothing else:
