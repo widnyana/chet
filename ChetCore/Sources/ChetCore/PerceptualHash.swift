@@ -28,37 +28,61 @@ public enum PerceptualHash {
     /// Decodes an image file into a side x side RGBA bitmap (stretched). Also returns the original pixel count.
     /// Nil when the file is not a decodable image.
     public static func bitmap(_ url: URL) -> (rgba: [UInt8], pixels: Int)? {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-            let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
-            let width = properties[kCGImagePropertyPixelWidth] as? Int,
-            let height = properties[kCGImagePropertyPixelHeight] as? Int
-        else { return nil }
-        let options: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceThumbnailMaxPixelSize: side,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-        ]
-        guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary),
-            let rgba = bitmap(thumbnail)
-        else { return nil }
-        return (rgba, width * height)
+        var rgba = [UInt8](repeating: 0, count: side * side * 4)
+        let pixels = rgba.withUnsafeMutableBytes { buffer in
+            bitmap(url, into: buffer.baseAddress!)
+        }
+        guard let pixels else { return nil }
+        return (rgba, pixels)
     }
+
+    /// Decodes into caller memory of `side * side * 4` bytes and returns the original pixel count.
+    /// Callers hand this a Metal buffer, so a bitmap is never copied after decoding.
+    public static func bitmap(_ url: URL, into rgba: UnsafeMutableRawPointer) -> Int? {
+        // ImageIO keeps its decoded buffers and file data in the caller's autorelease pool. One
+        // pool per image releases them now instead of at the end of the whole photo step.
+        autoreleasepool {
+            let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+            guard let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions),
+                let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+                let width = properties[kCGImagePropertyPixelWidth] as? Int,
+                let height = properties[kCGImagePropertyPixelHeight] as? Int
+            else { return nil }
+            let options: [CFString: Any] = [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceThumbnailMaxPixelSize: side,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceShouldCacheImmediately: true,
+            ]
+            guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary),
+                bitmap(thumbnail, into: rgba)
+            else { return nil }
+            return width * height
+        }
+    }
+
+    /// sRGB once: a color space per image is a per-image allocation with no benefit.
+    private static let sRGB = CGColorSpace(name: CGColorSpace.sRGB)
 
     /// Draws an image into a side x side RGBA bitmap (stretched).
     public static func bitmap(_ image: CGImage) -> [UInt8]? {
-        guard let space = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
         var rgba = [UInt8](repeating: 0, count: side * side * 4)
-        let drawn = rgba.withUnsafeMutableBytes { buffer -> Bool in
-            guard
-                let context = CGContext(
-                    data: buffer.baseAddress, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4,
-                    space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
-            else { return false }
-            context.interpolationQuality = .high
-            context.draw(image, in: CGRect(x: 0, y: 0, width: side, height: side))
-            return true
+        let drawn = rgba.withUnsafeMutableBytes { buffer in
+            bitmap(image, into: buffer.baseAddress!)
         }
         return drawn ? rgba : nil
+    }
+
+    /// Draws an image into caller memory of `side * side * 4` bytes.
+    public static func bitmap(_ image: CGImage, into rgba: UnsafeMutableRawPointer) -> Bool {
+        guard let space = sRGB,
+            let context = CGContext(
+                data: rgba, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4,
+                space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return false }
+        context.interpolationQuality = .high
+        context.draw(image, in: CGRect(x: 0, y: 0, width: side, height: side))
+        return true
     }
 
     public static func cpu(_ rgba: [UInt8]) -> Features {
@@ -107,30 +131,67 @@ public enum PerceptualHash {
         return Features(hash: hash, lapSum: sum, lapSquares: squares)
     }
 
-    public static func gpu(_ batch: [[UInt8]], context: GPUContext) throws -> [Features] {
-        let count = batch.count
-        guard count > 0 else { return [] }
-        let imageBytes = side * side * 4
-        guard let input = context.device.makeBuffer(length: count * imageBytes, options: .storageModeShared),
-            let table = context.device.makeBuffer(
-                bytes: cosTable, length: cosTable.count * MemoryLayout<Int32>.stride, options: .storageModeShared),
-            let hashes = context.device.makeBuffer(length: count * 8, options: .storageModeShared),
-            let lap = context.device.makeBuffer(length: count * 16, options: .storageModeShared)
+    /// Metal buffers for one photo batch. Allocate once per scan: a fresh set per batch stays
+    /// in Metal's pool, so footprint grew with the number of images hashed.
+    public struct BatchBuffers: @unchecked Sendable {
+        let input: MTLBuffer
+        let table: MTLBuffer
+        let hashes: MTLBuffer
+        let lap: MTLBuffer
+        let capacity: Int
+    }
+
+    public static func makeBatchBuffers(capacity: Int, context: GPUContext) throws -> BatchBuffers {
+        let tableBytes = cosTable.count * MemoryLayout<Int32>.stride
+        guard capacity > 0,
+            let table = context.device.makeBuffer(bytes: cosTable, length: tableBytes, options: .storageModeShared),
+            let input = context.device.makeBuffer(
+                length: capacity * side * side * 4, options: .storageModeShared),
+            let hashes = context.device.makeBuffer(length: capacity * 8, options: .storageModeShared),
+            let lap = context.device.makeBuffer(length: capacity * 16, options: .storageModeShared)
         else { throw GPUError.commandFailed("photo buffers") }
+        return BatchBuffers(input: input, table: table, hashes: hashes, lap: lap, capacity: capacity)
+    }
+
+    /// Threads per image in `photo_features`. Must match PHOTO_THREADS in Image.metal.
+    static let photoThreads = 256
+
+    public static func gpu(_ batch: [[UInt8]], context: GPUContext) throws -> [Features] {
+        try gpu(batch, buffers: makeBatchBuffers(capacity: batch.count, context: context), context: context)
+    }
+
+    /// Copies CPU bitmaps into the batch buffer, then hashes them. The scan skips the copy by
+    /// decoding straight into `buffers.input` and calling `features(count:buffers:context:)`.
+    public static func gpu(
+        _ batch: [[UInt8]], buffers: BatchBuffers, context: GPUContext
+    ) throws -> [Features] {
+        let imageBytes = side * side * 4
         for (index, rgba) in batch.enumerated() {
             rgba.withUnsafeBytes { bytes in
-                input.contents().advanced(by: index * imageBytes)
+                buffers.input.contents().advanced(by: index * imageBytes)
                     .copyMemory(from: bytes.baseAddress!, byteCount: imageBytes)
             }
         }
-        try context.run("photo_features", grid: MTLSize(width: count, height: 1, depth: 1)) { encoder in
-            encoder.setBuffer(input, offset: 0, index: 0)
-            encoder.setBuffer(table, offset: 0, index: 1)
-            encoder.setBuffer(hashes, offset: 0, index: 2)
-            encoder.setBuffer(lap, offset: 0, index: 3)
+        return try features(count: batch.count, buffers: buffers, context: context)
+    }
+
+    /// Hashes a batch whose bitmaps already sit in `buffers.input`, one threadgroup per image.
+    public static func features(
+        count: Int, buffers: BatchBuffers, context: GPUContext
+    ) throws -> [Features] {
+        guard count > 0 else { return [] }
+        precondition(count <= buffers.capacity, "photo batch over the buffer capacity")
+        try context.run(
+            "photo_features", threadgroups: MTLSize(width: count, height: 1, depth: 1),
+            threadsPerThreadgroup: MTLSize(width: photoThreads, height: 1, depth: 1)
+        ) { encoder in
+            encoder.setBuffer(buffers.input, offset: 0, index: 0)
+            encoder.setBuffer(buffers.table, offset: 0, index: 1)
+            encoder.setBuffer(buffers.hashes, offset: 0, index: 2)
+            encoder.setBuffer(buffers.lap, offset: 0, index: 3)
         }
-        let hashValues = hashes.contents().bindMemory(to: UInt64.self, capacity: count)
-        let lapValues = lap.contents().bindMemory(to: Int64.self, capacity: count * 2)
+        let hashValues = buffers.hashes.contents().bindMemory(to: UInt64.self, capacity: count)
+        let lapValues = buffers.lap.contents().bindMemory(to: Int64.self, capacity: count * 2)
         return (0..<count).map {
             Features(hash: hashValues[$0], lapSum: lapValues[$0 * 2], lapSquares: lapValues[$0 * 2 + 1])
         }

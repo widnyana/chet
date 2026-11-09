@@ -1,4 +1,5 @@
 import Foundation
+import Metal
 
 public struct PhotoInfo: Sendable {
     public let entry: WalkEntry
@@ -45,23 +46,94 @@ public struct SimilarPhotos: Sendable {
         return try scan(entries: entries)
     }
 
+    /// One decoded image ready for hashing.
+    private struct Decoded: Sendable {
+        let entry: WalkEntry
+        let pixels: Int
+    }
+
+    /// Decodes a batch on `workers` threads straight into the shared buffer, so the CPU never
+    /// copies a bitmap into Metal. Undecodable rows are dropped and the survivors compacted.
+    private func decode(
+        _ entries: [WalkEntry], _ start: Int, _ count: Int, into input: MTLBuffer,
+        _ imageBytes: Int, _ workers: Int
+    ) -> [Decoded] {
+        let base = input.contents()
+        var slots = [Decoded?](repeating: nil, count: count)
+        slots.withUnsafeMutableBufferPointer { buffer in
+            nonisolated(unsafe) let output = buffer.baseAddress
+            guard let output else { return }
+            let stride = min(workers, count)
+            DispatchQueue.concurrentPerform(iterations: stride) { worker in
+                var index = worker
+                while index < count {
+                    let entry = entries[start + index]
+                    if let pixels = PerceptualHash.bitmap(
+                        entry.url, into: base.advanced(by: index * imageBytes))
+                    {
+                        output[index] = Decoded(entry: entry, pixels: pixels)
+                    }
+                    index += stride
+                }
+            }
+        }
+        var compact: [Decoded] = []
+        compact.reserveCapacity(count)
+        for index in 0..<count {
+            guard let slot = slots[index] else { continue }
+            if compact.count != index {
+                memcpy(
+                    base.advanced(by: compact.count * imageBytes),
+                    base.advanced(by: index * imageBytes), imageBytes)
+            }
+            compact.append(slot)
+        }
+        return compact
+    }
+
     /// Finds similar and blurry photos among files that were already walked (non-images are ignored).
     public func scan(entries all: [WalkEntry]) throws -> PhotoScanResult {
         let entries = all.filter { Self.extensions.contains($0.url.pathExtension.lowercased()) }
         let gpu = useGPU ? GPUContext.shared : nil
+        // One buffer set for the whole scan; per-batch buffers stay in Metal's pool.
+        let buffers = gpu.flatMap { try? PerceptualHash.makeBatchBuffers(capacity: batchSize, context: $0) }
+        let workers = min(4, max(1, ProcessInfo.processInfo.activeProcessorCount))
+        let imageBytes = PerceptualHash.side * PerceptualHash.side * 4
         var photos: [PhotoInfo] = []
         for start in stride(from: 0, to: entries.count, by: batchSize) {
             try Task.checkCancellation()
-            // ponytail: decodes sequentially; use DispatchQueue.concurrentPerform if decoding dominates.
-            var decoded: [(WalkEntry, [UInt8], Int)] = []
-            for entry in entries[start..<min(start + batchSize, entries.count)] {
-                if let image = PerceptualHash.bitmap(entry.url) { decoded.append((entry, image.rgba, image.pixels)) }
+            let count = min(batchSize, entries.count - start)
+            let features: [PerceptualHash.Features]
+            if let gpu, let buffers {
+                // Decode on a few workers straight into the shared buffer, then hash the batch
+                // with one threadgroup per image. No CPU bitmap copy per image.
+                let decoded = decode(entries, start, count, into: buffers.input, imageBytes, workers)
+                if let computed = try? PerceptualHash.features(count: decoded.count, buffers: buffers, context: gpu) {
+                    features = computed
+                } else {
+                    let base = buffers.input.contents()
+                    features = (0..<decoded.count).map { index in
+                        PerceptualHash.cpu(
+                            Array(
+                                UnsafeRawBufferPointer(
+                                    start: base.advanced(by: index * imageBytes), count: imageBytes)))
+                    }
+                }
+                for (item, feature) in zip(decoded, features) {
+                    photos.append(PhotoInfo(entry: item.entry, pixels: item.pixels, features: feature))
+                }
+                continue
             }
-            let features =
-                try gpu.map { try PerceptualHash.gpu(decoded.map(\.1), context: $0) }
-                ?? decoded.map { PerceptualHash.cpu($0.1) }
-            for (item, feature) in zip(decoded, features) {
-                photos.append(PhotoInfo(entry: item.0, pixels: item.2, features: feature))
+            // No GPU: decode into arrays and hash on the CPU.
+            var rgba: [(Decoded, [UInt8])] = []
+            rgba.reserveCapacity(count)
+            for index in 0..<count {
+                guard let image = PerceptualHash.bitmap(entries[start + index].url) else { continue }
+                rgba.append((Decoded(entry: entries[start + index], pixels: image.pixels), image.rgba))
+            }
+            features = rgba.map { PerceptualHash.cpu($0.1) }
+            for (item, feature) in zip(rgba.map(\.0), features) {
+                photos.append(PhotoInfo(entry: item.entry, pixels: item.pixels, features: feature))
             }
         }
 

@@ -79,18 +79,38 @@ public final class GPUContext: @unchecked Sendable {
 
     /// Runs kernel `name` over `grid` threads and waits for it to finish.
     public func run(_ name: String, grid: MTLSize, encode: (MTLComputeCommandEncoder) -> Void) throws {
+        try submit(name, encode) { encoder, state in
+            let width = state.threadExecutionWidth
+            let group =
+                grid.height > 1
+                ? MTLSize(width: width, height: max(1, state.maxTotalThreadsPerThreadgroup / width), depth: 1)
+                : MTLSize(width: max(1, min(state.maxTotalThreadsPerThreadgroup, grid.width)), height: 1, depth: 1)
+            encoder.dispatchThreads(grid, threadsPerThreadgroup: group)
+        }
+    }
+
+    /// Runs kernel `name` over a count of threadgroups and waits. Use this when threads inside a
+    /// group cooperate through threadgroup memory: the grid is then groups, not threads.
+    public func run(
+        _ name: String, threadgroups: MTLSize, threadsPerThreadgroup: MTLSize,
+        encode: (MTLComputeCommandEncoder) -> Void
+    ) throws {
+        try submit(name, encode) { encoder, _ in
+            encoder.dispatchThreadgroups(threadgroups, threadsPerThreadgroup: threadsPerThreadgroup)
+        }
+    }
+
+    private func submit(
+        _ name: String, _ encode: (MTLComputeCommandEncoder) -> Void,
+        dispatch: (MTLComputeCommandEncoder, MTLComputePipelineState) -> Void
+    ) throws {
         let state = try pipeline(name)
         guard let buffer = queue.makeCommandBuffer(), let encoder = buffer.makeComputeCommandEncoder() else {
             throw GPUError.commandFailed(name)
         }
         encoder.setComputePipelineState(state)
         encode(encoder)
-        let width = state.threadExecutionWidth
-        let group =
-            grid.height > 1
-            ? MTLSize(width: width, height: max(1, state.maxTotalThreadsPerThreadgroup / width), depth: 1)
-            : MTLSize(width: max(1, min(state.maxTotalThreadsPerThreadgroup, grid.width)), height: 1, depth: 1)
-        encoder.dispatchThreads(grid, threadsPerThreadgroup: group)
+        dispatch(encoder, state)
         encoder.endEncoding()
         buffer.commit()
         buffer.waitUntilCompleted()

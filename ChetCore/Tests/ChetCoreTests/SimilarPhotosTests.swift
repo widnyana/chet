@@ -18,6 +18,22 @@ struct SimilarPhotosTests {
         #expect(fromGPU == bitmaps.map(PerceptualHash.cpu))
     }
 
+    @Test func reusedBatchBuffersMatchAFreshBatch() throws {
+        let gpu = try GPUContext()
+        let dir = try TempDir()
+        var bitmaps: [[UInt8]] = []
+        for seed in 1...5 {
+            let url = PhotoFixtures.write(
+                PhotoFixtures.blocks(seed: UInt64(seed)), to: dir.url.appendingPathComponent("\(seed).png"))
+            bitmaps.append(try #require(PerceptualHash.bitmap(url)).rgba)
+        }
+        let buffers = try PerceptualHash.makeBatchBuffers(capacity: 8, context: gpu)
+        #expect(try PerceptualHash.gpu(bitmaps, buffers: buffers, context: gpu) == bitmaps.map(PerceptualHash.cpu))
+        // A shorter second batch must not read rows left over from the first one.
+        let half = Array(bitmaps.prefix(2))
+        #expect(try PerceptualHash.gpu(half, buffers: buffers, context: gpu) == half.map(PerceptualHash.cpu))
+    }
+
     @Test func gpuPairsMatchCPUPairs() throws {
         let gpu = try GPUContext()
         var state: UInt64 = 42
