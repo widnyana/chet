@@ -35,7 +35,7 @@ struct AboutView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(Theme.paper)
-        .frame(width: 560, height: 680)
+        .frame(width: 560, height: 620)
         .task { await load() }
         .onChange(of: model.isCleaning) { _, cleaning in
             if !cleaning { refreshPaths() }
@@ -46,10 +46,6 @@ struct AboutView: View {
         VStack(alignment: .leading, spacing: Spacing.s8) {
             section("This build") {
                 AboutInfoRow(label: "Build", value: build.build ?? "Unknown")
-                Hairline()
-                AboutInfoRow(label: "Bundle ID", value: build.bundleID ?? "Unknown")
-                Hairline()
-                AboutInfoRow(label: "Architecture", value: build.architecture)
                 Hairline()
                 AboutInfoRow(label: "Minimum macOS", value: build.minimumOS ?? "Unknown")
             }

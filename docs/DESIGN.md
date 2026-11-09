@@ -237,14 +237,14 @@ spinner while checking. No glass card and no pulsing dot.
 
 ### About
 
-One fixed 560 x 680 window, opened from `Mackit > About Mackit`. It is a
+One fixed 560 x 620 window, opened from `Mackit > About Mackit`. It is a
 ledger of app facts, not a landing page and not a system report. The window
 title is `About Mackit`; the page header names the app.
 
 Top to bottom:
 
 1. Page header: app icon, `Mackit`, one sentence, the version.
-2. This build: build number, bundle ID, architecture, minimum macOS.
+2. This build: build number, minimum macOS.
 3. Status: Full Disk Access with `Open Settings` when denied, last scan.
 4. Logs: selectable audit log and logs folder paths with `Show` and `Open`.
 

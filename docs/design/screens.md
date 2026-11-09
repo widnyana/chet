@@ -209,14 +209,14 @@ No section boxes, no cards, radius 0, hairlines between rows. The accent tints c
 Job: answer "which build is running, whether access is granted, and where are
 the logs?".
 
-`Mackit > About Mackit` opens one fixed 560 x 680 window. It is independent of
+`Mackit > About Mackit` opens one fixed 560 x 620 window. It is independent of
 the main window and can stay open during a scan.
 
 Top to bottom:
 
 1. `PageHeader`: app icon, `Mackit`, the one-sentence product line, metric: the
    version.
-2. `This build`: build, bundle ID, architecture, minimum macOS.
+2. `This build`: build, minimum macOS.
 3. `Status`: Full Disk Access with `Granted` or the amber `Not granted` plus
    `Open Settings`; last scan with its byte total and date.
 4. `Logs`: audit log path with `Show` when it exists; logs folder with `Open`.
