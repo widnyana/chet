@@ -181,19 +181,16 @@ the ink that contrasts with the block. The map does not encode categories.
 
 ## Settings
 
-Job: answer "what will the next scan do?". One fixed 500 x 520 window with three toolbar
-tab panes: `Scan`, `Sizes`, `Folders`. The window title is the active pane name.
+Job: answer "what will the next scan do?" in words a non-technical person already uses.
+One fixed 520 x 500 window, toolbar panes with an icon and a word: `Scan`, `Sizes`, `Folders`.
+The pane name is not repeated in the title bar.
 
-1. `Scan`: caption `Rules and folder index always run.`, then the six step switches, then
-   `Speed` with the `Threads` pop-up and the caption `Auto uses one thread per core.`
-2. `Sizes`: sliders `Duplicate size`, `Large file size`, `Old file age`, then the switch
-   `Search caches and build folders`.
-3. `Folders`: `Excluded folders` rows with a text `Remove`, empty state
-   `No folders are excluded.`, and `Exclude Folder…`; `Your rules` with its effect caption,
-   one row per added folder with a text `Remove`, empty state `No folder rules yet.`, and
-   `Add Folder Rule…`; `Outside your home folder` with one switch.
+1. `Scan`: panel `What Mackit looks for` with the note and the six switches.
+2. `Sizes`: panels `Copies`, `Big files`, `Old files`; sliders with the value on the right.
+3. `Folders`: panels `Folders to skip`, `Folders you add`, `Other drives`; picker buttons sit
+   at the panel's bottom right.
 
-A set `DRY_RUN` adds one amber status label above the panes.
+A set `DRY_RUN` adds one amber label above the panes: `Preview only. Nothing is deleted.`
 
 ## About
 

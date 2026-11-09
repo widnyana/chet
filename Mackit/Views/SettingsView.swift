@@ -21,8 +21,10 @@ struct SettingsWindowChrome: NSViewRepresentable {
     }
 }
 
-/// Settings page (Cmd+,). Three tabs, one question each: what the scan looks at, how it
-/// measures sizes, and which folders it reads. Every value applies to the next scan.
+/// Settings page (Cmd+,). Three panes, the macOS preference arrangement: a toolbar pane
+/// switcher, then grouped panels with the label on the left and its control on the right.
+/// The words are for someone who has never opened a terminal. Every value applies to the
+/// next scan.
 struct SettingsView: View {
     @Environment(ScanModel.self) private var model
 
@@ -32,90 +34,100 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             if DryRun.enabled {
                 StatusLabel(
-                    text: "Dry run on. Cleaning only simulates.",
+                    text: "Preview only. Nothing is deleted.",
                     systemImage: "eye.slash",
                     tone: .amber)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, Metrics.pageMargin)
-                    .padding(.top, Spacing.s3)
+                    .padding(.vertical, Spacing.s2)
+                    .background(Theme.paperRaised)
             }
             TabView {
-                scanTab.tabItem { Text("Scan") }
-                sizesTab.tabItem { Text("Sizes") }
-                foldersTab.tabItem { Text("Folders") }
+                scanPane.tabItem { Label("Scan", systemImage: "magnifyingglass") }
+                sizesPane.tabItem { Label("Sizes", systemImage: "ruler") }
+                foldersPane.tabItem { Label("Folders", systemImage: "folder") }
             }
         }
         .background(Theme.paper)
         .tint(Theme.accent)
-        .frame(width: 500, height: 520)
+        .frame(width: 520, height: 500)
         .background(SettingsWindowChrome())
     }
 
-    /// One scrolling column per tab, with the page margins applied once.
-    private func page<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+    private func pane<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Spacing.s6) {
+            VStack(alignment: .leading, spacing: Spacing.s4) {
                 content()
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(Metrics.pageMargin)
+            .padding(Spacing.s4)
         }
     }
 
-    private var scanTab: some View {
-        page {
-            VStack(alignment: .leading, spacing: Spacing.s3) {
-                SectionHeader(title: "Steps")
-                Text("Rules and folder index always run.")
-                    .font(Typography.caption)
-                    .foregroundStyle(Theme.inkSecondary)
-                VStack(alignment: .leading, spacing: Spacing.s2) {
-                    ForEach(optionalSteps, id: \.rawValue) { step in
-                        Toggle(
-                            step.title,
-                            isOn: Binding(
-                                get: { model.isStepEnabled(step) },
-                                set: { model.setStep(step, enabled: $0) }))
-                        .font(Typography.body)
-                        .foregroundStyle(Theme.ink)
+    // MARK: - Scan
+
+    private var scanPane: some View {
+        pane {
+            SettingsPanel(title: "What Mackit looks for") {
+                SettingsNote("Two checks always run: Mackit's own folder list, and measuring your folders.")
+                ForEach(optionalSteps, id: \.rawValue) { step in
+                    SettingsDivider()
+                    SettingsRow(label: step.title) {
+                        Toggle("", isOn: Binding(
+                            get: { model.isStepEnabled(step) },
+                            set: { model.setStep(step, enabled: $0) }))
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
                         .accessibilityLabel(step.title)
                     }
                 }
             }
-            threadsSection
         }
     }
 
-    private var sizesTab: some View {
-        page {
-            VStack(alignment: .leading, spacing: Spacing.s2) {
-                SectionHeader(title: "Sizes and ages")
-                SliderRow(
-                    title: "Duplicate size",
-                    valueText: "\(model.duplicateMinSizeMB) MB",
-                    value: Binding(
+    // MARK: - Sizes
+
+    private var sizesPane: some View {
+        pane {
+            SettingsPanel(title: "Copies") {
+                SettingsNote("Copies below this size are left alone.")
+                SettingsDivider()
+                sliderRow(
+                    title: "Smallest copy", value: "\(model.duplicateMinSizeMB) MB",
+                    binding: Binding(
                         get: { Double(model.duplicateMinSizeMB) },
                         set: { model.duplicateMinSizeMB = Int($0) }),
                     range: 1...100, step: 1)
-                Toggle("Search caches and build folders", isOn: Binding(
-                    get: { model.includeTempInDuplicates },
-                    set: { model.includeTempInDuplicates = $0 }))
-                .font(Typography.body)
-                .foregroundStyle(Theme.ink)
-                .accessibilityLabel("Search caches and build folders")
-                Hairline()
-                SliderRow(
-                    title: "Large file size",
-                    valueText: "\(model.largeFileMinSizeMB) MB",
-                    value: Binding(
+                SettingsDivider()
+                SettingsRow(
+                    label: "Look inside temporary app files",
+                    detail: "Apps rebuild them when they need them."
+                ) {
+                    Toggle("", isOn: Binding(
+                        get: { model.includeTempInDuplicates },
+                        set: { model.includeTempInDuplicates = $0 }))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .accessibilityLabel("Look inside temporary app files")
+                }
+            }
+            SettingsPanel(title: "Big files") {
+                SettingsNote("A file this big is listed even if you used it today.")
+                SettingsDivider()
+                sliderRow(
+                    title: "Big file size", value: "\(model.largeFileMinSizeMB) MB",
+                    binding: Binding(
                         get: { Double(model.largeFileMinSizeMB) },
                         set: { model.largeFileMinSizeMB = Int($0) }),
                     range: 50...2000, step: 50)
-                Hairline()
-                SliderRow(
-                    title: "Old file age",
-                    valueText: "\(model.largeFileOldAgeDays) days",
-                    value: Binding(
+            }
+            SettingsPanel(title: "Old files") {
+                SettingsNote("Files you have not touched for this long count as old.")
+                SettingsDivider()
+                sliderRow(
+                    title: "Unchanged for", value: "\(model.largeFileOldAgeDays) days",
+                    binding: Binding(
                         get: { Double(model.largeFileOldAgeDays) },
                         set: { model.largeFileOldAgeDays = Int($0) }),
                     range: 30...730, step: 30)
@@ -123,46 +135,102 @@ struct SettingsView: View {
         }
     }
 
-    private var foldersTab: some View {
-        page {
-            excludedSection
-            rulesSection
-            outsideSection
+    private func sliderRow(
+        title: String, value: String, binding: Binding<Double>, range: ClosedRange<Double>,
+        step: Double
+    ) -> some View {
+        SettingsRow(label: title) {
+            HStack(spacing: Spacing.s2) {
+                Slider(value: binding, in: range, step: step)
+                    .frame(width: 150)
+                    .controlSize(.small)
+                    .accessibilityLabel(title)
+                    .accessibilityValue(value)
+                Text(value)
+                    .font(Typography.row)
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.inkSecondary)
+                    .frame(width: 64, alignment: .trailing)
+            }
         }
     }
 
-    private var excludedSection: some View {
-        VStack(alignment: .leading, spacing: Spacing.s3) {
-            SectionHeader(title: "Excluded folders")
-            if model.excludedPaths.isEmpty {
-                Text("No folders are excluded.")
-                    .font(Typography.body)
-                    .foregroundStyle(Theme.inkSecondary)
-            } else {
-                VStack(spacing: 0) {
+    // MARK: - Folders
+
+    private var foldersPane: some View {
+        pane {
+            SettingsPanel(title: "Folders to skip") {
+                SettingsNote("Mackit never looks inside these, and never deletes here.")
+                if model.excludedPaths.isEmpty {
+                    SettingsDivider()
+                    SettingsNote("No folders are skipped.")
+                } else {
                     ForEach(model.excludedPaths, id: \.self) { path in
-                        HStack(spacing: Spacing.s2) {
-                            Text(path)
-                                .font(Typography.row)
-                                .foregroundStyle(Theme.inkSecondary)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                            Spacer(minLength: Spacing.s2)
+                        SettingsDivider()
+                        SettingsRow(label: path) {
                             Button("Remove") { model.removeExcludedPath(path) }
                                 .buttonStyle(.borderless)
                                 .font(Typography.caption)
                                 .foregroundStyle(Theme.inkSecondary)
-                                .accessibilityLabel("Stop excluding \(path)")
+                                .accessibilityLabel("Stop skipping \(path)")
                         }
-                        .padding(.vertical, Spacing.s2)
-                        Hairline()
                     }
                 }
+                SettingsDivider()
+                HStack {
+                    Spacer()
+                    Button("Skip a Folder…") { chooseExcludedFolders() }
+                        .controlSize(.small)
+                        .accessibilityLabel("Choose a folder to skip")
+                }
+                .padding(.horizontal, Spacing.s3)
+                .padding(.bottom, Spacing.s2)
             }
-            Button("Exclude Folder…") { chooseExcludedFolders() }
-                .accessibilityLabel("Choose folder to exclude")
+            SettingsPanel(title: "Folders you add") {
+                SettingsNote("Everything inside is listed, you approve it, then it goes to the Trash.")
+                if model.userRules.isEmpty {
+                    SettingsDivider()
+                    SettingsNote("No folders added yet.")
+                } else {
+                    ForEach(model.userRules) { userRule in
+                        SettingsDivider()
+                        SettingsRow(label: userRule.path) {
+                            Button("Remove") { model.removeUserRule(userRule.id) }
+                                .buttonStyle(.borderless)
+                                .font(Typography.caption)
+                                .foregroundStyle(Theme.inkSecondary)
+                                .accessibilityLabel("Remove folder \(userRule.path)")
+                        }
+                    }
+                }
+                SettingsDivider()
+                HStack {
+                    Spacer()
+                    Button("Add a Folder…") { chooseRuleFolders() }
+                        .controlSize(.small)
+                        .accessibilityLabel("Add a folder to check")
+                }
+                .padding(.horizontal, Spacing.s3)
+                .padding(.bottom, Spacing.s2)
+            }
+            SettingsPanel(title: "Other drives") {
+                SettingsRow(
+                    label: "Also look on other drives",
+                    detail: "For machines or projects kept on another disk."
+                ) {
+                    Toggle("", isOn: Binding(
+                        get: { model.scanOutsideHome },
+                        set: { model.scanOutsideHome = $0 }))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .accessibilityLabel("Also look on other drives")
+                }
+            }
         }
     }
+
+    // MARK: - Pickers
 
     /// The app is not sandboxed, so the picked path stays readable after relaunch.
     private func chooseExcludedFolders() {
@@ -170,48 +238,12 @@ struct SettingsView: View {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = true
-        panel.prompt = "Exclude"
-        panel.message = "Choose folders every scan skips."
+        panel.prompt = "Skip"
+        panel.message = "Choose folders Mackit should never look inside."
         panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
         guard panel.runModal() == .OK else { return }
         for url in panel.urls {
             model.addExcludedPath(url.path)
-        }
-    }
-
-    private var rulesSection: some View {
-        VStack(alignment: .leading, spacing: Spacing.s3) {
-            SectionHeader(title: "Your rules")
-            Text("Children of an added folder are listed as Your folders, reviewed, and moved to Trash.")
-                .font(Typography.caption)
-                .foregroundStyle(Theme.inkSecondary)
-            if model.userRules.isEmpty {
-                Text("No folder rules yet.")
-                    .font(Typography.body)
-                    .foregroundStyle(Theme.inkSecondary)
-            } else {
-                VStack(spacing: 0) {
-                    ForEach(model.userRules) { userRule in
-                        HStack(spacing: Spacing.s2) {
-                            Text(userRule.path)
-                                .font(Typography.row)
-                                .foregroundStyle(Theme.inkSecondary)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                            Spacer(minLength: Spacing.s2)
-                            Button("Remove") { model.removeUserRule(userRule.id) }
-                                .buttonStyle(.borderless)
-                                .font(Typography.caption)
-                                .foregroundStyle(Theme.inkSecondary)
-                                .accessibilityLabel("Remove rule for \(userRule.path)")
-                        }
-                        .padding(.vertical, Spacing.s2)
-                        Hairline()
-                    }
-                }
-            }
-            Button("Add Folder Rule…") { chooseRuleFolders() }
-                .accessibilityLabel("Add a rule for a folder")
         }
     }
 
@@ -221,88 +253,87 @@ struct SettingsView: View {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = true
         panel.prompt = "Add"
-        panel.message = "Choose folders whose contents a scan may reclaim."
+        panel.message = "Choose folders Mackit should check for things you can remove."
         panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
         guard panel.runModal() == .OK else { return }
         for url in panel.urls {
             model.addUserRule(path: url.path)
         }
     }
+}
 
-    private var outsideSection: some View {
-        VStack(alignment: .leading, spacing: Spacing.s3) {
-            SectionHeader(title: "Outside your home folder")
-            Toggle(isOn: Binding(
-                get: { model.scanOutsideHome },
-                set: { model.scanOutsideHome = $0 }))
-            {
-                VStack(alignment: .leading, spacing: Spacing.s1) {
-                    Text("Read folders outside your home folder")
-                        .font(Typography.body)
-                        .foregroundStyle(Theme.ink)
-                    Text("For machines or projects kept on another disk.")
+// MARK: - Panel parts
+
+/// A raised settings group: a small title over rows on `paperRaised`, one radius step up
+/// from the page. Settings is the app's only raised surface; every other page stays flat.
+private struct SettingsPanel<Content: View>: View {
+    let title: String
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title)
+                .font(Typography.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(Theme.inkSecondary)
+                .padding(.horizontal, Spacing.s3)
+                .padding(.top, Spacing.s2)
+                .padding(.bottom, Spacing.s1)
+            content
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.bottom, Spacing.s2)
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.paperRaised))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Theme.hairline))
+    }
+}
+
+/// One setting: label and optional detail on the left, the control on the right.
+private struct SettingsRow<Control: View>: View {
+    let label: String
+    var detail: String?
+    @ViewBuilder var control: Control
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: Spacing.s3) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(Typography.body)
+                    .foregroundStyle(Theme.ink)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                if let detail {
+                    Text(detail)
                         .font(Typography.caption)
                         .foregroundStyle(Theme.inkSecondary)
                 }
             }
-            .accessibilityLabel("Read folders outside your home folder")
+            Spacer(minLength: Spacing.s3)
+            control
         }
-    }
-
-    private var threadsSection: some View {
-        VStack(alignment: .leading, spacing: Spacing.s2) {
-            SectionHeader(title: "Speed")
-            HStack(alignment: .firstTextBaseline, spacing: Spacing.s3) {
-                Text("Threads")
-                    .font(Typography.body)
-                    .foregroundStyle(Theme.ink)
-                Spacer(minLength: Spacing.s3)
-                Picker("Threads", selection: Binding(
-                    get: { model.scanThreads },
-                    set: { model.scanThreads = $0 }))
-                {
-                    Text("Auto").tag(0)
-                    Text("1").tag(1)
-                    Text("2").tag(2)
-                    Text("4").tag(4)
-                    Text("8").tag(8)
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .fixedSize()
-            }
-            Text("Auto uses one thread per core.")
-                .font(Typography.caption)
-                .foregroundStyle(Theme.inkSecondary)
-        }
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, Spacing.s2)
     }
 }
 
-/// Label and value on one line, so the number and the thumb cannot disagree.
-private struct SliderRow: View {
-    let title: String
-    let valueText: String
-    @Binding var value: Double
-    let range: ClosedRange<Double>
-    let step: Double
+private struct SettingsNote: View {
+    let text: String
+    init(_ text: String) { self.text = text }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s1) {
-            HStack(alignment: .firstTextBaseline, spacing: Spacing.s3) {
-                Text(title)
-                    .font(Typography.body)
-                    .foregroundStyle(Theme.ink)
-                Spacer(minLength: Spacing.s3)
-                Text(valueText)
-                    .font(Typography.metric)
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.ink)
-            }
-            Slider(value: $value, in: range, step: step)
-                .controlSize(.small)
-                .accessibilityLabel(title)
-                .accessibilityValue(valueText)
-        }
-        .padding(.vertical, Spacing.s2)
+        Text(text)
+            .font(Typography.caption)
+            .foregroundStyle(Theme.inkSecondary)
+            .padding(.horizontal, Spacing.s3)
+            .padding(.bottom, Spacing.s2)
+    }
+}
+
+private struct SettingsDivider: View {
+    var body: some View {
+        Hairline()
+            .padding(.horizontal, Spacing.s3)
     }
 }

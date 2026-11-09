@@ -210,24 +210,24 @@ macOS reports the size only when the snapshot is deleted.
 
 ### Settings
 
-A settings page, not a report. Three panes, one question each, selected from the toolbar:
-`Scan`, `Sizes`, `Folders`. The window title follows the active pane, the macOS preference
-convention. Scan results are not repeated here; the Overview already reports them.
+A settings window in the macOS preference shape: a toolbar pane switcher with an icon and a
+word per pane, then grouped panels on `paperRaised` with the label on the left and its control
+on the right. The words are for someone who has never opened a terminal: no thread counts, no
+cache jargon, no "duplicate scope".
 
-- `Scan`: caption `Rules and folder index always run.`, then the six step switches, then
-  `Speed` with `Threads` as a pop-up menu and the caption `Auto uses one thread per core.`
-- `Sizes`: sliders `Duplicate size`, `Large file size`, `Old file age`, plus the duplicate
-  scope switch `Search caches and build folders`. Labels are nouns; no `at least` and no
-  threshold arithmetic in prose.
-- `Folders`: `Excluded folders` with the list, a text `Remove`, the empty state
-  `No folders are excluded.`, and `Exclude Folder…` opening the native picker; `Your rules`
-  with one caption stating the effect, a text `Remove`, `No folder rules yet.`, and
-  `Add Folder Rule…`; `Outside your home folder` with one switch.
-- A set `DRY_RUN` shows one amber status label above the panes.
+- `Scan`: panel `What Mackit looks for`, note `Two checks always run: Mackit's own folder
+  list, and measuring your folders.`, then the six checks as switches.
+- `Sizes`: panel `Copies` with `Smallest copy` and the switch `Look inside temporary app
+  files`, panel `Big files` with `Big file size`, panel `Old files` with `Unchanged for`.
+  Every note states the effect in one line.
+- `Folders`: panel `Folders to skip` with `Skip a Folder…`, panel `Folders you add` with
+  `Add a Folder…`, panel `Other drives`. Empty states `No folders are skipped.` and
+  `No folders added yet.`
+- A set `DRY_RUN` shows one amber label above the panes: `Preview only. Nothing is deleted.`
 
-Radius 0, hairlines under section headers, no cards, and the accent tints controls only.
-Every pane keeps the same shape, header then hairline then the control it needs. That is a
-deliberate RHYTHM 1, the System Settings convention, so a reader learns the page once.
+Panels are the app's only raised surface: radius 10, `paperRaised`, hairline border. Every
+other page stays flat, so Settings cannot be mistaken for a second Overview. Inside a pane the
+row shape repeats, because a preference list is scanned, not read.
 
 ### Permission page
 
