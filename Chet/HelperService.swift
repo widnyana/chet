@@ -8,7 +8,8 @@ import Synchronization
 /// may touch.
 enum HelperService {
     /// The daemon's status in plain words, so a view never names a ServiceManagement type.
-    enum State: Equatable { case off, enabled, needsApproval, missing }
+    /// `unsupported` means the build cannot register a daemon at all.
+    enum State: Equatable { case off, enabled, needsApproval, missing, unsupported }
 
     private struct Cached {
         var available: Bool?
@@ -25,12 +26,19 @@ enum HelperService {
 
     static var status: SMAppService.Status { service.status }
 
+    /// A daemon needs a Team ID. An ad-hoc build has none, and the system answers a
+    /// registration with "Operation not permitted" after recording a half-registered item,
+    /// so the app never offers the switch on such a build. The signature of a running app
+    /// cannot change, so one check answers for the whole session.
+    static let isSupported = CodeSignature.teamID(of: Bundle.main.bundleURL) != nil
+
     static var state: State {
+        guard isSupported else { return .unsupported }
         switch status {
-        case .enabled: .enabled
-        case .requiresApproval: .needsApproval
-        case .notFound: .missing
-        default: .off
+        case .enabled: return .enabled
+        case .requiresApproval: return .needsApproval
+        case .notFound: return .missing
+        default: return .off
         }
     }
 
@@ -45,7 +53,7 @@ enum HelperService {
             return value
         }
         if let cached { return cached }
-        let fresh = !DryRun.enabled && status == .enabled
+        let fresh = !DryRun.enabled && Self.state == .enabled
         cache.withLock { $0 = Cached(available: fresh, at: now) }
         return fresh
     }

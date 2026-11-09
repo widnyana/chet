@@ -110,7 +110,9 @@ same result.
 `dist/chet.zip`. `mise run dmg` runs the same build and writes `dist/chet.dmg`, a compressed
 read-only image holding `chet.app` and an `Applications` symlink; the mount carries no custom
 volume icon. The app is ad-hoc signed and not notarized, and the image is unsigned for the same
-reason. The quarantine step for another Mac is in the
+reason. The helper needs a Team ID: `SMAppService` records an ad-hoc daemon and then refuses
+to start it, so Settings reports the build as unsupported and disables the administrator
+switch. The quarantine step for another Mac is in the
 [user guide](docs/USER-GUIDE.md#install-on-another-mac).
 
 ## Boundaries

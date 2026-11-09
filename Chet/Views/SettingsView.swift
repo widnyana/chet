@@ -237,8 +237,10 @@ struct SettingsView: View {
                 SettingsRow(label: "Administrator cleanup") {
                     SecondaryActionButton(
                         title: helperOn ? "Turn Off" : "Turn On…",
-                        isEnabled: !DryRun.enabled && !helperBusy,
-                        help: "Turn on cleanup for system caches, logs, and app remnants",
+                        isEnabled: !DryRun.enabled && !helperBusy && helperState != .unsupported,
+                        help: helperState == .unsupported
+                            ? "Requires a Developer ID signed build"
+                            : "Turn on cleanup for system caches, logs, and app remnants",
                         accessibilityLabel: "Administrator cleanup",
                         action: { helperOn ? turnHelperOff() : turnHelperOn() }
                     )
@@ -262,7 +264,8 @@ struct SettingsView: View {
                     value: Binding(
                         get: { Double(model.helperLifetimeMinutes) },
                         set: { model.helperLifetimeMinutes = Int($0) }),
-                    range: 1...60, step: 1, isEnabled: !DryRun.enabled
+                    range: 1...60, step: 1,
+                    isEnabled: !DryRun.enabled && helperState != .unsupported
                 )
                 .accessibilityIdentifier("settings.helper.lifetime")
             }
@@ -285,6 +288,9 @@ struct SettingsView: View {
             return "Approve Chet in System Settings to turn it on."
         case .missing:
             return "The helper is missing. Reinstall Chet in Applications."
+        case .unsupported:
+            return
+                "Administrator cleanup needs a Developer ID signed copy. This build is ad-hoc signed, so macOS refuses the helper."
         case .off:
             return "Administrator cleanup is off. Chet never asks for an administrator."
         }

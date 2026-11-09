@@ -179,6 +179,8 @@ itself.
 - Covered: `/Library/Caches`, `/Library/Logs`, and app remnants under `/Library` such as launch
   agents and launch daemons. Nothing else outside those trees.
 - With the helper off, those rows stay unchecked and a cleanup skips them.
+- Only a signed build can turn this on. A locally built copy is ad-hoc signed, has no Team ID,
+  and macOS refuses its helper; the panel says so and keeps the switch off.
 
 ## Accessibility
 
