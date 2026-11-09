@@ -4,9 +4,9 @@ import Testing
 @testable import ChetCore
 
 struct LeftoversTests {
-    private func app(_ id: String) -> InstalledApp {
+    private func app(_ id: String, name: String? = nil) -> InstalledApp {
         InstalledApp(
-            url: URL(fileURLWithPath: "/Applications/\(id).app"), name: id, bundleID: id,
+            url: URL(fileURLWithPath: "/Applications/\(id).app"), name: name ?? id, bundleID: id,
             version: nil, helperBundleIDs: [], vendorLabel: nil, isWritable: true,
             stamp: FileStamp(
                 inode: 0, size: 0, modified: Date(), links: 1, isSymlink: false,
@@ -71,6 +71,17 @@ struct LeftoversTests {
         try dir.file("Library/Preferences/com.test.foo.helper.plist", bytes: 100)
         try dir.file("Library/Saved Application State/com.test.foo.savedState/data.data", bytes: 100)
         #expect(try scanner(dir, apps: [app("com.test.foo")]).scan().isEmpty)
+    }
+
+    @Test func installedAppNameShieldsItsDataID() throws {
+        let dir = try TempDir()
+        try dir.file("Library/Preferences/com.tdesktop.Telegram.plist", bytes: 100)
+        // Telegram's app id is ru.keepcoder.Telegram, so only the display name links its data.
+        #expect(try scanner(dir, apps: [app("ru.keepcoder.Telegram", name: "Telegram")]).scan().isEmpty)
+        #expect(
+            try names(scanner(dir, apps: [app("ru.keepcoder.Telegram", name: "Other")])) == [
+                "com.tdesktop.Telegram.plist"
+            ])
     }
 
     @Test func launchServicesResolutionKeepsAnInstalledApp() throws {

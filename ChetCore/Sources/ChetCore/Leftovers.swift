@@ -2,8 +2,8 @@ import AppKit
 import Foundation
 
 /// Library entries named after a bundle ID whose app (or any app from the same vendor) is not
-/// installed, is not registered with LaunchServices, and whose owner is not recorded as
-/// installed by container or group-container metadata.
+/// installed, is not registered with LaunchServices, whose name is not an installed app's, and
+/// whose owner is not recorded as installed by container or group-container metadata.
 public struct LeftoverScanner: Sendable {
     public let home: URL
     public let policy: SafetyPolicy
@@ -19,7 +19,7 @@ public struct LeftoverScanner: Sendable {
     ]
     /// Data untouched this long is treated as orphaned. A live app whose bundle id differs
     /// from its data id cannot be linked by identifier, and its data is rewritten whenever it
-    /// runs; age is the only general liveness signal left.
+    /// runs; age and the installed app names below are the liveness signals left.
     public static let orphanAge: TimeInterval = 90 * 86_400
     /// Our own app and its test domain are never cleanup targets.
     static let ownIdentifiers: Set<String> = ["id.web.widnyana.chet", "com.chet.tweaks.tests"]
@@ -53,6 +53,7 @@ public struct LeftoverScanner: Sendable {
         if apps == nil && installed.isEmpty { return [] }
         let installedIDs = BundleIDIndex(Set(installed.flatMap(\.allBundleIDs)))
         let vendors = Set(installed.compactMap { $0.bundleID.map(Self.vendor) })
+        let productNames = Set(installed.map { $0.name.lowercased() })
         let teams = teamIDs ?? Set(installed.compactMap { CodeSignature.teamID(of: $0.url) })
         let walker = FileWalker(policy: policy)
         let now = Date()
@@ -67,6 +68,7 @@ public struct LeftoverScanner: Sendable {
                 guard let id = Self.bundleID(fromName: entry.lastPathComponent) else { continue }
                 guard !Self.isOwn(id), !Self.isAppleOwned(id) else { continue }
                 guard !installedIDs.isShared(id), !vendors.contains(Self.vendor(id)) else { continue }
+                guard !productNames.contains(Self.product(id)) else { continue }
                 guard !resolvesInstalled(id) else { continue }
                 guard policy.isDeletable(entry) == .allowed, let stamp = FileStamp.read(entry) else {
                     continue
@@ -100,6 +102,13 @@ public struct LeftoverScanner: Sendable {
     /// First two reverse-DNS parts, lowercased: `com.google.Chrome` -> `com.google`.
     static func vendor(_ id: String) -> String {
         id.lowercased().split(separator: ".").prefix(2).joined(separator: ".")
+    }
+
+    /// Last part, lowercased: `com.tdesktop.Telegram` -> `telegram`. Telegram's app id is
+    /// `ru.keepcoder.Telegram`, so the product name is the only link between its data and it.
+    /// A name match ever only removes a row, never adds one.
+    static func product(_ id: String) -> String {
+        id.lowercased().split(separator: ".").last.map(String.init) ?? ""
     }
 
     /// LaunchServices knows every registered app, including ones outside the scanned folders.
