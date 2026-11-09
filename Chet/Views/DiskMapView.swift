@@ -311,10 +311,14 @@ struct DiskMapView: View {
                     Spacer()
                     SecondaryActionButton(
                         title: "Pause", isEnabled: !model.isPaused,
-                        action: { model.togglePause() })
+                        action: { model.togglePause() }
+                    )
+                    .accessibilityIdentifier("storage.pause")
                     SecondaryActionButton(
                         title: "Resume", isEnabled: model.isPaused,
-                        action: { model.togglePause() })
+                        action: { model.togglePause() }
+                    )
+                    .accessibilityIdentifier("storage.resume")
                 }
             }
             .padding(.horizontal, Spacing.s6)

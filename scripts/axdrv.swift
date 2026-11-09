@@ -86,6 +86,13 @@ case "press":
     } else {
         print("no element with id \(target)")
     }
+case "clicktitle":
+    let target = args[2]
+    if let hit = els.first(where: { str($0, kAXTitleAttribute as String) == target }) {
+        print(click(hit) ? "clicked \(target)" : "click failed")
+    } else {
+        print("no element titled \(target)")
+    }
 case "frame":
     let target = args[2]
     if let hit = els.first(where: { str($0, "AXIdentifier") == target }),

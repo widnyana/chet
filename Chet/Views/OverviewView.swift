@@ -215,10 +215,14 @@ struct OverviewView: View {
             HStack(spacing: Spacing.s2) {
                 SecondaryActionButton(
                     title: "Pause", isEnabled: !model.isPaused,
-                    action: { model.togglePause() })
+                    action: { model.togglePause() }
+                )
+                .accessibilityIdentifier("home.pause")
                 SecondaryActionButton(
                     title: "Resume", isEnabled: model.isPaused,
-                    action: { model.togglePause() })
+                    action: { model.togglePause() }
+                )
+                .accessibilityIdentifier("home.resume")
             }
             .padding(.top, Spacing.s1)
         }
