@@ -212,11 +212,12 @@ macOS reports the size only when the snapshot is deleted.
 
 A settings window in the macOS preference shape: a toolbar pane switcher with an icon and a
 word per pane, then grouped panels on `paperRaised` with the label on the left and its control
-on the right. The words are for someone who has never opened a terminal: no thread counts, no
-cache jargon, no "duplicate scope".
+on the right. The words are for someone who has never opened a terminal: no cache jargon, no
+"duplicate scope".
 
 - `Scan`: panel `What Mackit looks for`, note `Two checks always run: Mackit's own folder
-  list, and measuring your folders.`, then the six checks as switches.
+  list, and measuring your folders.`, then the six checks as switches. Panel `Speed` holds
+  `Threads` as a pop-up with the note `Auto uses one thread per core.`
 - `Sizes`: panel `Copies` with `Smallest copy` and the switch `Look inside temporary app
   files`, panel `Big files` with `Big file size`, panel `Old files` with `Unchanged for`.
   Every note states the effect in one line.

@@ -185,7 +185,8 @@ Job: answer "what will the next scan do?" in words a non-technical person alread
 One fixed 520 x 500 window, toolbar panes with an icon and a word: `Scan`, `Sizes`, `Folders`.
 The pane name is not repeated in the title bar.
 
-1. `Scan`: panel `What Mackit looks for` with the note and the six switches.
+1. `Scan`: panel `What Mackit looks for` with the note and the six switches, then panel
+   `Speed` with the `Threads` pop-up and the note `Auto uses one thread per core.`
 2. `Sizes`: panels `Copies`, `Big files`, `Old files`; sliders with the value on the right.
 3. `Folders`: panels `Folders to skip`, `Folders you add`, `Other drives`; picker buttons sit
    at the panel's bottom right.

@@ -82,6 +82,23 @@ struct SettingsView: View {
                     }
                 }
             }
+            SettingsPanel(title: "Speed") {
+                SettingsRow(label: "Threads", detail: "Auto uses one thread per core.") {
+                    Picker("Threads", selection: Binding(
+                        get: { model.scanThreads },
+                        set: { model.scanThreads = $0 }))
+                    {
+                        Text("Auto").tag(0)
+                        Text("1").tag(1)
+                        Text("2").tag(2)
+                        Text("4").tag(4)
+                        Text("8").tag(8)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .fixedSize()
+                }
+            }
         }
     }
 
