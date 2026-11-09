@@ -32,6 +32,20 @@ States:
 - While measuring: the metric slot shows `Measuring` with a small
   `ProgressView`, not a skeleton number.
 
+## Page scaffold
+
+Every content destination uses the same scaffold.
+
+- Header: page margin, 24 pt from the top, 12 pt below the hairline.
+- Content: the same page margin. No fixed 24/32 literals at a call site; use
+  `pageHorizontalPadding()`.
+- Table: 32 pt header, 40 pt rows, one hairline under the header, row rules on
+  the same margin.
+- Empty, loading, and error states use the same margin as the content.
+- Bottom bars are custom bars via `safeAreaBar`, not `safeAreaInset` with a
+  painted fill.
+- Settings and About are separate windows; they keep their own fixed margins.
+
 ## SectionHeader
 
 ```
@@ -78,10 +92,11 @@ Rules:
 
 ## LedgerTable
 
-The main comparison surface. It is a native SwiftUI `Table` or a `List` styled
-with the same metrics.
+The main comparison surface. It is `ColumnTable`: one pinned header, one hairline
+under it, and custom rows. Each screen supplies its columns; the metrics do not
+change.
 
-Columns, in order:
+Category columns, in order:
 
 1. Selection checkbox.
 2. Name, with a 22 pt icon and a second line for location.
@@ -89,10 +104,12 @@ Columns, in order:
 4. Modified, right-aligned, secondary.
 5. Risk, right-aligned, text only: `Review` or empty.
 
+Apps and Homebrew use their own documented columns. They keep the same checkbox,
+icon gutter, header height, row height, page margin, and column alignment.
+
 Rules:
 
-- Header height 32 pt. Custom rows are 40 pt; a native `Table` keeps its system
-  row height and is not forced.
+- Header height 32 pt. Rows are 40 pt.
 - No alternating row backgrounds.
 - One hairline under the header. Rows use the native separator or no line.
 - Selected rows use `accentSoft`.
@@ -114,8 +131,9 @@ A full-width bar at the bottom of the content area:
 Rules:
 
 - Height 56 pt minimum plus the safe-area bottom. Two lines of summary need it.
-- Background `paper`, top 1 px `hairline`.
-- No radius, no floating, no bottom padding.
+- No painted background. The bar is registered with `safeAreaBar`, so the system
+  scroll edge effect supplies the legibility layer.
+- Top 1 px `hairline`; no radius, no floating, no bottom padding.
 - Left: the selection summary in two lines: the byte total in `metric`, the
   count in `caption`.
 - Right: one primary button and an optional secondary text button. The primary
@@ -211,7 +229,7 @@ Uses:
 Rules:
 
 - Height 48 to 56 pt.
-- Background `paperRaised`, bottom 1 px `hairline`.
+- System bar material, bottom 1 px `hairline`.
 - No floating, no capsule, no overlay on content.
 - The strip pushes content down; it never covers it.
 
@@ -265,7 +283,7 @@ Home / Library / Caches                     Darker means a larger share
 - Legend: four 10 x 10 swatches of the neutral ramp, with `Small` and `Large`
   labels and a sentence. No category names.
 - Hover: a small plain label with the folder name and size. It uses
-  `paperRaised` and a hairline, not glass.
+  `paperRaised` and a hairline. It is content, not glass.
 - Detail labels on large blocks use the ink color that contrasts with the
   block.
 
@@ -296,8 +314,8 @@ Grid cell:
 
 - Row height 40 pt.
 - Columns are stable, right-aligned for version and size.
-- The row is not a button; a double click or the chevron opens the detail. The
-  checkbox marks it for bulk removal. The context menu carries Open and Reveal.
+- The row is not a button; a double click or the context menu opens the detail.
+  The checkbox marks it for bulk removal. The context menu carries Open and Reveal.
 - Running and admin states are `StatusLabel` text, never unlabeled dots.
 
 ## OwnershipRow

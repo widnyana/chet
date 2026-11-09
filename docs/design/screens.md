@@ -119,8 +119,7 @@ Job: answer "which app should I remove?".
 
 Top to bottom:
 
-1. Toolbar: `Done` (back to Home), search field, layout picker (list or grid),
-   Reload.
+1. Toolbar: search field, layout picker (list or grid), Reload.
 2. `PageHeader`: `Apps`, subtitle `N installed, M marked`.
 3. Inventory:
    - list: header row and rows with checkbox, icon, name and bundle ID,
@@ -137,7 +136,7 @@ in `UserDefaults`.
 
 States:
 
-- Loading: `Reading applications` and a flat skeleton in the chosen layout.
+- Loading: `Reading applications` with a native spinner.
 - Empty: `No applications found` with a `Full Disk Access` action when access is
   the likely cause, or `Reload` otherwise.
 - Error: the applications folder could not be read. Show the cause sentence and
@@ -156,8 +155,9 @@ Top to bottom:
 
 1. Toolbar: search field and `Reload`. No scan control.
 2. `PageHeader`: `Homebrew`, subtitle `N packages, M marked`.
-3. Inventory: checkbox, package name, version, kind (`formula` or `cask`), and
-   size when Homebrew reports one. The list is the only layout.
+3. Inventory: checkbox, 22 pt package icon, package name, kind (`formula` or
+   `cask`), version, size, and status. Columns use the Apps widths. The list is
+   the only layout.
 4. `CommandBar`: present and disabled until a package is marked; then the marked
    count and bytes, `Deselect`, and `Uninstall`.
 5. The uninstall confirmation uses the same grammar and 520 pt width as the app

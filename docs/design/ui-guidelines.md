@@ -16,8 +16,8 @@ Read it in this order when you add or change a screen:
 
 1. Name the screen job in [screens.md](screens.md). A screen with two jobs is
    two screens.
-2. Compose existing components from [components.md](components.md). Do not
-   restyle a row at the call site.
+2. Compose existing components from [components.md](components.md), following
+   [composition.md](composition.md). Do not restyle a row at the call site.
 3. Apply the layer rules in section 2 and the surface rules in section 3.
 4. Check the pitfalls below before writing the first line of the view.
 5. Run the review gate in section 12 and the recipes in section 13.

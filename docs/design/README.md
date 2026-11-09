@@ -41,6 +41,7 @@ MOTION 1.
 | [screens.md](screens.md) | Each screen, what it must do, and how it is composed |
 | [copy.md](copy.md) | Voice, labels, empty states, and error text |
 | [references.md](references.md) | Sources and the reasoning behind the direction |
+| [composition.md](composition.md) | How to add a page, layout, or component without duplicating the design system |
 | [ui-guidelines.md](ui-guidelines.md) | How to behave when changing UI, the layer model, the pitfalls, and the verification recipes |
 
 The shipped summary is [../DESIGN.md](../DESIGN.md). It is the file the layout
