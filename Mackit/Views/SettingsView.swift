@@ -2,9 +2,27 @@ import AppKit
 import MackitCore
 import SwiftUI
 
+/// SwiftUI's `Settings` scene puts the pane buttons in the window toolbar and repeats the
+/// active pane name in the title bar. The toolbar already names the pane, so the title text
+/// is hidden; the window keeps its title for accessibility and the Window menu.
+struct SettingsWindowChrome: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            view.window?.titleVisibility = .hidden
+        }
+        return view
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        DispatchQueue.main.async {
+            view.window?.titleVisibility = .hidden
+        }
+    }
+}
+
 /// Settings page (Cmd+,). Three tabs, one question each: what the scan looks at, how it
 /// measures sizes, and which folders it reads. Every value applies to the next scan.
-/// The window title follows the active pane, the standard macOS preference-pane behavior.
 struct SettingsView: View {
     @Environment(ScanModel.self) private var model
 
@@ -30,6 +48,7 @@ struct SettingsView: View {
         .background(Theme.paper)
         .tint(Theme.accent)
         .frame(width: 500, height: 520)
+        .background(SettingsWindowChrome())
     }
 
     /// One scrolling column per tab, with the page margins applied once.
