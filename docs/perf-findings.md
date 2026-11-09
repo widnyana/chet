@@ -254,7 +254,7 @@ on this machine; "read" means seen in the source and not yet profiled.
 
 |Finding|State in the tree|
 |---|---|
-|P0 duplicate memory growth|Landed in `72bef13`: POSIX `open`/`read` into one 1 MiB buffer and a table-based hex. Measured after: 19.3 MB peak RSS on a 4.29 GB fixture, 1.17 GB peak on `~/Development`.|
+|P0 duplicate memory growth|Landed in `72bef13`: POSIX `open`/`read` into one 1 MiB buffer and a table-based hex. Measured after: 163 MB footprint in the duplicate step on `~/Development` (was 51.36 GB), 22.3 MB peak RSS hashing a 4.29 GB fixture, and flat `CFData` counts in `heap` through the step.|
 |P1 event stream, rollup materialization|Landed in `72bef13`: `RollupGate` allows 4 updates a second and 512 rollups per walk; `TreeMerge.snapshots` filters before building and stops 2 levels below the node. `RollupBudgetTests` covers it.|
 |P1 live tree merge copies|Open.|
 |P1 rule scan re-walk|Open. Needs `ScanSession` to give `RuleScanner` an index size lookup.|
@@ -413,31 +413,46 @@ Duplicate fixture: 8 directories holding one 512 MiB file each (4.29 GB, identic
 
 |Metric|Value|
 |---|---|
-|Duplicate step|12.77 s|
-|Peak RSS|19.3 MB|
-|Peak memory footprint|11.3 MB|
+|Duplicate step|15.18 s|
+|Peak RSS|22.3 MB|
+|Peak memory footprint|10.8 MB|
+|`CFData` in `heap` through the step|26 objects, 1536 B, unchanged at every sample|
 |Before the change|51.36 GB footprint in the same step on `~/Development`|
 
-Full tree: `chet-scan /Users/wid/Development`, 2,202,020 files, 123.93 GB seen.
+Full tree: `chet-scan /Users/wid/Development`, 2,202,416 files, 123.94 GB seen.
 
 |Metric|Value|
 |---|---|
-|Total|312.5 s|
-|Duplicate step|46.89 s|
-|Peak RSS|1.17 GB (limit 1.5 GB)|
+|Total|427.5 s|
+|Duplicate step|58.9 s|
+|Peak RSS|1.18 GB (limit 1.5 GB)|
 |Termination|none|
+
+Physical footprint sampled every 3 s across that run, assigned to the step windows the
+scan prints:
+
+|Step|Wall time|Footprint|
+|---|---|---|
+|Index|19.1 s|208 MB peak|
+|Duplicates|58.9 s|163 MB peak, flat for the whole step (was 51.36 GB)|
+|Photos|329.0 s|6.9 GB peak, still climbing at the end of the step|
+|Videos and snapshots|20.3 s|412 MB peak|
+
+The remaining multi-GB peak belongs to the photo step (`PerceptualHash` decode and GPU
+batches), not to the duplicate reads. `heap` on the scanning process showed no `NSData`
+or `NSFileHandle` growth in the duplicate window.
 
 App checks, `DRY_RUN=1`:
 
 |Check|Result|
 |---|---|
-|Homebrew page, 211 packages|72 MB footprint after load (target < 150 MB)|
+|Homebrew page, 211 packages|78 MB footprint after load (target < 150 MB)|
 |Home selection|267 items, 44.18 GB|
 |Deselect all in Logs (27 items, 171.2 MB)|Home 240 items, 44.01 GB; category bar `0 of 27 selected, Zero kB`|
 |Select all in Logs again|Home 267 items, 44.18 GB|
 |Disk map during the index step|live blocks from rollups, then the final 223.3 GB tree|
 
-Tests: 283 tests in 38 suites pass (`swift test --package-path ChetCore`), and
+Tests: 285 tests in 38 suites pass (`swift test --package-path ChetCore`), and
 `swift format lint --strict` is clean on the touched files.
 
 ### Tooling
