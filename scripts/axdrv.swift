@@ -86,6 +86,15 @@ case "press":
     } else {
         print("no element with id \(target)")
     }
+case "frame":
+    let target = args[2]
+    if let hit = els.first(where: { str($0, "AXIdentifier") == target }),
+        let origin = point(hit, kAXPositionAttribute as String), let s = size(hit)
+    {
+        print("\(target) x=\(origin.x) y=\(origin.y) w=\(s.width) h=\(s.height)")
+    } else {
+        print("no framed element \(target)")
+    }
 case "clickid":
     let target = args[2]
     if let hit = els.first(where: { str($0, "AXIdentifier") == target }) {
