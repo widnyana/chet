@@ -22,6 +22,7 @@ final class HomebrewModel {
     var ascending = false
 
     var isWorking = false
+    var isUpdating = false
     var actionResult: String?
     var showUninstallConfirm = false
 
@@ -53,9 +54,11 @@ final class HomebrewModel {
     }
 
     var markedPackages: [BrewPackage] { packages.filter { marked.contains($0.id) } }
+    var markedOutdated: [BrewPackage] { markedPackages.filter(\.outdated) }
     var markedBytes: Int64 { markedPackages.reduce(0) { $0 + $1.size } }
     var totalBytes: Int64 { packages.reduce(0) { $0 + $1.size } }
-    var canAct: Bool { !isWorking && !isLoading }
+    var canAct: Bool { !isWorking && !isLoading && !isUpdating }
+    var canUpgrade: Bool { canAct && !markedOutdated.isEmpty }
 
     func setMark(_ package: BrewPackage, on: Bool) {
         if on { marked.insert(package.id) } else { marked.remove(package.id) }
@@ -134,6 +137,44 @@ final class HomebrewModel {
                     freed.map { "Freed about \($0)." } ?? "Cleaned up. Nothing to free."
             }
             if !dryRun { self.load() }
+        }
+    }
+
+    func update() {
+        guard canAct else { return }
+        let dryRun = DryRun.enabled
+        isUpdating = true
+        Task {
+            let result = await Task.detached(priority: .utility) {
+                Homebrew.update(dryRun: dryRun)
+            }.value
+            self.isUpdating = false
+            self.actionResult =
+                result.ok
+                ? (dryRun ? result.out : "Homebrew's catalog is up to date.")
+                : result.message
+            if result.ok && !dryRun { self.load() }
+        }
+    }
+
+    func upgrade() {
+        let targets = markedOutdated
+        guard canAct, !targets.isEmpty else { return }
+        let dryRun = DryRun.enabled
+        isWorking = true
+        Task {
+            let result = await Task.detached(priority: .userInitiated) {
+                Homebrew.upgrade(targets, dryRun: dryRun)
+            }.value
+            self.isWorking = false
+            self.actionResult =
+                result.ok
+                ? (dryRun
+                    ? result.out
+                    : "Upgraded \(targets.count) \(targets.count == 1 ? "package" : "packages").")
+                : result.message
+            self.marked.removeAll()
+            if result.ok && !dryRun { self.load() }
         }
     }
 }

@@ -100,12 +100,24 @@ struct HomebrewView: View {
     private var actionsRow: some View {
         HStack {
             Spacer()
+            SecondaryActionButton(
+                title: "Update",
+                isEnabled: model.canAct,
+                help: "Refresh Homebrew's catalog with brew update.",
+                action: { model.update() })
+            SecondaryActionButton(
+                title: "Upgrade selected (\(model.markedOutdated.count))",
+                isEnabled: model.canUpgrade,
+                help: model.canUpgrade
+                    ? "Upgrade the selected packages that have an update."
+                    : "Mark a package with an update first.",
+                action: { model.upgrade() })
             QuietActionButton(
                 title: "Clean up old versions",
                 isEnabled: model.canAct,
                 help: "Remove old versions and the download cache.",
                 action: { model.cleanup() })
-            if model.isWorking { ProgressView().controlSize(.mini) }
+            if model.isWorking || model.isUpdating { ProgressView().controlSize(.mini) }
         }
         .padding(.horizontal, Metrics.widePageMargin)
         .padding(.bottom, Spacing.s2)

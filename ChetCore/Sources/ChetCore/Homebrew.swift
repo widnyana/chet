@@ -60,6 +60,37 @@ public enum Homebrew {
         return Subprocess.run(executable, args, env: env, timeout: timeout)
     }
 
+    /// One result from several brew invocations: the first failure's status, every stdout
+    /// line, every failure message.
+    private static func combine(_ outs: [Subprocess.Result]) -> Subprocess.Result {
+        let failed = outs.filter { !$0.ok }
+        return Subprocess.Result(
+            status: failed.first?.status ?? 0,
+            out: outs.map(\.out).joined(separator: "\n"),
+            err: failed.map(\.message).joined(separator: "\n\n"))
+    }
+
+    /// The report a dry run returns in place of spawning a process.
+    private static func wouldRun(_ command: String) -> Subprocess.Result {
+        Subprocess.Result(status: 0, out: "Would run: " + command, err: "")
+    }
+
+    /// The dry-run report for a formula/cask split command: one line per non-empty group.
+    private static func wouldRun(
+        formulae: [String], casks: [String], verb: String, zap: Bool = false
+    ) -> Subprocess.Result {
+        var lines: [String] = []
+        if !formulae.isEmpty {
+            lines.append("Would run: brew \(verb) --formula " + formulae.joined(separator: " "))
+        }
+        if !casks.isEmpty {
+            lines.append(
+                "Would run: brew \(verb) --cask" + (zap ? " --zap" : "") + " "
+                    + casks.joined(separator: " "))
+        }
+        return Subprocess.Result(status: 0, out: lines.joined(separator: "\n"), err: "")
+    }
+
     /// Everything Homebrew has installed, with sizes measured on disk. Throws when `brew` fails
     /// or its output cannot be read.
     public static func installed() throws -> [BrewPackage] {
@@ -187,36 +218,21 @@ public enum Homebrew {
     public static func uninstall(_ packages: [BrewPackage], zap: Bool, dryRun: Bool) -> Subprocess.Result {
         let formulae = packages.filter { $0.kind == .formula }.map(\.name)
         let casks = packages.filter { $0.kind == .cask }.map(\.name)
-        if dryRun {
-            var lines: [String] = []
-            if !formulae.isEmpty {
-                lines.append("Would run: brew uninstall --formula " + formulae.joined(separator: " "))
-            }
-            if !casks.isEmpty {
-                lines.append(
-                    "Would run: brew uninstall --cask" + (zap ? " --zap" : "") + " "
-                        + casks.joined(separator: " "))
-            }
-            return Subprocess.Result(status: 0, out: lines.joined(separator: "\n"), err: "")
+        guard !dryRun else {
+            return wouldRun(formulae: formulae, casks: casks, verb: "uninstall", zap: zap)
         }
         var outs: [Subprocess.Result] = []
         if !formulae.isEmpty { outs.append(run(["uninstall", "--formula"] + formulae, timeout: 300)) }
         if !casks.isEmpty {
             outs.append(run(["uninstall", "--cask"] + (zap ? ["--zap"] : []) + casks, timeout: 300))
         }
-        let failed = outs.filter { !$0.ok }
-        return Subprocess.Result(
-            status: failed.first?.status ?? 0,
-            out: outs.map(\.out).joined(separator: "\n"),
-            err: failed.map(\.message).joined(separator: "\n\n"))
+        return combine(outs)
     }
 
     /// `brew cleanup`: removes old versions and the download cache. Returns the "freed
     /// approximately X" amount when brew reports one. A dry run runs no `brew` call.
     public static func cleanup(dryRun: Bool) -> (result: Subprocess.Result, freed: String?) {
-        guard !dryRun else {
-            return (Subprocess.Result(status: 0, out: "Would run: brew cleanup", err: ""), nil)
-        }
+        guard !dryRun else { return (wouldRun("brew cleanup"), nil) }
         let result = run(["cleanup"], timeout: 300)
         let freed = (result.out + "\n" + result.err).split(separator: "\n")
             .first { $0.contains("freed approximately") }
@@ -225,5 +241,25 @@ public enum Homebrew {
                 return line[range.upperBound...].split(separator: " ").first.map(String.init)
             }
         return (result, freed)
+    }
+
+    /// `brew update`. A dry run reports the command and spawns no process.
+    public static func update(dryRun: Bool) -> Subprocess.Result {
+        guard !dryRun else { return wouldRun("brew update") }
+        return run(["update"], timeout: 300)
+    }
+
+    /// `brew upgrade` for the given packages, formulae then casks. A dry run reports the
+    /// commands and spawns no process.
+    public static func upgrade(_ packages: [BrewPackage], dryRun: Bool) -> Subprocess.Result {
+        let formulae = packages.filter { $0.kind == .formula }.map(\.name)
+        let casks = packages.filter { $0.kind == .cask }.map(\.name)
+        guard !dryRun else {
+            return wouldRun(formulae: formulae, casks: casks, verb: "upgrade")
+        }
+        var outs: [Subprocess.Result] = []
+        if !formulae.isEmpty { outs.append(run(["upgrade", "--formula"] + formulae, timeout: 1800)) }
+        if !casks.isEmpty { outs.append(run(["upgrade", "--cask"] + casks, timeout: 1800)) }
+        return combine(outs)
     }
 }
