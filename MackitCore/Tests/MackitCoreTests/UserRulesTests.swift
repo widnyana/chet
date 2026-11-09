@@ -38,4 +38,23 @@ struct UserRulesTests {
         let result = try await RuleScanner(home: home.url, rules: [rule]).scan(rule)
         #expect(result.items.map(\.url.lastPathComponent) == ["blob"])
     }
+
+    @Test func keepListBecomesExcludedAndIsNotListed() async throws {
+        let dir = try TempDir()
+        try dir.file("Downloads/old/a.bin", bytes: 1_000_000)
+        try dir.file("Downloads/old/keep.txt", bytes: 2_000_000)
+        let folder = dir.url.appendingPathComponent("Downloads/old")
+        let userRule = UserRule(path: folder.path, keepNames: ["keep.txt"])
+        #expect(userRule.rule.excluded == ["keep.txt"])
+        let result = try await RuleScanner(home: dir.url, rules: [userRule.rule]).scan(userRule.rule)
+        #expect(result.items.map(\.url.lastPathComponent) == ["a.bin"])
+    }
+
+    @Test func storedRuleWithoutKeepListDecodes() throws {
+        let json = Data(#"{"id":"abc","path":"/tmp/x"}"#.utf8)
+        let decoded = try JSONDecoder().decode(UserRule.self, from: json)
+        #expect(decoded.id == "abc")
+        #expect(decoded.path == "/tmp/x")
+        #expect(decoded.keepNames.isEmpty)
+    }
 }
