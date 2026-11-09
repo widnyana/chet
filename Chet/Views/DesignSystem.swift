@@ -561,13 +561,17 @@ struct ErrorStateView: View {
 
 // MARK: - Capacity
 
+enum CapacityLegendStyle {
+    case full, reclaimable, none
+}
+
 struct CapacityBarView: View {
     let volumeName: String
     let total: Int64
     let free: Int64
     let reclaimable: Int64
     var showsHeader = true
-    var showsLegend = true
+    var legendStyle: CapacityLegendStyle = .full
     var height: CGFloat = 10
 
     var body: some View {
@@ -611,7 +615,8 @@ struct CapacityBarView: View {
                 .overlay {
                     Rectangle().strokeBorder(Theme.hairline, lineWidth: 1)
                 }
-                if showsLegend {
+                switch legendStyle {
+                case .full:
                     HStack(spacing: Spacing.s4) {
                         legend("Used", Theme.capacityUsed, used)
                         if reclaimable > 0 {
@@ -621,6 +626,14 @@ struct CapacityBarView: View {
                     }
                     .font(Typography.caption)
                     .foregroundStyle(Theme.inkSecondary)
+                case .reclaimable:
+                    if reclaimable > 0 {
+                        legend("Can be reclaimed", Theme.accent, reclaimable)
+                            .font(Typography.caption)
+                            .foregroundStyle(Theme.inkSecondary)
+                    }
+                case .none:
+                    EmptyView()
                 }
             }
         }

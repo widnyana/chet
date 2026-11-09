@@ -68,7 +68,9 @@ struct CategoryDetailView: View {
                 }
                 ListHeaderBar(items: category.items)
                 if let groups = model.groups[category.id] {
-                    GroupedItemsView(groups: groups)
+                    GroupedItemsView(
+                        groups: groups,
+                        needsFullDiskAccess: category.needsFullDiskAccess)
                 } else {
                     table
                 }
@@ -177,8 +179,11 @@ struct CategoryDetailView: View {
                     .accessibilityLabel("Remove \(item.url.lastPathComponent)")
                     .frame(width: CategoryColumns.mark)
             }
-            ItemNameCell(item: item)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            ItemNameCell(
+                item: item,
+                needsFullDiskAccess: category.needsFullDiskAccess
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
             Text(item.reclaimableBytes.formatted(.byteCount(style: .file)))
                 .font(Typography.row)
                 .monospacedDigit()

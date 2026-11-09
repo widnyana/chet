@@ -5,6 +5,7 @@ import SwiftUI
 /// empty it. The capacity bar shows used against free; purgeable space is named below it.
 struct SidebarFooter: View {
     @Environment(SystemStatusModel.self) private var status
+    @Environment(ScanModel.self) private var scan
     @State private var confirmingEmpty = false
 
     var body: some View {
@@ -39,9 +40,9 @@ struct SidebarFooter: View {
                 volumeName: capacity.name,
                 total: capacity.total,
                 free: capacity.free,
-                reclaimable: 0,
+                reclaimable: scan.totalBytes,
                 showsHeader: false,
-                showsLegend: false,
+                legendStyle: .reclaimable,
                 height: 10)
             if capacity.purgeable > 0 {
                 Text("\(capacity.purgeable.formatted(.byteCount(style: .file))) purgeable")
