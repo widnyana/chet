@@ -10,10 +10,22 @@ struct TrashBinTests {
         try dir.file("trash/sub/b.bin", bytes: 4096)
         let trash = dir.url.appendingPathComponent("trash")
         #expect(TrashBin.size(at: trash) >= 8192)
-        let result = TrashBin.empty(at: trash)
+        let result = TrashBin.empty(at: trash, dryRun: false)
         #expect(result.removed == 2)
         #expect(result.failed.isEmpty)
         #expect(result.freed >= 8192)
         #expect((FS.list(trash.path) ?? []).isEmpty)
+    }
+
+    @Test func dryRunEmptyReportsRemovedAndFreedButKeepsFiles() throws {
+        let dir = try TempDir()
+        try dir.file("trash/a.bin", bytes: 4096)
+        try dir.file("trash/sub/b.bin", bytes: 4096)
+        let trash = dir.url.appendingPathComponent("trash")
+        let result = TrashBin.empty(at: trash, dryRun: true)
+        #expect(result.removed == 2)
+        #expect(result.failed.isEmpty)
+        #expect(result.freed >= 8192)
+        #expect((FS.list(trash.path) ?? []).contains("a.bin"))
     }
 }

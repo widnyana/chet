@@ -1,7 +1,7 @@
 import Foundation
 
 /// DRY_RUN gate: when set to `true` or `1` (case-insensitive), cleaning reports success but
-/// no file is ever removed. Read from the process environment first, then from a `.env` file
+/// no user file is removed. App-owned diagnostics may still rotate under the gate. Read from the process environment first, then from a `.env` file
 /// found walking up from the working directory or the running bundle — so `source .env` in
 /// the repo, `swift test`, the CLI, and the launched app all behave the same.
 public enum DryRun {

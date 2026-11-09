@@ -27,7 +27,9 @@ public enum Snapshots {
         parse(try tmutil(["listlocalsnapshots", "/"]))
     }
 
-    public static func delete(_ snapshot: LocalSnapshot) throws {
+    /// Deletes a local snapshot with `tmutil`. A dry run runs no `tmutil` call at all.
+    public static func delete(_ snapshot: LocalSnapshot, dryRun: Bool) throws {
+        guard !dryRun else { return }
         _ = try tmutil(["deletelocalsnapshots", snapshot.date])
     }
 

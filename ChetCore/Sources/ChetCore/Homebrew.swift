@@ -182,10 +182,23 @@ enum Homebrew {
         return out
     }
 
-    /// `brew uninstall` for the given packages. `zap` also removes a cask's app data.
-    static func uninstall(_ packages: [BrewPackage], zap: Bool) -> Subprocess.Result {
+    /// `brew uninstall` for the given packages. `zap` also removes a cask's app data. A dry run
+    /// reports the would-run lines and spawns no process.
+    static func uninstall(_ packages: [BrewPackage], zap: Bool, dryRun: Bool) -> Subprocess.Result {
         let formulae = packages.filter { $0.kind == .formula }.map(\.name)
         let casks = packages.filter { $0.kind == .cask }.map(\.name)
+        if dryRun {
+            var lines: [String] = []
+            if !formulae.isEmpty {
+                lines.append("Would run: brew uninstall --formula " + formulae.joined(separator: " "))
+            }
+            if !casks.isEmpty {
+                lines.append(
+                    "Would run: brew uninstall --cask" + (zap ? " --zap" : "") + " "
+                        + casks.joined(separator: " "))
+            }
+            return Subprocess.Result(status: 0, out: lines.joined(separator: "\n"), err: "")
+        }
         var outs: [Subprocess.Result] = []
         if !formulae.isEmpty { outs.append(run(["uninstall", "--formula"] + formulae, timeout: 300)) }
         if !casks.isEmpty {
@@ -199,8 +212,11 @@ enum Homebrew {
     }
 
     /// `brew cleanup`: removes old versions and the download cache. Returns the "freed
-    /// approximately X" amount when brew reports one.
-    static func cleanup() -> (result: Subprocess.Result, freed: String?) {
+    /// approximately X" amount when brew reports one. A dry run runs no `brew` call.
+    static func cleanup(dryRun: Bool) -> (result: Subprocess.Result, freed: String?) {
+        guard !dryRun else {
+            return (Subprocess.Result(status: 0, out: "Would run: brew cleanup", err: ""), nil)
+        }
         let result = run(["cleanup"], timeout: 300)
         let freed = (result.out + "\n" + result.err).split(separator: "\n")
             .first { $0.contains("freed approximately") }

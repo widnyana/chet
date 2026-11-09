@@ -53,4 +53,20 @@ struct HomebrewParseTests {
     @Test func invalidOutputThrows() {
         #expect(throws: BrewError.self) { try Homebrew.parse("not json") }
     }
+
+    @Test func dryRunUninstallAndCleanupNeverRunBrew() {
+        // Safe without brew installed: the dry-run paths never spawn a process.
+        let pkg = BrewPackage(
+            kind: .formula, name: "libpng", title: "libpng", desc: "", homepage: "",
+            version: "1.6.40", latest: "1.6.40", outdated: false, pinned: false,
+            onRequest: true, deps: [])
+
+        let uninstall = Homebrew.uninstall([pkg], zap: false, dryRun: true)
+        #expect(uninstall.ok)
+        #expect(uninstall.out.hasPrefix("Would run: brew uninstall"))
+
+        let cleanup = Homebrew.cleanup(dryRun: true)
+        #expect(cleanup.result.ok)
+        #expect(cleanup.freed == nil)
+    }
 }

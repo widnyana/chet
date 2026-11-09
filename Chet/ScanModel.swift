@@ -608,10 +608,8 @@ final class ScanModel {
     }
 
     @concurrent nonisolated static func deleteSnapshot(_ snapshot: LocalSnapshot) async -> String? {
-        // Dry run reports success so the UI drops the row, but tmutil never runs.
-        if DryRun.enabled { return nil }
         do {
-            try Snapshots.delete(snapshot)
+            try Snapshots.delete(snapshot, dryRun: DryRun.enabled)
             return nil
         } catch {
             return "\(error)"

@@ -13,7 +13,15 @@ struct SidebarFooter: View {
             if let capacity = status.capacity, capacity.total > 0 {
                 capacityBlock(capacity)
             }
-            trashRow
+            VStack(alignment: .leading, spacing: Spacing.s1) {
+                if DryRun.enabled {
+                    StatusLabel(
+                        text: "Preview only. Nothing will be removed.",
+                        systemImage: "exclamationmark.triangle",
+                        tone: .amber)
+                }
+                trashRow
+            }
         }
         .padding(.horizontal, Spacing.s3)
         .padding(.vertical, Spacing.s2)
@@ -25,7 +33,7 @@ struct SidebarFooter: View {
             Button("Empty Trash", role: .destructive) { status.emptyTrash() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This permanently deletes everything in your Trash.")
+            Text(DryRun.enabled ? "Preview only. Nothing will be removed." : "This permanently deletes everything in your Trash.")
         }
     }
 

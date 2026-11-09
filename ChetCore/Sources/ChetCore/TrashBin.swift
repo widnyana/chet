@@ -17,15 +17,18 @@ public enum TrashBin {
         FS.usage(directory.path).size
     }
 
-    /// Permanently removes each top-level item in the Trash and reports what went.
-    public static func empty(at directory: URL = url) -> EmptyResult {
+    /// Permanently removes each top-level item in the Trash and reports what went. A dry run
+    /// reports the outcome and removes nothing.
+    public static func empty(at directory: URL = url, dryRun: Bool) -> EmptyResult {
         var result = EmptyResult()
         let fileManager = FileManager.default
         for name in (try? fileManager.contentsOfDirectory(atPath: directory.path)) ?? [] {
             let item = directory.appendingPathComponent(name)
             let bytes = FS.usage(item.path).size
             do {
-                try fileManager.removeItem(at: item)
+                if !dryRun {
+                    try fileManager.removeItem(at: item)
+                }
                 result.removed += 1
                 result.freed += bytes
             } catch {

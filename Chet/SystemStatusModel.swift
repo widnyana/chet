@@ -24,7 +24,7 @@ final class SystemStatusModel {
         guard !isEmptyingTrash else { return }
         isEmptyingTrash = true
         Task {
-            _ = await Task.detached(priority: .userInitiated) { TrashBin.empty() }.value
+            _ = await Task.detached(priority: .userInitiated) { TrashBin.empty(dryRun: DryRun.enabled) }.value
             self.isEmptyingTrash = false
             self.refresh()
         }
