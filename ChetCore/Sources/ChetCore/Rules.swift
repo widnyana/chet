@@ -31,6 +31,9 @@ public struct Rule: Sendable, Identifiable {
     /// Directory names never descended into while walking `recursiveNames` roots
     /// (`.git` is always skipped). Prevents double-counting under another rule's match.
     public let prunedNames: Set<String>
+    /// When true, a walked directory holding a `pyvenv.cfg` child is one item: a Python
+    /// virtual environment, whatever it is named (`venv`, `.venv`, `.venv-codegen`).
+    public let matchesVirtualEnvironments: Bool
     /// Extra roots discovered from a tool registry at scan time.
     public let discovery: Discovery?
     /// When true, items are listed for size visibility only and the cleaner will never delete them.
@@ -50,7 +53,7 @@ public struct Rule: Sendable, Identifiable {
         owningBundleID: String? = nil, minAge: TimeInterval? = nil, extensions: Set<String>? = nil,
         excluded: Set<String> = [], keepNewest: Bool = false, wholeRoots: Bool = false,
         recursiveNames: Set<String>? = nil, prunedNames: Set<String> = [], discovery: Discovery? = nil,
-        listOnly: Bool = false, requiresAdmin: Bool = false
+        listOnly: Bool = false, requiresAdmin: Bool = false, matchesVirtualEnvironments: Bool = false
     ) {
         self.id = id
         self.category = category ?? id
@@ -66,6 +69,7 @@ public struct Rule: Sendable, Identifiable {
         self.wholeRoots = wholeRoots
         self.recursiveNames = recursiveNames
         self.prunedNames = prunedNames
+        self.matchesVirtualEnvironments = matchesVirtualEnvironments
         self.discovery = discovery
         self.listOnly = listOnly
         self.requiresAdmin = requiresAdmin
@@ -137,7 +141,7 @@ extension Rule {
             id: "dev-garbage", title: "Project build dirs",
             roots: ["Development", "Projects", "Documents", "Desktop"], risk: .review, mode: .trash,
             recursiveNames: DuplicateScope.regenerableNames,
-            prunedNames: [".terraform", ".terragrunt-cache"]),
+            prunedNames: [".terraform", ".terragrunt-cache"], matchesVirtualEnvironments: true),
         Rule(
             id: "terraform-build-dirs", category: "dev-garbage", title: "Terraform build dirs",
             roots: ["Development", "Projects", "Documents", "Desktop"], risk: .safe, mode: .permanent,

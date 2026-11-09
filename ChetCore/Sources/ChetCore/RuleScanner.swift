@@ -31,6 +31,15 @@ public struct RuleScanner: Sendable {
             && isDirectory.boolValue
     }
 
+    /// Only the environment's own bootstrapper writes `pyvenv.cfg`, so its presence identifies
+    /// a virtual environment; the folder name does not (`.venv-codegen`, `venv`, `list`).
+    static func isVirtualEnvironment(_ url: URL) -> Bool {
+        var isDirectory: ObjCBool = false
+        return FileManager.default.fileExists(
+            atPath: url.appendingPathComponent("pyvenv.cfg").path, isDirectory: &isDirectory)
+            && !isDirectory.boolValue
+    }
+
     public let home: URL
     public let rules: [Rule]
     public let policy: SafetyPolicy
@@ -56,7 +65,8 @@ public struct RuleScanner: Sendable {
             let isAbsolute = root.hasPrefix("/")
             var candidates: [URL]
             if let names = rule.recursiveNames {
-                candidates = try recursiveMatches(rootURL, names, pruning: rule.prunedNames)
+                candidates = try recursiveMatches(
+                    rootURL, names, pruning: rule.prunedNames, venvs: rule.matchesVirtualEnvironments)
             } else {
                 do {
                     let listed = try FileManager.default.contentsOfDirectory(
@@ -111,7 +121,7 @@ public struct RuleScanner: Sendable {
     /// `pruning` names are neither matched nor entered when another rule owns them.
     /// Depth is capped so a pathological tree cannot make the scan unbounded.
     private func recursiveMatches(
-        _ root: URL, _ names: Set<String>, pruning: Set<String> = [], depth: Int = 0
+        _ root: URL, _ names: Set<String>, pruning: Set<String> = [], venvs: Bool = false, depth: Int = 0
     ) throws -> [URL] {
         guard depth <= Self.maxScanDepth else { return [] }
         let children = (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
@@ -126,10 +136,12 @@ public struct RuleScanner: Sendable {
             if name == ".git" { continue }
             if policy.isExcluded(child) { continue }
             if Self.isMiseDataDirectory(child) { continue }
-            if names.contains(name) {
+            if venvs && Self.isVirtualEnvironment(child) {
+                found.append(child)
+            } else if names.contains(name) {
                 found.append(child)
             } else if !pruning.contains(name) {
-                found += try recursiveMatches(child, names, pruning: pruning, depth: depth + 1)
+                found += try recursiveMatches(child, names, pruning: pruning, venvs: venvs, depth: depth + 1)
             }
         }
         return found

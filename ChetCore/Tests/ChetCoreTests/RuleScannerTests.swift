@@ -53,6 +53,25 @@ struct RuleScannerTests {
         #expect(result.totalBytes > 3_400_000)
     }
 
+    @Test func devGarbageOffersPythonVirtualEnvironments() async throws {
+        let dir = try TempDir()
+        try dir.file("Development/repos/app/.venv-codegen/pyvenv.cfg", bytes: 100)
+        try dir.file("Development/repos/app/.venv-codegen/lib/python3.14/site-packages/x.py", bytes: 900_000)
+        try dir.file("Development/repos/api/venv/pyvenv.cfg", bytes: 100)
+        try dir.file("Development/repos/api/venv/bin/python", bytes: 500_000)
+        // Only the environment's own bootstrapper writes pyvenv.cfg: a folder that merely
+        // carries the name is not an environment.
+        try dir.file("Development/repos/other/.venv/notes.txt", bytes: 100)
+        let items = try await RuleScanner(home: dir.url).scan(try rule("dev-garbage")).items
+        #expect(
+            Set(items.map(\.url.path)) == [
+                dir.url.appendingPathComponent("Development/repos/app/.venv-codegen").path,
+                dir.url.appendingPathComponent("Development/repos/api/venv").path,
+            ])
+        #expect(items.allSatisfy { $0.risk == .review && $0.mode == .trash })
+        #expect(try await RuleScanner(home: dir.url).scan(try rule("terraform-build-dirs")).items.isEmpty)
+    }
+
     @Test func devGarbageWithoutProjectsIsEmpty() async throws {
         let dir = try TempDir()
         try dir.file("Development/notes.txt", bytes: 100)
