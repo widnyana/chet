@@ -581,10 +581,14 @@ final class ScanModel {
         excludedPaths.removeAll { $0 == path }
     }
 
-    func addUserRule(path: String) {
+    func addUserRule(path: String, keepNames: [String] = []) {
         let normalized = URL(fileURLWithPath: path).standardizedFileURL.path
-        guard !userRules.contains(where: { $0.path == normalized }) else { return }
-        userRules.append(UserRule(path: normalized))
+        let keep = Array(Set(keepNames)).sorted()
+        if let index = userRules.firstIndex(where: { $0.path == normalized }) {
+            userRules[index] = UserRule(id: userRules[index].id, path: normalized, keepNames: keep)
+        } else {
+            userRules.append(UserRule(path: normalized, keepNames: keep))
+        }
     }
 
     func removeUserRule(_ id: String) {

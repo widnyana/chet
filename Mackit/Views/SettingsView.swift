@@ -197,17 +197,28 @@ struct SettingsView: View {
                 }
             }
             SettingsPanel(title: "Folders you add") {
-                SettingsNote("Everything inside is listed, you approve it, then it goes to the Trash.")
+                SettingsNote(
+                    "Everything inside is listed, you approve it, then it goes to the Trash. Use Keep to protect anything you never want removed."
+                )
                 if model.userRules.isEmpty {
                     SettingsNote("No folders added yet.")
                 } else {
                     ForEach(model.userRules) { userRule in
                         SettingsDivider()
-                        SettingsRow(label: userRule.path) {
-                            Button("Remove") { model.removeUserRule(userRule.id) }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-                                .accessibilityLabel("Remove folder \(userRule.path)")
+                        SettingsRow(
+                            label: userRule.path,
+                            detail: userRule.keepNames.isEmpty ? nil : keepDetail(userRule.keepNames)
+                        ) {
+                            HStack(spacing: Spacing.s2) {
+                                Button("Keep…") { chooseKeepItems(for: userRule) }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.small)
+                                    .accessibilityLabel("Choose items to keep in \(userRule.path)")
+                                Button("Remove") { model.removeUserRule(userRule.id) }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.small)
+                                    .accessibilityLabel("Remove folder \(userRule.path)")
+                            }
                         }
                     }
                 }
@@ -264,6 +275,32 @@ struct SettingsView: View {
         for url in panel.urls {
             model.addUserRule(path: url.path)
         }
+    }
+
+    private func keepDetail(_ names: [String]) -> String {
+        names.count == 1 ? "Keeping 1 item" : "Keeping \(names.count) items"
+    }
+
+    /// Adds items the user picks inside this folder to its keep list. Only direct children are
+    /// matched by name, which is what the scanner compares against. Picking is add-only; to
+    /// clear the list, remove the folder and add it again.
+    private func chooseKeepItems(for userRule: UserRule) {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = true
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Keep"
+        panel.message = "Choose items inside this folder Mackit must never remove."
+        panel.directoryURL = URL(fileURLWithPath: userRule.path)
+        guard panel.runModal() == .OK else { return }
+        let parent = URL(fileURLWithPath: userRule.path).standardizedFileURL.path
+        var names = userRule.keepNames
+        for url in panel.urls
+        where url.deletingLastPathComponent().standardizedFileURL.path == parent {
+            let name = url.lastPathComponent
+            if !names.contains(name) { names.append(name) }
+        }
+        model.addUserRule(path: userRule.path, keepNames: names)
     }
 }
 
