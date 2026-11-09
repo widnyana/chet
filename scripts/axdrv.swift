@@ -22,6 +22,8 @@ struct Options {
     var json = false
     var all = false
     var depth = 60
+    var timeout: Float = 1.5
+    var maxNodes = 20000
     var command = ""
     var operands: [String] = []
 }
@@ -29,7 +31,12 @@ struct Options {
 func usage() -> Never {
     print(
         """
-        usage: axdrv [--pid <pid>|--app <name|bundle>] [--json] [--all] [--depth <n>] <command> [operand]
+        usage: axdrv [--pid <pid>|--app <name|bundle>] [--json] [--all] [--depth <n>]
+                     [--timeout <seconds>] [--max-nodes <n>] <command> [operand]
+
+        limits:
+          --timeout <s>        per-call accessibility timeout, default 1.5
+          --max-nodes <n>      stop walking after n nodes, default 20000
 
         target:
           --pid <pid>          drive this process
@@ -86,6 +93,18 @@ func parseArguments() -> Options {
                 usage()
             }
             options.depth = depth
+        case "--timeout":
+            index += 1
+            guard index < arguments.count, let seconds = Float(arguments[index]), seconds > 0 else {
+                usage()
+            }
+            options.timeout = seconds
+        case "--max-nodes":
+            index += 1
+            guard index < arguments.count, let count = Int(arguments[index]), count > 0 else {
+                usage()
+            }
+            options.maxNodes = count
         case "--help", "-h", "help":
             usage()
         default:
@@ -203,28 +222,76 @@ struct Node {
     }
 }
 
+/// Per-run limits, set once in Main before the first walk.
+var messagingTimeout: Float = 1.5
+var nodeLimit = 20000
+var truncated = false
+let walkStart = Date()
+var slowNoted = false
+
+/// One IPC call for eight attributes. A missing attribute comes back as an AXValue of type
+/// axError, which the casts below turn into nil.
+let nodeAttributes: [String] = [
+    kAXRoleAttribute as String, "AXIdentifier", "AXDescription", kAXTitleAttribute as String,
+    kAXValueAttribute as String, "AXEnabled", kAXPositionAttribute as String,
+    kAXSizeAttribute as String,
+]
+
+func axPoint(_ raw: CFTypeRef?) -> CGPoint? {
+    guard let raw, CFGetTypeID(raw) == AXValueGetTypeID() else { return nil }
+    var out = CGPoint.zero
+    return AXValueGetValue(raw as! AXValue, .cgPoint, &out) ? out : nil
+}
+
+func axSize(_ raw: CFTypeRef?) -> CGSize? {
+    guard let raw, CFGetTypeID(raw) == AXValueGetTypeID() else { return nil }
+    var out = CGSize.zero
+    return AXValueGetValue(raw as! AXValue, .cgSize, &out) ? out : nil
+}
+
 func makeNode(_ element: AXUIElement, window: String, depth: Int) -> Node {
-    Node(
+    var values: CFArray?
+    AXUIElementCopyMultipleAttributeValues(
+        element, nodeAttributes as CFArray, AXCopyMultipleAttributeOptions(rawValue: 0), &values)
+    let got = (values as? [CFTypeRef]) ?? []
+    func at(_ index: Int) -> CFTypeRef? { index < got.count ? got[index] : nil }
+    return Node(
         element: element,
-        role: str(element, kAXRoleAttribute as String),
-        id: str(element, "AXIdentifier"),
-        desc: str(element, "AXDescription"),
-        title: str(element, kAXTitleAttribute as String),
-        value: str(element, kAXValueAttribute as String),
-        enabled: attr(element, "AXEnabled") as? Bool,
+        role: at(0) as? String ?? "",
+        id: at(1) as? String ?? "",
+        desc: at(2) as? String ?? "",
+        title: at(3) as? String ?? "",
+        value: at(4) as? String ?? "",
+        enabled: at(5) as? Bool,
         actions: actions(element),
         window: window,
         depth: depth,
-        origin: point(element, kAXPositionAttribute as String),
-        size: size(element))
+        origin: axPoint(at(6)),
+        size: axSize(at(7)))
 }
 
 /// Windows only. The menu bar is excluded on purpose: menu items are better reached with
 /// keyboard shortcuts, and including the full menu tree floods every dump.
+/// A visited set stops cycles; `nodeLimit` stops runaway lists.
 func walk(_ root: AXUIElement, window: String, depthLimit: Int, into nodes: inout [Node]) {
+    AXUIElementSetMessagingTimeout(root, messagingTimeout)
+    var seen = Set<CFHashCode>()
     var stack: [(AXUIElement, Int)] = [(root, 0)]
     while let (element, depth) = stack.popLast() {
+        if nodes.count >= nodeLimit {
+            if !truncated {
+                truncated = true
+                FileHandle.standardError.write(Data("truncated at \(nodeLimit) nodes\n".utf8))
+            }
+            return
+        }
+        guard seen.insert(CFHash(element)).inserted else { continue }
         nodes.append(makeNode(element, window: window, depth: depth))
+        if !slowNoted, Date().timeIntervalSince(walkStart) > 3 {
+            slowNoted = true
+            FileHandle.standardError.write(
+                Data("slow walk: \(nodes.count) nodes so far, target may be busy\n".utf8))
+        }
         if depth < depthLimit {
             for child in kids(element) { stack.append((child, depth + 1)) }
         }
@@ -233,6 +300,7 @@ func walk(_ root: AXUIElement, window: String, depthLimit: Int, into nodes: inou
 
 func snapshot(_ target: Target, depthLimit: Int) -> [Node] {
     let app = AXUIElementCreateApplication(target.pid)
+    AXUIElementSetMessagingTimeout(app, messagingTimeout)
     let windows = (attr(app, kAXWindowsAttribute as String) as? [AXUIElement]) ?? []
     var nodes: [Node] = []
     if windows.isEmpty {
@@ -494,6 +562,8 @@ guard AXIsProcessTrusted() else {
     exit(3)
 }
 
+messagingTimeout = options.timeout
+nodeLimit = options.maxNodes
 let selector = Selector(options.operands)
 let nodes = snapshot(target, depthLimit: options.depth)
 
