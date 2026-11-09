@@ -52,6 +52,13 @@ public struct SimilarPhotos: Sendable {
         let pixels: Int
     }
 
+    /// Raw pointers handed to the decode workers. Each worker writes disjoint slots, so no
+    /// lock is needed.
+    private struct DecodeTargets: @unchecked Sendable {
+        let bitmap: UnsafeMutableRawPointer
+        let slots: UnsafeMutablePointer<Decoded?>
+    }
+
     /// Decodes a batch on `workers` threads straight into the shared buffer, so the CPU never
     /// copies a bitmap into Metal. Undecodable rows are dropped and the survivors compacted.
     private func decode(
@@ -61,17 +68,17 @@ public struct SimilarPhotos: Sendable {
         let base = input.contents()
         var slots = [Decoded?](repeating: nil, count: count)
         slots.withUnsafeMutableBufferPointer { buffer in
-            nonisolated(unsafe) let output = buffer.baseAddress
-            guard let output else { return }
+            guard let output = buffer.baseAddress else { return }
+            let targets = DecodeTargets(bitmap: base, slots: output)
             let stride = min(workers, count)
             DispatchQueue.concurrentPerform(iterations: stride) { worker in
                 var index = worker
                 while index < count {
                     let entry = entries[start + index]
                     if let pixels = PerceptualHash.bitmap(
-                        entry.url, into: base.advanced(by: index * imageBytes))
+                        entry.url, into: targets.bitmap.advanced(by: index * imageBytes))
                     {
-                        output[index] = Decoded(entry: entry, pixels: pixels)
+                        targets.slots[index] = Decoded(entry: entry, pixels: pixels)
                     }
                     index += stride
                 }

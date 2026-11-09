@@ -9,8 +9,8 @@ run = "xcodegen generate --quiet"
 description = "Debug build of the app into .build/xc"
 depends = ["gen"]
 run = [
-  "xcodebuild -project chet.xcodeproj -scheme chet-helper -configuration Debug -derivedDataPath .build/xc -quiet build",
-  "xcodebuild -project chet.xcodeproj -scheme chet -configuration Debug -derivedDataPath .build/xc -quiet build",
+  "xcodebuild -project chet.xcodeproj -scheme chet-helper -configuration Debug -destination 'generic/platform=macOS' -derivedDataPath .build/xc -quiet build",
+  "xcodebuild -project chet.xcodeproj -scheme chet -configuration Debug -destination 'generic/platform=macOS' -derivedDataPath .build/xc -quiet build",
 ]
 
 [tasks.dev]
@@ -30,8 +30,8 @@ run = "swift test --package-path ChetCore"
 description = "Release build, arm64 check, zipped to dist/chet.zip"
 depends = ["gen"]
 run = [
-  "xcodebuild -project chet.xcodeproj -scheme chet-helper -configuration Release -derivedDataPath .build/xc -quiet build",
-  "xcodebuild -project chet.xcodeproj -scheme chet -configuration Release -derivedDataPath .build/xc -quiet build",
+  "xcodebuild -project chet.xcodeproj -scheme chet-helper -configuration Release -destination 'generic/platform=macOS' -derivedDataPath .build/xc -quiet build",
+  "xcodebuild -project chet.xcodeproj -scheme chet -configuration Release -destination 'generic/platform=macOS' -derivedDataPath .build/xc -quiet build",
   "test \"$(lipo -archs .build/xc/Build/Products/Release/chet.app/Contents/MacOS/chet)\" = arm64",
   "test \"$(lipo -archs .build/xc/Build/Products/Release/chet.app/Contents/MacOS/chet-helper)\" = arm64",
   "mkdir -p dist && rm -f dist/chet.zip && ditto -c -k --keepParent .build/xc/Build/Products/Release/chet.app dist/chet.zip",

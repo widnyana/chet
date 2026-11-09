@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// Runs short-lived command-line tools (diskutil, tmutil, brew) with a wall-clock timeout.
 public enum Subprocess {
@@ -34,11 +35,11 @@ public enum Subprocess {
             return Result(status: -1, out: "", err: error.localizedDescription)
         }
 
-        var errData = Data()
+        let errBox = Mutex(Data())
         let group = DispatchGroup()
         group.enter()
         DispatchQueue.global(qos: .userInitiated).async {
-            errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+            errBox.withLock { $0 = errPipe.fileHandleForReading.readDataToEndOfFile() }
             group.leave()
         }
         let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
@@ -49,6 +50,7 @@ public enum Subprocess {
         process.waitUntilExit()
         watchdog.cancel()
         group.wait()
+        let errData = errBox.withLock { $0 }
         return Result(
             status: process.terminationStatus,
             out: String(decoding: outData, as: UTF8.self),
