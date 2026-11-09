@@ -1,12 +1,18 @@
 # Chet
 
-Chet finds and removes junk on Apple Silicon Macs: caches, logs, developer build data, old installers, duplicate files, similar photos and videos, leftovers of deleted apps, and more. It removes only data that apps can rebuild, or files you confirm one by one.
+Chet is a macOS utility that frees disk space and adjusts system preferences. It scans for
+caches, logs, developer build data, old installers, duplicate files, similar photos and videos,
+data left by removed apps, and large files. It deletes what apps rebuild, moves user files to
+the Trash, deletes Time Machine snapshots with `tmutil`, and changes nothing until you confirm
+it.
 
-**Home** runs the junk scan. **Apps** in the sidebar removes an app together with the Library data that belongs to it.
+**Home** runs the scan. **Apps** in the sidebar removes an app together with the Library data
+that belongs to it. **Settings** holds the scan toggles, size limits, folder rules, and Tweaks.
 
 ## Requirements
 
-- A Mac with Apple Silicon (M1 or newer). The app is built for arm64 only and does not run on Intel Macs.
+- A Mac with Apple Silicon (M1 or newer). The app is built for arm64 only and does not run on
+  Intel Macs.
 - macOS 26 or newer.
 - Xcode 26 or newer and [mise](https://mise.jdx.dev).
 
@@ -21,6 +27,8 @@ Every development step is a mise task:
 
 | Command | What it does |
 |---|---|
+| `mise run gen` | Generate `chet.xcodeproj` from `project.yml` |
+| `mise run build` | Debug build into `.build/xc` |
 | `mise run dev` | Build the debug app and launch it |
 | `mise run test` | Run the ChetCore tests. Filter with `mise run test -- --filter Cleaner` |
 | `mise run check` | Tests, debug build, and a check that the binary is arm64 only |
@@ -32,15 +40,20 @@ Every development step is a mise task:
 | `mise run log` | Follow the clean audit log |
 | `mise run clean` | Remove build output, the generated project and `dist/` |
 
-The Xcode project is generated from `project.yml` by XcodeGen and is not committed. `mise run gen` regenerates it; the build tasks do this for you.
+The Xcode project is generated from `project.yml` by XcodeGen and is not committed. `mise run
+gen` regenerates it; the build tasks do this for you.
 
 ## Full Disk Access
 
-macOS hides caches, Mail downloads and browser data from apps without Full Disk Access. On first launch Chet shows a screen with a button that opens **System Settings > Privacy & Security > Full Disk Access**. Turn on Chet there and switch back; the screen closes by itself. You can also continue without it. Categories that miss data then show a lock icon.
+macOS hides caches, Mail downloads and browser data from apps without Full Disk Access. On
+first launch Chet shows a screen with a button that opens **System Settings > Privacy &
+Security > Full Disk Access**. Turn on Chet there and switch back; the screen closes by
+itself. You can also continue without it. Categories that miss data then show a lock icon.
 
 ## What Chet cleans
 
-"Safe" items are selected after a scan. "Review" items are never selected for you.
+"Safe" items are selected after a scan. "Review" items are never selected for you. Delete
+means the item is removed permanently; Move to Trash means it can be restored.
 
 | Category | What | Group | Removal |
 |---|---|---|---|
@@ -48,7 +61,7 @@ macOS hides caches, Mail downloads and browser data from apps without Full Disk 
 | App caches | `~/Library/Caches`, one item per app | Safe to remove | Delete |
 | Logs | `~/Library/Logs` | Safe to remove | Delete |
 | Xcode files | DerivedData, simulator caches, old device support files | Safe to remove | Delete |
-| Developer caches | Homebrew, npm, Yarn, pnpm, pip, uv, Cargo, Go, Gradle, SwiftPM, CocoaPods | Safe to remove | Delete |
+| Developer caches | Homebrew, npm, Yarn, pnpm, pip, uv, Cargo, Go, Gradle, SwiftPM, CocoaPods, Nix | Safe to remove | Delete |
 | Browser data | Safari, Chrome, Brave, Edge, Firefox, Arc (cache only, never history or profiles) | Safe to remove | Delete |
 | Mail downloads | Attachments Mail saved to open them | Safe to remove | Delete |
 | Xcode archives | `~/Library/Developer/Xcode/Archives` | Check first | Move to Trash |
@@ -62,17 +75,31 @@ macOS hides caches, Mail downloads and browser data from apps without Full Disk 
 | Similar videos | Re-encoded copies of the same video | Check first | Move to Trash |
 | Time Machine snapshots | Snapshots on the startup disk | Check first | Delete with `tmutil` |
 
-The **Storage** page shows which folders in your home folder take the most space. Click a folder to look inside.
+Settings can change the duplicate size, the large-file size, and the large-file age. The
+other limits are fixed.
 
-The interface is a ledger: paper and ink, one accent, tabular numbers, and one command bar.
-The design system and the screen specs live in `docs/DESIGN.md` and `docs/design/`.
+## Storage
+
+The **Storage** page shows which folders in your home folder take the most space. Click a
+folder to look inside.
+
+## Tweaks
+
+Tweaks changes macOS preferences that normally take a `defaults write` command or a hidden
+setting. The list covers Finder, Dock, keyboard, screenshots, windows, and appearance. Each
+row shows the current value, labels the change low, medium, or high risk, and names what to
+restart: Finder, the Dock, the menu bar, or the whole session.
+
+Chet writes one value at a time, reads it back to verify, and appends the change to
+`~/Library/Application Support/Chet/tweaks.log`. The pane counts the tweaks you changed and
+can reset them all to their original values.
 
 ## Uninstall apps
 
-Pick **Apps** in the sidebar, search for an app, and select it. Chet reads the app
-bundle, then looks in the user Library for data that names the app's bundle ID or its helpers:
-Application Support, Preferences (including ByHost), Caches, Logs, Containers, Group
-Containers, Saved Application State, Cookies, Application Scripts, Launch Agents and WebKit.
+Pick **Apps** in the sidebar, search for an app, and select it. Chet reads the app bundle, then
+looks in the user Library for data that names the app's bundle ID or its helpers: Application
+Support, Preferences (including ByHost), Caches, Logs, Containers, Group Containers, Saved
+Application State, Cookies, Application Scripts, Launch Agents and WebKit.
 
 Each row says why it matched:
 
@@ -86,30 +113,63 @@ Each row says why it matched:
 - **Protected by macOS**: system folders, Keychains, Mail, Messages and iCloud Drive. Never
   listed as removable.
 
-The app is unchecked when it is open, needs an administrator, or cannot be written.
-The **Move to Trash** button is disabled while the app or one of its helpers runs, and the core checks
+The app is unchecked when it is open, needs an administrator, or cannot be written. The **Move
+to Trash** button is disabled while the app or one of its helpers runs, and the core checks
 again before the first move. Related files go first and the app bundle goes last, so a failed
 move never hides the app itself. Everything goes to the Trash; nothing is deleted permanently.
 
 ## How Chet protects your data
 
-- A single safety check runs for every item, at scan time and again right before removal. It refuses system folders, app bundles (the Apps page has its own explicit app-bundle allowlist), iCloud Drive, Keychains, Mail and Messages data, Photos libraries, `.git` folders, symlinks and other volumes.
-- Before removal Chet compares each file with what the scan saw (inode, size, modification time). If anything changed, the file is left alone.
+- A single safety check runs for every item, at scan time and again right before removal. It
+  refuses system folders, app bundles (the Apps page has its own explicit app-bundle
+  allowlist), iCloud Drive, Keychains, Mail and Messages data, Photos libraries, `.git`
+  folders, symlinks and other volumes.
+- Before removal Chet compares each file with what the scan saw (inode, size, modification
+  time). If anything changed, the file is left alone.
 - Caches of a running app are skipped. The summary tells you which app to quit.
-- For duplicates and similar media, one copy is always kept. Exact duplicates are compared byte for byte before they are shown.
-- In Apps, only exact bundle-ID matches and embedded helper matches are selected for
-  you. Name-only matches stay unchecked, shared group containers are unselectable, and
+- For duplicates and similar media, one copy is always kept. Exact duplicates are compared
+  byte for byte before they are shown.
+- In Apps, only exact bundle-ID matches and embedded helper matches are selected for you.
+  Name-only matches stay unchecked, shared group containers are unselectable, and
   administrator-only entries are shown read-only. Every row is checked again right before it
   moves.
-- Every action is written to `~/Library/Logs/chet/clean.log`, one JSON line per item with its category, path, bytes, mode, and result.
+- Every cleanup is written to `~/Library/Logs/chet/clean.log`, one JSON line per item with its
+  category, path, bytes, mode, and result.
+- Every tweak write is read back and verified, then recorded in the tweak log.
+
+## Engines
+
+Chet removes things through three engines. They share filesystem primitives and nothing else:
+identification and the removal decision belong to one engine each.
+
+| Engine | Identification | Removal | Shared primitives |
+|---|---|---|---|
+| Disk cleaner | `RuleScanner`, `Rules`, `LargeFiles`, `Leftovers` | `Cleaner`, one item at a time, after re-checking the stamp and the policy | `FileWalker`, `FileIndex`, `SizeProbe`, `SafetyPolicy`, `AuditLog` |
+| Application uninstaller | `AppUninstaller.components(for:)` and its match rules | `AppUninstaller.uninstall`, its own loop, the app bundle last | `SafetyPolicy.isProtectedPath`, `FileStamp`, the Trash |
+| Duplicate finder | `DuplicateFinder`, `SimilarPhotos`, `SimilarVideos` | none; the engine picks the keeper, then the group becomes a Trash item that `Cleaner` executes | `GPUHasher`, `PerceptualHash`, `FileWalker` |
+
+Tweaks follows the same shape. `TweakCatalog` identifies preferences, `TweakEngine` writes and
+verifies one value, and the shared pieces are `Subprocess` and the append-only change record.
+
+Rules for new code:
+
+- An engine's identification code never moves into a shared primitive.
+- A shared primitive never decides what is junk. It measures, walks, hashes, moves to the
+  Trash, or answers a path question.
+- `SafetyPolicy` is the single answer to "may this path be removed at all": system trees,
+  protected home folders, excluded folders, app bundles, Photos libraries.
 
 ## Metal
 
-Chet uses the GPU through Metal for the heavy work: perceptual hashes and blur scores for photos, frame hashes for videos, pair matching, an optional GPU hash for exact duplicates, and drawing the disk map. Every GPU kernel has a CPU version, and the tests check that both give the same result.
+Chet uses the GPU through Metal for the heavy work: perceptual hashes and blur scores for
+photos, frame hashes for videos, pair matching, an optional GPU hash for exact duplicates, and
+drawing the disk map. Every GPU kernel has a CPU version, and the tests check that both give
+the same result.
 
 ## Running on another Mac
 
-The app is ad-hoc signed and not notarized. Copied to another Mac, macOS blocks it at first launch. Right-click the app and choose **Open**, or run:
+The app is ad-hoc signed and not notarized. Copied to another Mac, macOS blocks it at first
+launch. Right-click the app and choose **Open**, or run:
 
 ```sh
 xattr -dr com.apple.quarantine /Applications/chet.app
@@ -120,14 +180,16 @@ xattr -dr com.apple.quarantine /Applications/chet.app
 ```
 Chet/        SwiftUI app (views and the scan model)
 ChetCore/    Swift package with all scanning, safety and cleaning logic, Metal shaders, and tests
-project.yml    XcodeGen spec for the app
-mise.toml      Tool versions and development tasks
+project.yml  XcodeGen spec for the app
+mise.toml    Tool versions and development tasks
 ```
 
 ## Not covered
 
-- Caches and logs owned by root (`/Library/Caches`, system logs). This needs a privileged helper.
+- Caches and logs owned by root (`/Library/Caches`, system logs). This needs a privileged
+  helper.
 - Removing app languages or thinning app binaries. It breaks code signatures.
 - Docker or OrbStack images. Use `docker system prune`.
 - Removing apps or files that need administrator rights. Apps shows those entries with a
   Needs admin status but does not move them; there is no privileged helper.
+- Tweaks outside the catalog. Chet changes only the preferences it can read back and verify.
