@@ -68,7 +68,7 @@ struct GroupedItemsView: View {
                 .fixedSize()
                 .help("Change the order")
             }
-            .padding(.horizontal, Spacing.s6)
+            .pageHorizontalPadding()
             .padding(.vertical, Spacing.s2)
             Hairline()
             if isMedia {

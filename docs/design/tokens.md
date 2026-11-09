@@ -110,8 +110,10 @@ No radius outside 0, 6, and 8. A 1 or 3 pt radius is a drift, not a style.
 | `elevationNone` | Everything in the content area |
 | System sheet | Presented and dismissed by macOS |
 
-No custom shadows. No glass. The sidebar uses the native sidebar material. The
-command bar uses the window background plus a top hairline. The app icon is the
+No custom shadows. The only glass is the system Liquid Glass on window chrome.
+Content never gets glass. The sidebar and sheet surfaces use the native material.
+The command bar is a custom bar registered with `safeAreaBar`, so it gets the
+system scroll edge effect instead of a painted background. The app icon is the
 only place with a gradient.
 
 ## Motion
@@ -137,6 +139,7 @@ Rules:
 |---|---|---|
 | `iconInline` | 8 to 12 | Glyph inside text: chevron, stop, small badge. Match the line it sits in |
 | `iconAction` | 16 | Buttons, status labels, strip icons |
+| `iconSidebar` | 16 | Sidebar rows, inside an 18 pt frame |
 | `iconRow` | 22 | Table and list rows |
 | `iconProgress` | 24 | Toolbar scan ring |
 | `iconHeader` | 44 | Page header, app detail header |

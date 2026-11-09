@@ -60,7 +60,7 @@ struct ListHeaderBar: View {
                 .fixedSize()
             }
             .frame(minHeight: Metrics.rowHeight)
-            .padding(.horizontal, Spacing.s6)
+            .pageHorizontalPadding()
             .padding(.vertical, Spacing.s2)
             Hairline()
         }
