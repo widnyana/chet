@@ -87,12 +87,15 @@ Delete means the item is removed permanently; Move to Trash means it can be rest
 | Blurry photos | Photos with very little sharp detail | Check first | Move to Trash |
 | Similar videos | Re-encoded copies of the same video | Check first | Move to Trash |
 | Time Machine snapshots | Snapshots on the startup disk | Check first | Delete with `tmutil` |
+| System caches | `/Library/Caches`, one item per folder | Check first | Delete with administrator |
+| System logs | `/Library/Logs`, one item per folder | Check first | Delete with administrator |
 
 ## Settings
 
-Settings holds the scan toggles, size limits, folder rules, and tweak preferences. The size
-limits you can change are the duplicate size, the large-file size, and the large-file age. The
-other limits are fixed.
+Settings holds the scan toggles, size limits, folder rules, tweak preferences, and the
+administrator switch. The size limits you can change are the duplicate size, the large-file
+size, and the large-file age. The other limits are fixed. The **Administrator** panel at the
+bottom of **Folders** turns system cleanup on or off and sets how long each approval lasts.
 
 ## Storage
 
@@ -131,15 +134,16 @@ Each row says why it matched:
 - **Shared with another app**: a group container, or data another installed app also claims.
   Cannot be selected.
 - **Needs an administrator**: an entry under `/Library` or in a folder the user cannot write.
-  Cannot be selected.
+  Unchecked until you turn on Administrator cleanup in Settings. Those files are removed
+  permanently, not moved to the Trash.
 - **Protected by macOS**: system folders, Keychains, Mail, Messages, and iCloud Drive. Never
   listed as removable.
 
-The app is unchecked when it is open, needs an administrator, or cannot be written. The
-**Move to Trash** button is disabled while the app or one of its helpers runs, and the core
-checks again before the first move. Related files go first and the app bundle goes last, so a
-failed move never hides the app itself. Everything goes to the Trash; nothing is deleted
-permanently.
+The app is unchecked when it is open or cannot be written. The **Move to Trash** button is
+disabled while the app or one of its helpers runs, and the core checks again before the first
+move. Related files go first and the app bundle goes last, so a failed move never hides the app
+itself. Files go to the Trash; a file that needed an administrator is removed permanently
+instead, and the app bundle always goes to the Trash.
 
 ## How Chet protects your data
 
@@ -154,10 +158,27 @@ permanently.
   byte for byte before they are shown.
 - In Apps, only exact bundle-ID matches and embedded helper matches are selected for you.
   Name-only matches stay unchecked, shared group containers are unselectable, and
-  administrator-only entries are shown read-only. Every row is checked again right before it
-  moves.
+  administrator-only entries stay unchecked until you turn on Administrator cleanup. Every row
+  is checked again right before it moves.
 - Every cleanup is written to `~/Library/Logs/chet/clean.log`.
 - Every tweak write is read back and verified, then recorded in the tweak log.
+
+## Administrator cleanup
+
+Caches, logs, and app remnants owned by root need an administrator. Chet ships a small helper
+for that job and keeps it off until you turn it on. It never asks for an administrator by
+itself.
+
+- Turn it on in Settings, pane **Folders**, panel **Administrator**, then approve Chet when
+  macOS asks. The same panel turns it off again.
+- The helper lives inside the app. It starts on your first removal and exits when the approval
+  runs out, so nothing privileged stays running. An approval lasts 1 to 60 minutes, 10 by
+  default; change it with the **Approval lifetime** slider.
+- These files are removed permanently: root-owned data has no Trash of your own. The app
+  bundle itself is never touched, and each row is checked again right before it goes.
+- Covered: `/Library/Caches`, `/Library/Logs`, and app remnants under `/Library` such as launch
+  agents and launch daemons. Nothing else outside those trees.
+- With the helper off, those rows stay unchecked and a cleanup skips them.
 
 ## Accessibility
 
@@ -183,10 +204,6 @@ xattr -dr com.apple.quarantine /Applications/chet.app
 
 ## Not covered
 
-- Caches and logs owned by root (`/Library/Caches`, system logs). This needs a privileged
-  helper.
 - Removing app languages or thinning app binaries. It breaks code signatures.
 - Docker or OrbStack images. Use `docker system prune`.
-- Removing apps or files that need administrator rights. Apps shows those entries with a Needs
-  admin status but does not move them; there is no privileged helper.
 - Tweaks outside the catalog. Chet changes only the preferences it can read back and verify.

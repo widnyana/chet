@@ -25,7 +25,7 @@ Every development step is a mise task:
 | Command | What it does |
 |---|---|
 | `mise run gen` | Generate `chet.xcodeproj` from `project.yml` |
-| `mise run build` | Debug build into `.build/xc` |
+| `mise run build` | Debug build into `.build/xc`: `chet-helper` first, then the app |
 | `mise run dev` | Build the debug app and launch it |
 | `mise run test` | Run the ChetCore tests. Filter with `mise run test -- --filter Cleaner` |
 | `mise run check` | Tests, debug build, and a check that the binary is arm64 only |
@@ -40,12 +40,19 @@ Every development step is a mise task:
 The Xcode project is generated from `project.yml` by XcodeGen and is not committed.
 `mise run gen` regenerates it; the build tasks do this for you.
 
+The app ships a privileged helper, `chet-helper`, as a second target. `mise run build` and
+`mise run release` build it before the app, and the app's post-build script copies it to
+`Contents/MacOS/chet-helper` with its launchd plist in `Contents/Library/LaunchDaemons` and
+signs it, so Xcode's final app signature covers both. It is off until the user registers it in
+Settings; nothing in the build registers or launches it.
+
 ## Project layout
 
 ```
 Chet/        SwiftUI app (views and the scan model)
+ChetHelper/  Privileged helper daemon: the XPC listener, one bounded removal session
 ChetCore/    Swift package with all scanning, safety and cleaning logic, Metal shaders, and tests
-project.yml  XcodeGen spec for the app
+project.yml  XcodeGen spec for the app and the helper
 mise.toml    Tool versions and development tasks
 ```
 
@@ -63,6 +70,12 @@ identification and the removal decision belong to one engine each.
 Tweaks follows the same shape. `TweakCatalog` identifies preferences, `TweakEngine` writes and
 verifies one value, and the shared pieces are `Subprocess` and the append-only change record.
 
+A root-owned item takes one more step. `Cleaner` and `AppUninstaller` hand it to an injected
+`privileged` closure instead of removing it themselves. The app builds that closure from
+`PrivilegedClient`, and the daemon applies `HelperGuard.refusal` before `removeItem`. With the
+closure absent, a root-owned item is a policy skip, so no engine can remove one on its own.
+The removal is permanent; root-owned data has no per-user Trash.
+
 Rules for new code:
 
 - An engine's identification code never moves into a shared primitive.
@@ -70,6 +83,8 @@ Rules for new code:
   the Trash, or answers a path question.
 - `SafetyPolicy` is the single answer to "may this path be removed at all": system trees,
   protected home folders, excluded folders, app bundles, Photos libraries.
+- A privileged removal is always a request through `ChetHelperProtocol`. No engine gains a
+  second root path, and `HelperGuard` is the only place that decides what root may touch.
 
 ## Metal
 
@@ -96,6 +111,8 @@ Mac is in the [user guide](docs/USER-GUIDE.md#install-on-another-mac).
 
 ## Boundaries
 
-Root-owned caches and logs, app thinning, Docker images, administrator-only removals, and
-tweaks outside the catalog are out of scope. The reasons are in the
+App thinning, Docker images, and tweaks outside the catalog are out of scope. Root-owned data
+is in scope only through the registered helper and only under `/Library/Caches`,
+`/Library/Logs`, and the app remnant roots in `HelperGuard`; an app bundle always needs a
+writable parent. The reasons for the rest are in the
 [user guide](docs/USER-GUIDE.md#not-covered).
