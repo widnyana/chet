@@ -15,6 +15,8 @@ public struct AuditLog: Sendable {
         let time: String
         let path: String
         let bytes: Int64
+        /// Optional so lines written before the field existed still decode.
+        let category: String?
         let mode: String
         let result: String
     }
@@ -23,16 +25,18 @@ public struct AuditLog: Sendable {
         _ item: ScanItem, _ outcome: CleanOutcome, dryRun: Bool, at date: Date = Date()
     ) {
         append(
-            path: item.url.path, bytes: item.reclaimableBytes, mode: item.mode, result: outcome.logValue,
-            dryRun: dryRun, at: date)
+            category: item.categoryID, path: item.url.path, bytes: item.reclaimableBytes, mode: item.mode,
+            result: outcome.logValue, dryRun: dryRun, at: date)
     }
 
     /// One row for a non-scan action, such as an app uninstall row.
     public func append(
-        path: String, bytes: Int64, mode: DeleteMode, result: String, dryRun: Bool, at date: Date = Date()
+        category: String, path: String, bytes: Int64, mode: DeleteMode, result: String, dryRun: Bool,
+        at date: Date = Date()
     ) {
         let entry = Entry(
-            time: ISO8601DateFormatter().string(from: date), path: path, bytes: bytes, mode: mode.rawValue,
+            time: ISO8601DateFormatter().string(from: date), path: path, bytes: bytes, category: category,
+            mode: mode.rawValue,
             // "dry-removed" can never be misread as a performed deletion.
             result: dryRun ? "dry-" + result : result)
         let encoder = JSONEncoder()

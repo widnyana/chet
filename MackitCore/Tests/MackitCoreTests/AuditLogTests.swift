@@ -22,7 +22,28 @@ struct AuditLogTests {
         let entries = try lines.map { try JSONDecoder().decode(AuditLog.Entry.self, from: Data($0.utf8)) }
         #expect(entries.map(\.path) == [a.path, b.path])
         #expect(entries.map(\.bytes) == [100, 200])
+        #expect(entries.map(\.category) == ["test", "test"])
+        #expect(lines.allSatisfy { $0.contains("\"category\":\"test\"") })
         #expect(entries.allSatisfy { $0.mode == "permanent" && $0.result == "removed" && !$0.time.isEmpty })
+    }
+
+    @Test func appRowsCarryTheApplicationsCategory() throws {
+        let dir = try TempDir()
+        let logURL = dir.url.appendingPathComponent("logs/clean.log")
+        AuditLog(url: logURL).append(
+            category: "applications", path: "/Applications/Example.app", bytes: 10, mode: .trash,
+            result: "trashed", dryRun: true)
+        let line = try String(contentsOf: logURL, encoding: .utf8)
+        let entry = try JSONDecoder().decode(AuditLog.Entry.self, from: Data(line.utf8))
+        #expect(entry.category == "applications")
+        #expect(entry.mode == "trash")
+        #expect(entry.result == "dry-trashed")
+    }
+
+    @Test func legacyLineWithoutCategoryStillDecodes() throws {
+        let line = #"{"bytes":1,"mode":"permanent","path":"/tmp/a","result":"removed","time":"2026-01-01T00:00:00Z"}"#
+        let entry = try JSONDecoder().decode(AuditLog.Entry.self, from: Data(line.utf8))
+        #expect(entry.category == nil)
     }
 
     @Test func skipReasonIsLogged() {

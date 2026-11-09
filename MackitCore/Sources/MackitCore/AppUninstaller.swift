@@ -751,8 +751,8 @@ public struct AppUninstaller: Sendable {
         guard let log else { return }
         for row in report.results {
             log.append(
-                path: row.url.path, bytes: row.bytes, mode: .trash, result: row.outcome.logValue,
-                dryRun: report.dryRun)
+                category: "applications", path: row.url.path, bytes: row.bytes, mode: .trash,
+                result: row.outcome.logValue, dryRun: report.dryRun)
         }
     }
 

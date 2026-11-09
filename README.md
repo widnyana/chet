@@ -99,7 +99,7 @@ move never hides the app itself. Everything goes to the Trash; nothing is delete
   you. Name-only matches stay unchecked, shared group containers are unselectable, and
   administrator-only entries are shown read-only. Every row is checked again right before it
   moves.
-- Every action is written to `~/Library/Logs/Mackit/clean.log`, one JSON line per item.
+- Every action is written to `~/Library/Logs/Mackit/clean.log`, one JSON line per item with its category, path, bytes, mode, and result.
 
 ## Metal
 
