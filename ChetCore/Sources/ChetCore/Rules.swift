@@ -156,10 +156,6 @@ extension Rule {
             roots: [], risk: .review, mode: .trash, owningBundleID: "org.virtualbox.app.VirtualBox",
             wholeRoots: true, discovery: .virtualBoxMachines),
         Rule(
-            id: "virtualbox-support", category: "dev-garbage", title: "VirtualBox support files",
-            roots: ["Library/VirtualBox"], risk: .safe, mode: .permanent,
-            owningBundleID: "org.virtualbox.app.VirtualBox", excluded: ["VirtualBox.xml"]),
-        Rule(
             id: "nix", title: "Nix",
             roots: ["/nix/store", "/nix/var/nix/profiles"], risk: .informational, mode: .trash,
             wholeRoots: true, listOnly: true),

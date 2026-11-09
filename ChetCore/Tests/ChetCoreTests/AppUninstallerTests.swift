@@ -83,13 +83,20 @@ struct AppUninstallerTests {
         ("com.test.foobar.binarycookies", "com.test.foobar"),
         ("group.com.test.shared", "com.test.shared"),
         ("ABCDE12345.com.test.shared", "com.test.shared"),
+        ("EQHXZ8M8AV.group.com.test.shared", "com.test.shared"),
+        ("group.ABCDE12345.com.test.shared", "com.test.shared"),
+        ("groups.com.apple.podcasts", "com.apple.podcasts"),
+        (
+            "systemgroup.com.apple.icloud.searchpartyd.sharedsettings.plist",
+            "com.apple.icloud.searchpartyd.sharedsettings"
+        ),
         ("com.test.foobar.123E4567-E89B-12D3-A456-426614174000.plist", "com.test.foobar"),
     ])
     func normalizesIdentifiers(name: String, expected: String) {
         #expect(AppUninstaller.normalizedIdentifier(name) == expected)
     }
 
-    @Test(arguments: ["Google", ".GlobalPreferences.plist", "com.test", "a..b.c"])
+    @Test(arguments: ["Google", ".GlobalPreferences.plist", "com.test", "a..b.c", "HUAQ24HBR6.dev.orbstack"])
     func rejectsNonIdentifiers(name: String) {
         #expect(AppUninstaller.normalizedIdentifier(name) == nil)
     }
@@ -148,6 +155,7 @@ struct AppUninstallerTests {
         let apps = try TempDir()
         try makeApp(in: apps.url, name: "Foobar", bundleID: "com.test.foobar")
         try home.file("Library/Group Containers/group.com.test.foobar/data", bytes: 10)
+        try home.file("Library/Group Containers/EQHXZ8M8AV.group.com.test.foobar/data", bytes: 10)
 
         let app = try #require(
             AppUninstaller(home: home.url, appFolders: [apps.url], searchRoots: []).installedApps().first)
@@ -155,12 +163,15 @@ struct AppUninstallerTests {
             AppSearchRoot(
                 url: home.url.appendingPathComponent("Library/Group Containers"), kind: .groupContainers, maxDepth: 0)
         ]
-        let component = try #require(
-            await uninstaller(home: home.url, apps: [apps.url], roots: roots)
-                .components(for: app, installedApps: [app]).first)
-        #expect(component.ownership == .shared)
-        #expect(!component.isSelectable)
-        #expect(!component.defaultSelected)
+        let components = await uninstaller(home: home.url, apps: [apps.url], roots: roots)
+            .components(for: app, installedApps: [app])
+        #expect(
+            Set(components.map(\.url.lastPathComponent)) == [
+                "group.com.test.foobar", "EQHXZ8M8AV.group.com.test.foobar",
+            ])
+        #expect(components.allSatisfy { $0.ownership == .shared })
+        #expect(components.allSatisfy { !$0.isSelectable })
+        #expect(components.allSatisfy { !$0.defaultSelected })
     }
 
     @Test func dataClaimedByAnotherInstalledAppIsShared() async throws {

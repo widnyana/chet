@@ -329,15 +329,34 @@ struct RuleScannerTests {
         #expect(items.allSatisfy { $0.risk == .safe && $0.mode == .permanent })
     }
 
-    @Test func virtualBoxSupportFilesSkipTheLiveRegistry() async throws {
+    @Test func virtualBoxRuntimeStateIsNotACleanupRule() {
+        #expect(Rule.catalog.allSatisfy { $0.id != "virtualbox-support" })
+        #expect(Rule.catalog.allSatisfy { !$0.roots.contains("Library/VirtualBox") })
+        #expect(Rule.catalog.contains { $0.id == "virtualbox-machines" })
+    }
+
+    @Test func devGarbageSkipsMiseInstallTrees() async throws {
         let dir = try TempDir()
-        try dir.file("Library/VirtualBox/VBoxSVC.log", bytes: 1_000)
-        try dir.file("Library/VirtualBox/VBoxSVC.log.1", bytes: 2_000_000)
-        try dir.file("Library/VirtualBox/VirtualBox.xml", bytes: 500)
-        let items = try await RuleScanner(home: dir.url).scan(try rule("virtualbox-support")).items
-        #expect(Set(items.map(\.url.lastPathComponent)) == ["VBoxSVC.log", "VBoxSVC.log.1"])
-        #expect(items.allSatisfy { $0.risk == .safe && $0.mode == .permanent })
-        #expect(items.allSatisfy { $0.ownerBundleID == "org.virtualbox.app.VirtualBox" })
+        try dir.file(
+            "Development/sdks/mise/installs/npm-socket/1.14.1/node_modules/x/index.js", bytes: 1_000_000)
+        try dir.file(
+            "Development/sdks/mise/installs/node/26.13.0/lib/node_modules/npm/package.json", bytes: 1_000_000)
+        try dir.file("Development/.mise/installs/npm-y/1.0.0/node_modules/y/index.js", bytes: 1_000_000)
+        try dir.file("Development/repos/app/node_modules/express/index.js", bytes: 1_000_000)
+        let items = try await RuleScanner(home: dir.url).scan(try rule("dev-garbage")).items
+        #expect(
+            items.map(\.url.path) == [
+                dir.url.appendingPathComponent("Development/repos/app/node_modules").path
+            ])
+    }
+
+    @Test func devGarbageFindsFlutterBuildDirs() async throws {
+        let dir = try TempDir()
+        try dir.file("Development/repos/app/build/app/outputs/flutter-apk/app-release.apk", bytes: 900_000)
+        try dir.file("Development/repos/app/.dart_tool/package_config.json", bytes: 10_000)
+        let items = try await RuleScanner(home: dir.url).scan(try rule("dev-garbage")).items
+        #expect(Set(items.map(\.url.lastPathComponent)) == ["build", ".dart_tool"])
+        #expect(items.allSatisfy { $0.risk == .review && $0.mode == .trash })
     }
 
     @Test func excludedFolderIsNotScanned() async throws {

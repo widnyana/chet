@@ -15,6 +15,22 @@ public struct RuleScanner: Sendable {
     /// The walk lists directories only and prunes heavy names, so the bound stays cheap.
     static let maxScanDepth = 12
 
+    /// Version managers own their install trees. Removing a build directory inside one breaks
+    /// the installed tool, so the walk never enters a mise data directory: the path named by
+    /// `MISE_DATA_DIR`, or a `mise`/`.mise` folder holding an `installs` child.
+    static let miseDataDirectory: String? = ProcessInfo.processInfo.environment["MISE_DATA_DIR"]
+        .map { URL(fileURLWithPath: $0, isDirectory: true).standardizedFileURL.path }
+
+    static func isMiseDataDirectory(_ url: URL) -> Bool {
+        let path = url.standardizedFileURL.path
+        if let root = miseDataDirectory, path == root || path.hasPrefix(root + "/") { return true }
+        guard url.lastPathComponent == "mise" || url.lastPathComponent == ".mise" else { return false }
+        var isDirectory: ObjCBool = false
+        return FileManager.default.fileExists(
+            atPath: url.appendingPathComponent("installs").path, isDirectory: &isDirectory)
+            && isDirectory.boolValue
+    }
+
     public let home: URL
     public let rules: [Rule]
     public let policy: SafetyPolicy
@@ -109,6 +125,7 @@ public struct RuleScanner: Sendable {
             let name = child.lastPathComponent
             if name == ".git" { continue }
             if policy.isExcluded(child) { continue }
+            if Self.isMiseDataDirectory(child) { continue }
             if names.contains(name) {
                 found.append(child)
             } else if !pruning.contains(name) {

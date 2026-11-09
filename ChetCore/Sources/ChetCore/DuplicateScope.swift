@@ -11,10 +11,11 @@ public enum DuplicateScope: Sendable, Equatable {
     /// Project build dir names, shared with the "Project build dirs" rule
     /// (`Rules.rules` uses the same set as its `recursiveNames`).
     /// `.vite` and `.next` usually sit under `node_modules` or a project root, and `.turbo`
-    /// caches Turborepo task output; all three rebuild from source.
+    /// caches Turborepo task output; all three rebuild from source. `build` and `.dart_tool`
+    /// are Flutter output: `flutter build` and `flutter pub get` recreate them.
     public static let regenerableNames: Set<String> = [
         "target", "node_modules", "vendor", ".build", ".gradle", "DerivedData", "Pods", ".vite", ".next",
-        ".turbo",
+        ".turbo", "build", ".dart_tool",
     ]
 
     /// Well-known cache and temporary folder names found inside user folders.

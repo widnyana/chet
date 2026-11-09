@@ -656,30 +656,39 @@ public struct AppUninstaller: Sendable {
     }
 
     /// `com.foo.app.plist` -> `com.foo.app`, `group.com.foo.x` -> `com.foo.x`,
-    /// `ABCDE12345.com.foo.x` -> `com.foo.x`, `com.foo.x.<UUID>` -> `com.foo.x`.
+    /// `ABCDE12345.com.foo.x` -> `com.foo.x`, `group.ABCDE12345.com.foo.x` -> `com.foo.x`,
+    /// `ABCDE12345.group.com.foo.x` -> `com.foo.x`, `groups.com.apple.podcasts` -> `com.apple.podcasts`,
+    /// `com.foo.x.<UUID>` -> `com.foo.x`.
     /// Nil when the name does not look like a reverse-DNS identifier with at least 3 parts.
     static func normalizedIdentifier(_ name: String) -> String? {
         var id = name
         for suffix in [".plist", ".savedState", ".binarycookies"] where id.hasSuffix(suffix) {
             id.removeLast(suffix.count)
         }
-        if id.hasPrefix("group.") { id.removeFirst("group.".count) }
-        var parts = id.split(separator: ".", omittingEmptySubsequences: false)
-        if parts.count >= 4, parts[0].count == 10,
-            parts[0].allSatisfy({ $0.isUppercase || $0.isNumber })
-        {
-            parts.removeFirst()
+        var parts = id.split(separator: ".", omittingEmptySubsequences: false).map(String.init)
+        var changed = true
+        while changed {
+            changed = false
+            if parts.count >= 3,
+                parts[0].count == 10, parts[0].allSatisfy({ $0.isUppercase || $0.isNumber })
+            {
+                parts.removeFirst()
+                changed = true
+            }
+            if let first = parts.first, ["group", "groups", "systemgroup"].contains(first.lowercased()) {
+                parts.removeFirst()
+                changed = true
+            }
         }
-        if parts.count >= 4, let last = parts.last, last.count == 36, last.contains("-") {
+        if parts.count >= 4, let last = parts.last, last.count == 36, UUID(uuidString: last) != nil {
             parts.removeLast()
         }
-        let check = parts
-        guard check.count >= 3,
-            check.allSatisfy({
+        guard parts.count >= 3,
+            parts.allSatisfy({
                 !$0.isEmpty && $0.allSatisfy { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }
             })
         else { return nil }
-        return check.joined(separator: ".")
+        return parts.joined(separator: ".")
     }
 
     static func vendorLabel(_ bundleID: String) -> String? {
@@ -689,7 +698,9 @@ public struct AppUninstaller: Sendable {
     }
 
     static func isGroupContainer(_ name: String) -> Bool {
-        name.lowercased().hasPrefix("group.")
+        let lower = name.lowercased()
+        return lower.hasPrefix("group.") || lower.hasPrefix("groups.") || lower.hasPrefix("systemgroup.")
+            || lower.contains(".group.") || lower.contains(".groups.") || lower.contains(".systemgroup.")
     }
 
     static func isShared(_ identifier: String, with otherIDs: BundleIDIndex) -> Bool {
