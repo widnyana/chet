@@ -64,11 +64,11 @@ struct GPUHasherTests {
             expected.append(GPUHasher.cpuDigest(data))
         }
         let gpu = GPUHasher(context: try GPUContext())
-        let urls = urls
+        let files = urls
         nonisolated(unsafe) var results = [String?](repeating: nil, count: 8)
         let lock = NSLock()
         DispatchQueue.concurrentPerform(iterations: 8) { i in
-            let digest = try? gpu.digest(urls[i % 2])
+            let digest = try? gpu.digest(files[i % 2])
             lock.lock()
             results[i] = digest
             lock.unlock()
