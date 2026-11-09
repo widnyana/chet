@@ -8,7 +8,8 @@ struct CategoryState: Identifiable {
     let title: String
     var items: [ScanItem] = []
     var needsFullDiskAccess = false
-    var bytes: Int64 { items.reduce(0) { $0 + $1.reclaimableBytes } }
+    /// Sum of `items`, kept by the writers so every render and sort reads it in O(1).
+    var bytes: Int64 = 0
 }
 
 /// One phase of a scan, listed on the overview while it runs.
@@ -142,13 +143,16 @@ final class ScanModel {
         }
     }
     nonisolated static let helperLifetimeKey = "helperLifetimeMinutes"
-    var categories: [CategoryState] = [] {
-        didSet { reindexItems() }
-    }
-    /// First item per URL (a file can sit in several categories) and the sum over those, kept in
-    /// step with `categories` so reads during render are O(1) / O(selected).
+    var categories: [CategoryState] = []
+    /// First item per URL (a file can sit in several categories), filled by `record` so no read
+    /// rebuilds it.
     private(set) var itemsByURL: [URL: ScanItem] = [:]
+    /// Every URL already counted in `totalBytes`, so duplicates across categories count once.
+    @ObservationIgnored private var countedURLs: Set<URL> = []
+    /// Reclaimable bytes per counted URL. `selectedBytes` reads this on selection changes.
+    @ObservationIgnored private var bytesByURL: [URL: Int64] = [:]
     private(set) var totalBytes: Int64 = 0
+    private(set) var selectedBytes: Int64 = 0
     /// Category id -> groups, for duplicates and similar media.
     var groups: [String: [ItemGroup]] = [:]
     var snapshots: [LocalSnapshot] = []
@@ -219,23 +223,26 @@ final class ScanModel {
         "system-caches": "System caches", "system-logs": "System logs",
     ]
 
-    private func reindexItems() {
-        var map: [URL: ScanItem] = [:]
-        var total: Int64 = 0
-        for category in categories {
-            for item in category.items where map[item.url] == nil {
-                map[item.url] = item
-                total += item.reclaimableBytes
-            }
-        }
-        itemsByURL = map
-        totalBytes = total
-    }
-
     /// Selected items, each URL once (a file can show up in more than one category).
     var selectedItems: [ScanItem] { selected.compactMap { itemsByURL[$0] } }
 
-    var selectedBytes: Int64 { selected.reduce(0) { $0 + (itemsByURL[$1]?.reclaimableBytes ?? 0) } }
+    /// Counts an item's bytes once, so a URL in two categories adds to the total a single time.
+    private func record(_ item: ScanItem) {
+        guard countedURLs.insert(item.url).inserted else { return }
+        bytesByURL[item.url] = item.reclaimableBytes
+        totalBytes += item.reclaimableBytes
+        itemsByURL[item.url] = item
+    }
+
+    func select(_ url: URL) {
+        guard selected.insert(url).inserted, let bytes = bytesByURL[url] else { return }
+        selectedBytes += bytes
+    }
+
+    func deselect(_ url: URL) {
+        guard selected.remove(url) != nil, let bytes = bytesByURL[url] else { return }
+        selectedBytes -= bytes
+    }
 
     func refreshAccess() {
         access = FullDiskAccess.status()
@@ -269,6 +276,11 @@ final class ScanModel {
         groups = [:]
         snapshots = []
         selected = []
+        countedURLs.removeAll()
+        bytesByURL.removeAll()
+        itemsByURL.removeAll()
+        totalBytes = 0
+        selectedBytes = 0
         selectedSnapshots = []
         folderTrees = []
         confirmItems = []
@@ -400,13 +412,25 @@ final class ScanModel {
                     }
                 })
             for index in categories.indices {
-                categories[index].items.removeAll { gone.contains($0.url) }
+                var removedBytes: Int64 = 0
+                categories[index].items.removeAll { item in
+                    guard gone.contains(item.url) else { return false }
+                    removedBytes += item.reclaimableBytes
+                    return true
+                }
+                categories[index].bytes -= removedBytes
             }
             groups = groups.mapValues { list in
                 list.map { ItemGroup(keeper: $0.keeper, items: $0.items.filter { !gone.contains($0.url) }) }
                     .filter { !$0.items.isEmpty }
             }
-            selected.subtract(gone)
+            for url in gone {
+                if selected.contains(url) { deselect(url) }
+                if countedURLs.remove(url) != nil {
+                    self.totalBytes -= bytesByURL.removeValue(forKey: url) ?? 0
+                }
+                itemsByURL.removeValue(forKey: url)
+            }
             snapshots.removeAll { deleted.contains($0) }
             selectedSnapshots.subtract(deleted)
             snapshotErrors = errors
@@ -545,18 +569,24 @@ final class ScanModel {
                 CategoryState(id: result.category, title: Self.titles[result.category] ?? result.category))
         }
         guard let index = categories.firstIndex(where: { $0.id == result.category }) else { return }
+        let itemBytes = result.items.reduce(Int64(0)) { $0 + $1.reclaimableBytes }
+        for item in result.items { record(item) }
         categories[index].items += result.items
+        categories[index].bytes += itemBytes
         categories[index].needsFullDiskAccess = categories[index].needsFullDiskAccess || result.needsFullDiskAccess
-        selected.formUnion(result.items.filter { $0.risk == .safe }.map(\.url))
-        categories.sort { $0.bytes > $1.bytes }
+        for item in result.items where item.risk == .safe { select(item.url) }
+        categories = categories.map { ($0.bytes, $0) }.sorted { $0.0 > $1.0 }.map(\.1)
     }
 
     private func add(_ id: String, items: [ScanItem] = [], groups newGroups: [ItemGroup] = []) {
         let all = items + newGroups.flatMap(\.items)
         guard !all.isEmpty else { return }
-        categories.append(CategoryState(id: id, title: Self.titles[id] ?? id, items: all))
+        for item in all { record(item) }
+        let bytes = all.reduce(Int64(0)) { $0 + $1.reclaimableBytes }
+        categories.append(
+            CategoryState(id: id, title: Self.titles[id] ?? id, items: all, bytes: bytes))
         if !newGroups.isEmpty { groups[id] = newGroups }
-        categories.sort { $0.bytes > $1.bytes }
+        categories = categories.map { ($0.bytes, $0) }.sorted { $0.0 > $1.0 }.map(\.1)
     }
 
     nonisolated static func item(_ entry: WalkEntry, _ category: String) -> ScanItem {

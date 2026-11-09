@@ -1,4 +1,5 @@
 import CryptoKit
+import Darwin
 import Foundation
 
 public struct DuplicateGroup: Sendable, Identifiable {
@@ -116,48 +117,115 @@ public struct DuplicateFinder: Sendable {
         return groups
     }
 
+    /// One 1 MiB chunk buffer for a hashing pass. POSIX reads keep Foundation's
+    /// autoreleased `NSData` out of the long synchronous duplicate step.
+    private static func withBuffer<T>(_ body: (UnsafeMutableRawPointer) throws -> T) rethrows -> T {
+        let buffer = UnsafeMutableRawPointer.allocate(byteCount: 1 << 20, alignment: 8)
+        defer { buffer.deallocate() }
+        return try body(buffer)
+    }
+
+    private static func openFile(_ url: URL) throws -> Int32 {
+        let fd = url.withUnsafeFileSystemRepresentation { path -> Int32 in
+            guard let path else { return -1 }
+            return open(path, O_RDONLY | O_CLOEXEC)
+        }
+        guard fd >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        _ = fcntl(fd, F_NOCACHE, 1)
+        return fd
+    }
+
+    private static func readChunk(_ fd: Int32, _ buffer: UnsafeMutableRawPointer, _ count: Int)
+        -> Int
+    {
+        while true {
+            let got = read(fd, buffer, count)
+            if got >= 0 { return got }
+            if errno != EINTR { return -1 }
+        }
+    }
+
     static func sameBytes(_ a: URL, _ b: URL) throws -> Bool {
-        guard let left = try? FileHandle.uncached(a), let right = try? FileHandle.uncached(b) else {
+        let left = try? openFile(a)
+        let right = try? openFile(b)
+        guard let left, let right else {
+            if let left { close(left) }
+            if let right { close(right) }
             return false
         }
         defer {
-            try? left.close()
-            try? right.close()
+            close(left)
+            close(right)
+        }
+        let first = UnsafeMutableRawPointer.allocate(byteCount: 1 << 20, alignment: 8)
+        let second = UnsafeMutableRawPointer.allocate(byteCount: 1 << 20, alignment: 8)
+        defer {
+            first.deallocate()
+            second.deallocate()
         }
         while true {
             try Task.checkCancellation()
-            let x = (try? left.read(upToCount: 1 << 20)) ?? Data()
-            let y = (try? right.read(upToCount: 1 << 20)) ?? Data()
-            if x != y { return false }
-            if x.isEmpty { return true }
+            let x = readChunk(left, first, 1 << 20)
+            let y = readChunk(right, second, 1 << 20)
+            if x < 0 || y < 0 || x != y { return false }
+            if x == 0 { return true }
+            if memcmp(first, second, x) != 0 { return false }
         }
     }
 
     static func edgeHash(_ url: URL) throws -> String {
-        let handle = try FileHandle.uncached(url)
-        defer { try? handle.close() }
+        let fd = try openFile(url)
+        defer { close(fd) }
+        var info = stat()
+        guard fstat(fd, &info) == 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
         var hasher = SHA256()
-        if let head = try handle.read(upToCount: 16_384) { hasher.update(data: head) }
-        let end = try handle.seekToEnd()
-        if end > 16_384 {
-            try handle.seek(toOffset: end - 16_384)
-            if let tail = try handle.read(upToCount: 16_384) { hasher.update(data: tail) }
+        try withBuffer { buffer in
+            let head = readChunk(fd, buffer, 16_384)
+            if head < 0 { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+            if head > 0 {
+                hasher.update(bufferPointer: UnsafeRawBufferPointer(start: buffer, count: head))
+            }
+            if info.st_size > 16_384 {
+                guard lseek(fd, info.st_size - 16_384, SEEK_SET) >= 0 else {
+                    throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+                }
+                let tail = readChunk(fd, buffer, 16_384)
+                if tail < 0 { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+                if tail > 0 {
+                    hasher.update(bufferPointer: UnsafeRawBufferPointer(start: buffer, count: tail))
+                }
+            }
         }
         return hex(hasher.finalize())
     }
 
     static func fullHash(_ url: URL) throws -> String {
-        let handle = try FileHandle.uncached(url)
-        defer { try? handle.close() }
+        let fd = try openFile(url)
+        defer { close(fd) }
         var hasher = SHA256()
-        while let chunk = try handle.read(upToCount: 1 << 20), !chunk.isEmpty {
-            try Task.checkCancellation()
-            hasher.update(data: chunk)
+        try withBuffer { buffer in
+            while true {
+                try Task.checkCancellation()
+                let count = readChunk(fd, buffer, 1 << 20)
+                if count < 0 { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+                if count == 0 { break }
+                hasher.update(bufferPointer: UnsafeRawBufferPointer(start: buffer, count: count))
+            }
         }
         return hex(hasher.finalize())
     }
 
+    private static let hexDigits: [UInt8] = Array("0123456789abcdef".utf8)
+
     static func hex(_ digest: SHA256.Digest) -> String {
-        digest.map { String(format: "%02x", $0) }.joined()
+        var bytes: [UInt8] = []
+        bytes.reserveCapacity(64)
+        for byte in digest {
+            bytes.append(hexDigits[Int(byte >> 4)])
+            bytes.append(hexDigits[Int(byte & 0x0F)])
+        }
+        return String(decoding: bytes, as: UTF8.self)
     }
 }

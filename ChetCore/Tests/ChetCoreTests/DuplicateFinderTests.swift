@@ -115,6 +115,25 @@ struct DuplicateFinderTests {
         await #expect(throws: CancellationError.self) { try await task.value }
     }
 
+    @Test func fullHashMatchesKnownDigest() throws {
+        let dir = try TempDir()
+        let file = try write(Data("abc".utf8), "abc.bin", in: dir)
+        #expect(
+            try DuplicateFinder.fullHash(file)
+                == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+    }
+
+    @Test func sameBytesReadsPastTheFirstChunk() throws {
+        let dir = try TempDir()
+        let first = Data(repeating: 0x41, count: 2_500_000)
+        var second = first
+        second[2_400_000] = 0x42
+        let a = try write(first, "a.bin", in: dir)
+        let b = try write(second, "b.bin", in: dir)
+        #expect(try DuplicateFinder.sameBytes(a, b) == false)
+        #expect(try DuplicateFinder.sameBytes(a, a) == true)
+    }
+
     // MARK: DuplicateScope
 
     @Test func standardScopeSkipsRegenerableAndTempFolders() throws {

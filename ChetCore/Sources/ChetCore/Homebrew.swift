@@ -128,26 +128,39 @@ public enum Homebrew {
         let caskroom = prefix + "/Caskroom"
         var out = packages
         out.withUnsafeMutableBufferPointer { buffer in
-            DispatchQueue.concurrentPerform(iterations: buffer.count) { index in
-                var package = buffer[index]
-                if package.kind == .formula {
-                    let keg = cellar + "/" + package.name
-                    var total: Int64 = 0
-                    var old: Int64 = 0
-                    for version in FS.list(keg) ?? [] {
-                        let size = FS.usage(keg + "/" + version).size
-                        total += size
-                        if version != package.version { old += size }
+            guard let baseAddress = buffer.baseAddress else { return }
+            // Each worker writes disjoint indices, so the shared base pointer is safe.
+            nonisolated(unsafe) let base = baseAddress
+            let count = buffer.count
+            let workers = min(4, count)
+            DispatchQueue.concurrentPerform(iterations: workers) { worker in
+                var index = worker
+                while index < count {
+                    // One pool per package: the walk builds Foundation strings and arrays that
+                    // would otherwise live until the worker finishes.
+                    autoreleasepool {
+                        var package = base[index]
+                        if package.kind == .formula {
+                            let keg = cellar + "/" + package.name
+                            var total: Int64 = 0
+                            var old: Int64 = 0
+                            for version in FS.list(keg) ?? [] {
+                                let size = FS.usage(keg + "/" + version).size
+                                total += size
+                                if version != package.version { old += size }
+                            }
+                            package.size = total
+                            package.oldVersionsSize = old
+                            package.paths = [keg]
+                        } else {
+                            let room = caskroom + "/" + package.name
+                            package.size = FS.usage(room).size + package.paths.reduce(0) { $0 + FS.usage($1).size }
+                            package.paths = package.paths + [room]
+                        }
+                        base[index] = package
                     }
-                    package.size = total
-                    package.oldVersionsSize = old
-                    package.paths = [keg]
-                } else {
-                    let room = caskroom + "/" + package.name
-                    package.size = FS.usage(room).size + package.paths.reduce(0) { $0 + FS.usage($1).size }
-                    package.paths = package.paths + [room]
+                    index += workers
                 }
-                buffer[index] = package
             }
         }
         return out

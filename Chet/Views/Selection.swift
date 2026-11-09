@@ -21,9 +21,9 @@ extension ScanModel {
             set: { on in
                 if on {
                     guard self.canSelect(url) else { return }
-                    self.selected.insert(url)
+                    self.select(url)
                 } else {
-                    self.selected.remove(url)
+                    self.deselect(url)
                 }
             })
     }
@@ -38,15 +38,15 @@ extension ScanModel {
 
     func setSelected(_ urls: [URL], _ on: Bool) {
         let allowed = on ? urls.filter { canSelect($0) } : urls
-        if on { selected.formUnion(allowed) } else { selected.subtract(allowed) }
+        for url in allowed { if on { select(url) } else { deselect(url) } }
     }
 
     func invertSelection(_ urls: [URL]) {
         for url in urls {
             if selected.contains(url) {
-                selected.remove(url)
+                deselect(url)
             } else if canSelect(url) {
-                selected.insert(url)
+                select(url)
             }
         }
     }

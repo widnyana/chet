@@ -102,6 +102,25 @@ final class TickGate: Sendable {
     }
 }
 
+/// Rate and total limits for live rollup trees. Shared by every worker.
+final class RollupGate: Sendable {
+    private let tick = TickGate()
+    private let remaining: Mutex<Int>
+
+    init(limit: Int) {
+        remaining = Mutex(limit)
+    }
+
+    func allow(now: UInt64) -> Bool {
+        guard tick.take(now: now, interval: 250_000_000) else { return false }
+        return remaining.withLock { count in
+            guard count > 0 else { return false }
+            count -= 1
+            return true
+        }
+    }
+}
+
 public struct FileIndexBuilder: Sendable {
     public let policy: SafetyPolicy
     public let progress: ScanProgress
@@ -120,6 +139,11 @@ public struct FileIndexBuilder: Sendable {
     public var rollupMaxDepth = 2
     /// Folders at or above this size are reported regardless of depth.
     public var rollupMinBytes: Int64 = 32_000_000
+    /// Folder levels materialized below a rollup node for the live map. The map draws
+    /// three nesting levels, so two below the node is enough.
+    public var rollupLevels = 2
+    /// Hard cap on live rollup trees per walk. The final `folderTrees` is unaffected.
+    public var rollupUpdateLimit = 512
     /// Folder levels kept in `FileIndex.trees`; deeper folders only add to their ancestors.
     public var maxDepth = 6
     public var candidateMinSize: Int64 = 1_000_000
@@ -188,6 +212,7 @@ public struct FileIndexBuilder: Sendable {
         if cancellation.isCancelled { throw CancellationError() }
         let count = threads == 0 ? max(1, ProcessInfo.processInfo.activeProcessorCount) : max(1, threads)
         let queue = DirQueue(threads: count)
+        let rollupGate = RollupGate(limit: rollupUpdateLimit)
         let merge = TreeMerge()
         var rootIDs: [Int] = []
         var seed: [DirQueue.OpenDir] = []  // roots beyond the queue capacity: worker 0's stack
@@ -214,7 +239,7 @@ public struct FileIndexBuilder: Sendable {
         if count == 1 {
             Self.workerBody(
                 queue: queue, merge: merge, cancel: cancellation, builder: self,
-                rootsTotal: roots.count, seed: seed)
+                rootsTotal: roots.count, seed: seed, rollupGate: rollupGate)
         } else {
             let group = DispatchGroup()
             for i in 0..<count {
@@ -223,7 +248,7 @@ public struct FileIndexBuilder: Sendable {
                 let worker = Thread { [self] in
                     Self.workerBody(
                         queue: queue, merge: merge, cancel: cancellation, builder: self,
-                        rootsTotal: roots.count, seed: workerSeed)
+                        rootsTotal: roots.count, seed: workerSeed, rollupGate: rollupGate)
                     group.leave()
                 }
                 worker.name = "chet-scan-\(i)"
@@ -281,9 +306,12 @@ public struct FileIndexBuilder: Sendable {
         let tag = openat(fd, "CACHEDIR.TAG", O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
         guard tag >= 0 else { return false }
         defer { close(tag) }
-        var buffer = [UInt8](repeating: 0, count: cacheTagSignature.count)
-        let count = read(tag, &buffer, buffer.count)
-        return count == buffer.count && buffer == cacheTagSignature
+        // Stack space, not a fresh array per directory: this runs once for every folder walked.
+        return withUnsafeTemporaryAllocation(of: UInt8.self, capacity: cacheTagSignature.count) {
+            buffer in
+            let count = read(tag, buffer.baseAddress, buffer.count)
+            return count == buffer.count && buffer.elementsEqual(cacheTagSignature)
+        }
     }
 
     struct Entry {
@@ -579,12 +607,15 @@ private final class TreeMerge: @unchecked Sendable {
     }
 
     /// Trees for the ids finalized in one merge, with the depth and root flag the callbacks need.
-    func snapshots(_ ids: [Int], maxDepth: Int) -> [Snapshot] {
+    func snapshots(
+        _ ids: [Int], maxDepth: Int, levels: Int, include: (DirNode) -> Bool
+    ) -> [Snapshot] {
         state.withLock { s in
             ids.compactMap { id in
-                guard let n = s.nodes[id] else { return nil }
+                guard let n = s.nodes[id], include(n) else { return nil }
+                let limit = min(maxDepth, n.depth + levels)
                 return Snapshot(
-                    node: Self.folderNode(id, maxDepth: maxDepth, nodes: s.nodes),
+                    node: Self.folderNode(id, maxDepth: limit, nodes: s.nodes),
                     depth: n.depth, isRoot: n.parent == nil)
             }
         }
@@ -625,7 +656,7 @@ private final class TreeMerge: @unchecked Sendable {
 extension FileIndexBuilder {
     fileprivate static func workerBody(
         queue: DirQueue, merge: TreeMerge, cancel: CancelState, builder: FileIndexBuilder,
-        rootsTotal: Int, seed: [DirQueue.OpenDir]
+        rootsTotal: Int, seed: [DirQueue.OpenDir], rollupGate: RollupGate
     ) {
         var stack = seed
         while !cancel.isCancelled, let dir = queue.pop() {
@@ -633,7 +664,7 @@ extension FileIndexBuilder {
             while !cancel.isCancelled, let d = stack.popLast() {
                 process(
                     d, stack: &stack, queue: queue, merge: merge, cancel: cancel, builder: builder,
-                    rootsTotal: rootsTotal)
+                    rootsTotal: rootsTotal, rollupGate: rollupGate)
             }
         }
         for d in stack { close(d.fd) }
@@ -643,7 +674,8 @@ extension FileIndexBuilder {
 
     private static func process(
         _ dir: DirQueue.OpenDir, stack: inout [DirQueue.OpenDir], queue: DirQueue,
-        merge: TreeMerge, cancel: CancelState, builder: FileIndexBuilder, rootsTotal: Int
+        merge: TreeMerge, cancel: CancelState, builder: FileIndexBuilder, rootsTotal: Int,
+        rollupGate: RollupGate
     ) {
         defer { close(dir.fd) }
         builder.progress.enter(dir.url.path)
@@ -722,11 +754,18 @@ extension FileIndexBuilder {
             node: dir.node, entries: entries, batch: batch, plainBytes: plainBytes,
             plainLeaves: plainLeaves, plainCandidates: plainCandidates)
         builder.progress.add(files: entries, bytes: counted)
-        for snapshot in merge.snapshots(finalized, maxDepth: builder.maxDepth) {
+        let rollups = merge.snapshots(
+            finalized, maxDepth: builder.maxDepth, levels: builder.rollupLevels,
+            include: { node in
+                if node.parent == nil { return true }
+                guard builder.onRollup != nil else { return false }
+                guard node.depth <= builder.rollupMaxDepth || node.size >= builder.rollupMinBytes
+                else { return false }
+                return rollupGate.allow(now: DispatchTime.now().uptimeNanoseconds)
+            })
+        for snapshot in rollups {
             if snapshot.isRoot { builder.onRootMeasured?(snapshot.node) }
-            if snapshot.depth <= builder.rollupMaxDepth || snapshot.node.size >= builder.rollupMinBytes {
-                builder.onRollup?(snapshot.node)
-            }
+            builder.onRollup?(snapshot.node)
         }
         builder.emitProgress(
             folder: dir.url.path, rootsDone: merge.rootsDone, rootsTotal: rootsTotal,
