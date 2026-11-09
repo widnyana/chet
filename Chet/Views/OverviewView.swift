@@ -275,9 +275,12 @@ struct OverviewView: View {
                 actionTitle: "Clean selected",
                 actionSystemImage: "trash",
                 isEnabled: !model.isCleaning,
+                secondaryTitle: "Scan again",
+                secondaryAction: { model.scan() },
                 help: "Review and clean the selected items",
                 accessibilityLabel: "Clean selected, \(count) items",
                 disabledReason: "Cleaning is running.",
+                secondaryIdentifier: "home.rescan",
                 action: {
                     model.beginClean()
                     onClean()

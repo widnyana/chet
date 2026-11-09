@@ -147,8 +147,8 @@ Top to bottom:
      `Check first`.
 4. Category ledger: monochrome symbol, name, item count, size. Largest first.
    Clicking a row opens the category.
-5. Command bar: `Scan this Mac`, `Scan again`, `Stop scan`, or `Clean selected`,
-   one per state.
+5. Command bar: `Scan this Mac`, `Scan again`, `Stop scan`, or `Clean selected` with
+   `Scan again` beside it, one primary per state.
 
 No chart. The ledger is the chart. No uninstall card. Apps is in the
 sidebar.

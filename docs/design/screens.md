@@ -51,7 +51,9 @@ Top to bottom:
 5. `CommandBar`:
    - never scanned: primary `Scan this Mac`;
    - scan running: `Stop scan`;
-   - scan finished with a selection: summary and `Clean selected`;
+   - scan finished with a selection: summary, `Clean selected` as the primary, and
+     `Scan again` beside it, so a settings change never strands the user on stale
+     results;
    - scan finished with nothing selected: `Scan again`.
 
 Home does not contain an uninstall card. Apps is a sidebar destination.

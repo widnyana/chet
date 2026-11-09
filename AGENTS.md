@@ -113,7 +113,9 @@ The window becomes the split view:
   - never scanned: capacity bar, `Scan` (`home.scan`), empty state `No scan yet` (`home.empty`);
   - scanning: the step list, linear progress, `Pause` (`home.pause`) and `Resume`
     (`home.resume`);
-  - finished: `Safe to remove` and `Check first` ledgers, total metric, command bar.
+  - finished: `Safe to remove` and `Check first` ledgers, total metric, command bar. While
+    items are selected the bar holds `Clean selected` as the primary and `Scan again`
+    (`home.rescan`) beside it; with nothing selected `Scan again` is the primary (`home.scan`).
 - Toolbar: the scan control (`toolbar.scan`, or `toolbar.scanStop` while scanning) on every
   destination except Apps and Tweaks. Apps owns search, layout, and reload. Tweaks owns
   search and `Read again` (`tweaks.reload`).
@@ -329,7 +331,7 @@ identifiers of the controls inside it. Put the identifier on the control you wil
 | `sidebar.tweaks` | Tweaks |
 | `sidebar.<category id>` | category rows: `trash`, `caches`, `logs`, `xcode`, `dev-garbage`, `browser`, `duplicates`, `large-files`, `leftovers`, `snapshots`, and the rest |
 | `toolbar.scan`, `toolbar.scanStop` | toolbar scan control |
-| `home.header`, `home.empty`, `home.scan`, `home.pause`, `home.resume` | Home |
+| `home.header`, `home.empty`, `home.scan`, `home.rescan`, `home.pause`, `home.resume` | Home |
 | `apps.header` | Apps |
 | `storage.header`, `storage.pause`, `storage.resume` | Storage |
 | `list.selectAll` | category table select-all |
