@@ -665,31 +665,38 @@ public struct AppUninstaller: Sendable {
         for suffix in [".plist", ".savedState", ".binarycookies"] where id.hasSuffix(suffix) {
             id.removeLast(suffix.count)
         }
-        var parts = id.split(separator: ".", omittingEmptySubsequences: false).map(String.init)
-        var changed = true
-        while changed {
-            changed = false
-            if parts.count >= 3,
-                parts[0].count == 10, parts[0].allSatisfy({ $0.isUppercase || $0.isNumber })
-            {
-                parts.removeFirst()
-                changed = true
-            }
-            if let first = parts.first, ["group", "groups", "systemgroup"].contains(first.lowercased()) {
-                parts.removeFirst()
-                changed = true
+        let parts = id.split(separator: ".", omittingEmptySubsequences: false).map(String.init)
+        var start = 0
+        while start < parts.count {
+            let part = parts[start]
+            // A team prefix is only dropped while at least three parts remain, so a bare
+            // `TEAMXXXXXX.domain.tld` is not mistaken for an app identifier.
+            if parts.count - start >= 3, isTeamComponent(part) {
+                start += 1
+            } else if groupPrefixes.contains(part.lowercased()) {
+                start += 1
+            } else {
+                break
             }
         }
-        if parts.count >= 4, let last = parts.last, last.count == 36, UUID(uuidString: last) != nil {
-            parts.removeLast()
+        var rest = Array(parts[start...])
+        if rest.count >= 4, let last = rest.last, last.count == 36, UUID(uuidString: last) != nil {
+            rest.removeLast()
         }
-        guard parts.count >= 3,
-            parts.allSatisfy({
+        guard rest.count >= 3,
+            rest.allSatisfy({
                 !$0.isEmpty && $0.allSatisfy { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }
             })
         else { return nil }
-        return parts.joined(separator: ".")
+        return rest.joined(separator: ".")
     }
+
+    /// A signing-team component: ten uppercase alphanumeric characters.
+    static func isTeamComponent(_ part: String) -> Bool {
+        part.count == 10 && part.allSatisfy { $0.isUppercase || $0.isNumber }
+    }
+
+    static let groupPrefixes: Set<String> = ["group", "groups", "systemgroup"]
 
     static func vendorLabel(_ bundleID: String) -> String? {
         let parts = bundleID.split(separator: ".")

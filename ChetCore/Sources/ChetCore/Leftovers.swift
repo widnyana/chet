@@ -1,6 +1,5 @@
 import AppKit
 import Foundation
-import Security
 
 /// Library entries named after a bundle ID whose app (or any app from the same vendor) is not
 /// installed, is not registered with LaunchServices, and whose owner is not recorded as
@@ -67,9 +66,14 @@ public struct LeftoverScanner: Sendable {
                 try Task.checkCancellation()
                 guard let id = Self.bundleID(fromName: entry.lastPathComponent) else { continue }
                 guard !Self.isOwn(id), !Self.isAppleOwned(id) else { continue }
-                guard !installedIDs.isShared(id) else { continue }
-                guard !vendors.contains(Self.vendor(id)) else { continue }
+                guard !installedIDs.isShared(id), !vendors.contains(Self.vendor(id)) else { continue }
                 guard !resolvesInstalled(id) else { continue }
+                guard policy.isDeletable(entry) == .allowed, let stamp = FileStamp.read(entry) else {
+                    continue
+                }
+                guard now.timeIntervalSince(stamp.modified) >= minAge else { continue }
+                // Container metadata costs a plist read and two parses, so it is paid only
+                // for data that already passed every cheap filter.
                 if folder == "Library/Containers", !Self.containerIsOrphan(entry, teams: teams) {
                     continue
                 }
@@ -78,10 +82,6 @@ public struct LeftoverScanner: Sendable {
                 {
                     continue
                 }
-                guard policy.isDeletable(entry) == .allowed, let stamp = FileStamp.read(entry) else {
-                    continue
-                }
-                guard now.timeIntervalSince(stamp.modified) >= minAge else { continue }
                 items.append(
                     ScanItem(
                         url: entry, categoryID: "leftovers", risk: .review, mode: .trash,
@@ -121,8 +121,7 @@ public struct LeftoverScanner: Sendable {
     /// The signing team of a container or group container name: any 10-character
     /// uppercase alphanumeric component.
     static func team(in name: String) -> String? {
-        for part in name.split(separator: ".")
-        where part.count == 10 && part.allSatisfy({ $0.isUppercase || $0.isNumber }) {
+        for part in name.split(separator: ".") where AppUninstaller.isTeamComponent(String(part)) {
             return String(part)
         }
         return nil
@@ -138,20 +137,31 @@ public struct LeftoverScanner: Sendable {
                 as? [String: Any],
             let info = plist["MCMMetadataInfo"] as? [String: Any]
         else { return true }
-        if let owners = info["Owners"] as? String,
-            let payload = owners.data(using: .utf8),
-            let list = try? JSONSerialization.jsonObject(with: payload) as? [[String: Any]],
-            list.contains(where: { ($0["teamIdentifier"] as? String).map(teams.contains) ?? false })
-        {
-            return false
-        }
-        if let validation = info["SandboxProfileDataValidationInfo"] as? [String: Any],
-            let parameters = validation["Parameters"] as? [String: Any],
-            let bundle = parameters["application_bundle"] as? String,
-            FileManager.default.fileExists(atPath: bundle)
+        if Self.ownerTeams(info).contains(where: teams.contains) { return false }
+        if let bundle = Self.recordedAppBundle(info),
+            FileManager.default.fileExists(atPath: bundle.path)
         {
             return false
         }
         return true
+    }
+
+    /// `MCMMetadataInfo.Owners` holds a JSON string, not a nested plist value.
+    static func ownerTeams(_ info: [String: Any]) -> [String] {
+        guard let owners = info["Owners"] as? String,
+            let payload = owners.data(using: .utf8),
+            let list = try? JSONSerialization.jsonObject(with: payload) as? [[String: Any]]
+        else { return [] }
+        return list.compactMap { $0["teamIdentifier"] as? String }
+    }
+
+    /// The app bundle path the container's sandbox profile was validated against.
+    static func recordedAppBundle(_ info: [String: Any]) -> URL? {
+        let validation = info["SandboxProfileDataValidationInfo"] as? [String: Any]
+        guard
+            let bundle = (validation?["Parameters"] as? [String: Any])?["application_bundle"]
+                as? String
+        else { return nil }
+        return URL(fileURLWithPath: bundle)
     }
 }

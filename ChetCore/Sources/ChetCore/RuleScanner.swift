@@ -65,8 +65,10 @@ public struct RuleScanner: Sendable {
             let isAbsolute = root.hasPrefix("/")
             var candidates: [URL]
             if let names = rule.recursiveNames {
-                candidates = try recursiveMatches(
-                    rootURL, names, pruning: rule.prunedNames, venvs: rule.matchesVirtualEnvironments)
+                candidates = []
+                try recursiveMatches(
+                    rootURL, names, pruning: rule.prunedNames, venvs: rule.matchesVirtualEnvironments,
+                    into: &candidates)
             } else {
                 do {
                     let listed = try FileManager.default.contentsOfDirectory(
@@ -120,12 +122,13 @@ public struct RuleScanner: Sendable {
     /// directory becomes one item and is never descended into; `.git` is never entered, and
     /// `pruning` names are neither matched nor entered when another rule owns them.
     /// Depth is capped so a pathological tree cannot make the scan unbounded.
+    /// Matches accumulate into one array, so the walk never copies its results per level.
     private func recursiveMatches(
-        _ root: URL, _ names: Set<String>, pruning: Set<String> = [], venvs: Bool = false, depth: Int = 0
-    ) throws -> [URL] {
-        guard depth <= Self.maxScanDepth else { return [] }
+        _ root: URL, _ names: Set<String>, pruning: Set<String> = [], venvs: Bool = false,
+        into found: inout [URL], depth: Int = 0
+    ) throws {
+        guard depth <= Self.maxScanDepth else { return }
         let children = (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
-        var found: [URL] = []
         for child in children {
             try Task.checkCancellation()
             var isDirectory: ObjCBool = false
@@ -136,15 +139,13 @@ public struct RuleScanner: Sendable {
             if name == ".git" { continue }
             if policy.isExcluded(child) { continue }
             if Self.isMiseDataDirectory(child) { continue }
-            if venvs && Self.isVirtualEnvironment(child) {
-                found.append(child)
-            } else if names.contains(name) {
+            if (venvs && Self.isVirtualEnvironment(child)) || names.contains(name) {
                 found.append(child)
             } else if !pruning.contains(name) {
-                found += try recursiveMatches(child, names, pruning: pruning, venvs: venvs, depth: depth + 1)
+                try recursiveMatches(
+                    child, names, pruning: pruning, venvs: venvs, into: &found, depth: depth + 1)
             }
         }
-        return found
     }
 
     /// Absolute roots a rule learns only at scan time (tool registries, custom install paths).

@@ -24,10 +24,9 @@ public enum DuplicateScope: Sendable, Equatable {
     /// Hidden per-project tool state dirs; regenerable, never worth hashing.
     public static let toolStateNames: Set<String> = [".terraform", ".terragrunt-cache"]
 
-    /// Path components the standard scope never hashes duplicates in.
-    static var skippedComponents: Set<String> {
-        regenerableNames.union(toolStateNames).union(tempNames)
-    }
+    /// Path components the standard scope never hashes duplicates in. Stored, not computed:
+    /// the duplicate filter reads it once per walked entry.
+    static let skippedComponents: Set<String> = regenerableNames.union(toolStateNames).union(tempNames)
 
     /// Drops candidates under skipped folders. `.everything` passes the list through
     /// untouched, so opting in is exactly yesterday's behavior.
