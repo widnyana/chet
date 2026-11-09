@@ -31,7 +31,7 @@ public struct SimilarPhotos: Sendable {
     public var blurThreshold = 60.0
     public var useGPU = true
     /// Images per GPU command buffer. Small, so one submission stays well under 50 ms.
-    public var batchSize = 32
+    public var batchSize = 64
 
     public init(policy: SafetyPolicy) {
         self.policy = policy
@@ -97,7 +97,7 @@ public struct SimilarPhotos: Sendable {
         let gpu = useGPU ? GPUContext.shared : nil
         // One buffer set for the whole scan; per-batch buffers stay in Metal's pool.
         let buffers = gpu.flatMap { try? PerceptualHash.makeBatchBuffers(capacity: batchSize, context: $0) }
-        let workers = min(4, max(1, ProcessInfo.processInfo.activeProcessorCount))
+        let workers = min(6, max(1, ProcessInfo.processInfo.activeProcessorCount))
         let imageBytes = PerceptualHash.side * PerceptualHash.side * 4
         var photos: [PhotoInfo] = []
         for start in stride(from: 0, to: entries.count, by: batchSize) {
