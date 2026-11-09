@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Extract the accessibility selectors of a running Chet window into a JSON file.
 
-The macOS accessibility tree is the closest thing this app has to a DOM. This script
-compiles a small Swift extractor (`scripts/ax_selectors.swift`), dumps one app's windows,
-and merges the result into `docs/ui-selectors.json` under a screen name, so the selector
-list survives restarts and can be reviewed in a diff.
+The macOS accessibility tree is the closest thing a desktop app has to a DOM. This script
+calls `scripts/axdrv.swift` with `dump --json`, drops per-app inventory rows so the saved
+file is stable across machines, and merges the result into `docs/ui-selectors.json` under a
+screen name.
 
 Usage:
     python3 scripts/ui_selectors.py --pid 1234 --screen apps
@@ -14,39 +14,38 @@ Usage:
 Exit codes:
     0  selectors written
     1  no Chet process, or several without --pid
-    2  extractor failed
+    2  axdrv could not run or returned no JSON
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
+import signal
 import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-EXTRACTOR_SOURCE = ROOT / "scripts" / "ax_selectors.swift"
-EXTRACTOR_BIN = ROOT / ".build" / "ui-selectors" / "ax_selectors"
+AXDRV_SOURCE = ROOT / "scripts" / "axdrv.swift"
+AXDRV_BIN = ROOT / ".build" / "ui-selectors" / "axdrv"
 DEFAULT_OUT = ROOT / "docs" / "ui-selectors.json"
 
 
 def built_binary() -> Path:
-    """Compile the extractor when its source is newer than the binary."""
-    if EXTRACTOR_BIN.exists():
-        if EXTRACTOR_BIN.stat().st_mtime >= EXTRACTOR_SOURCE.stat().st_mtime:
-            return EXTRACTOR_BIN
-    EXTRACTOR_BIN.parent.mkdir(parents=True, exist_ok=True)
+    """Compile axdrv when its source is newer than the binary."""
+    if AXDRV_BIN.exists() and AXDRV_BIN.stat().st_mtime >= AXDRV_SOURCE.stat().st_mtime:
+        return AXDRV_BIN
+    AXDRV_BIN.parent.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
-        ["swiftc", "-O", "-o", str(EXTRACTOR_BIN), str(EXTRACTOR_SOURCE)],
+        ["swiftc", "-O", "-o", str(AXDRV_BIN), str(AXDRV_SOURCE)],
         capture_output=True,
         text=True,
     )
     if result.returncode != 0:
         sys.stderr.write(result.stderr)
         raise SystemExit(2)
-    return EXTRACTOR_BIN
+    return AXDRV_BIN
 
 
 def chet_pids() -> list[int]:
@@ -69,13 +68,30 @@ def resolve_pid(requested: int | None) -> int:
     return pids[0]
 
 
+def per_app_label(node: dict) -> bool:
+    description = node.get("description", "")
+    return description.startswith("Show files left by ") or description.startswith("Select ")
+
+
 def dump(pid: int) -> dict:
     binary = built_binary()
-    result = subprocess.run([str(binary), str(pid)], capture_output=True)
+    result = subprocess.run(
+        [str(binary), "--pid", str(pid), "dump", "--json"], capture_output=True
+    )
     if result.returncode != 0:
         sys.stderr.write(result.stderr.decode("utf-8", "replace"))
         raise SystemExit(2)
-    return json.loads(result.stdout)
+    payload = json.loads(result.stdout)
+    for node in payload["nodes"]:
+        if (node.get("id") or "").startswith("SwiftUI."):
+            node.pop("id", None)
+    nodes = [node for node in payload["nodes"] if not per_app_label(node)]
+    windows = [
+        {"role": "AXWindow", "title": node.get("title", "")}
+        for node in nodes
+        if node.get("role") == "AXWindow"
+    ]
+    return {"pid": payload["target"]["pid"], "windows": windows, "nodes": nodes}
 
 
 def summarise(payload: dict) -> None:
@@ -117,6 +133,8 @@ def merge_into(path: Path, screen: str, payload: dict) -> None:
 
 
 def main() -> None:
+    # A closed pipe (`| head`) should end the summary quietly, not raise.
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pid", type=int, help="PID of the Chet instance to inspect")
     parser.add_argument("--screen", default="current", help="screen key stored in the JSON")
@@ -124,13 +142,13 @@ def main() -> None:
     parser.add_argument("--list", action="store_true", help="print a summary, write nothing")
     args = parser.parse_args()
 
-    if not EXTRACTOR_SOURCE.exists():
-        raise SystemExit(f"missing {EXTRACTOR_SOURCE}")
+    if not AXDRV_SOURCE.exists():
+        raise SystemExit(f"missing {AXDRV_SOURCE}")
 
     payload = dump(resolve_pid(args.pid))
-    summarise(payload)
     if not args.list:
         merge_into(args.out, args.screen, payload)
+    summarise(payload)
 
 
 if __name__ == "__main__":

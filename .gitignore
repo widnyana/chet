@@ -24,9 +24,8 @@
 !/project.yml
 !/mise.toml
 !/README.md
-!/DEVELOPING.md
-!/.swift-format
 !/AGENTS.md
+!/.swift-format
 !/CLAUDE.md
 !Chet/**
 !ChetCore/**
@@ -34,7 +33,10 @@
 !docs/findings.md
 !docs/design/
 !docs/design/**
-!scripts/**
+!scripts/axdrv.swift
+!scripts/dedupe-launchservices.sh
+!scripts/layout_check.py
+!scripts/ui_selectors.py
 
 # --- 4. Explicit re-ignores inside committable trees ---
 ChetCore/.build/
