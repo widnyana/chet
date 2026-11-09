@@ -95,6 +95,13 @@ Each line is the one-line reason required by R-31.
 | Grid as a secondary layout | Some users recognize apps by icon. The grid is available, not primary. |
 | No bulk operation without a mark | Bulk removal is destructive. The user must mark each app, then confirm the set. |
 | Dry run is a top strip and a verb change | A debug gate must be impossible to mistake for a real removal. |
+| Shipped type scale is canonical | The implementation is the one scale in use. The docs follow it so a new screen cannot fork a second scale. |
+| 40 pt custom rows, system rows in native tables | Custom rows need a stable comparison rhythm; a native `Table` already owns its height and should not be forced. |
+| 56 pt command bar | Two lines of summary plus vertical padding need the room. A 52 pt bar cannot hold them without clipping. |
+| 960 x 632 minimum | This is the size the layout was checked at. 600 is the older registry value and is no longer supported. |
+| Tested gate sentences | The AX tests assert `Preview only...` on the gate. One wording keeps the test, the strip, and the sheet in agreement. |
+| Homebrew is a Tools destination | Package cleanup is a tool, not a finding. It owns its toolbar and does not use the scan control. |
+| Docs define the target, UI-FINDINGS lists the gaps | A review records code that has not caught up yet. Design docs stay the contract for new work. |
 
 ## Design Read
 
@@ -110,9 +117,9 @@ Why this read:
   not fight it.
 - Visual language: paper and ink, one accent, tabular numbers, hairlines.
 - ENERGY 1: the screen does not shout. The product's seriousness is the point.
-- RHYTHM 2: the screens differ by job, not by decoration. Overview has the
-  capacity hero, category has the table, disk map has the canvas, applications
-  has the inventory.
+- RHYTHM 2: the screens differ by job, not by decoration. Home has the
+  capacity hero, category has the table, Storage has the canvas, and Apps and
+  Homebrew have the inventories.
 - MOTION 1: state changes only. The scan is background work, not a show.
 
 ## What we deliberately did not use

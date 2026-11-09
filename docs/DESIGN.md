@@ -39,6 +39,7 @@ NavigationSplitView
       Tweaks
     Tools
       Apps
+      Homebrew
       Storage
   Detail
     one destination at a time
@@ -46,9 +47,12 @@ NavigationSplitView
 
 - The sidebar is the route. The detail pane shows one destination.
 - Apps uses its own `NavigationStack` for the inventory and one app.
-- The toolbar carries Scan / Stop on every destination except Apps and Tweaks.
-- Apps owns Search, Layout, and Reload. Tweaks owns Search and Read again.
-- Tools has two destinations, Apps and Storage. Configure has one, Tweaks.
+- The toolbar carries Scan / Stop on every destination except Home, Apps,
+  Homebrew, and Tweaks.
+- Apps owns Search, Layout, and Reload. Homebrew owns Search and Reload.
+  Tweaks owns Search and Read again.
+- Tools has three destinations: Apps, Homebrew, and Storage. Configure has one,
+  Tweaks.
 - There are no mode tabs. Apps is a destination, not a mode.
 - About is not a destination. `Chet > About Chet` opens one fixed window,
   separate from the main window.
@@ -85,29 +89,33 @@ Rules:
 
 System font, SF Pro. Numbers use `.monospacedDigit()`.
 
-| Token | Size / line | Weight | Use |
+| Token | Size | Weight | Use |
 |---|---|---|---|
-| display | 34 / 40 | semibold | Reclaimable total, app size |
-| title | 22 / 28 | semibold | Page title |
-| section | 15 / 20 | semibold | Section heading |
-| body | 14 / 20 | regular | Paragraphs |
-| row | 13 / 18 | regular | Table cells |
-| caption | 11 / 14 | regular | Locations, metadata |
-| metric | 17 / 22 | medium, tabular | Row size |
+| display | 34 | semibold | Reclaimable total, app size |
+| title | 24 | semibold | Page title |
+| section | 16 | semibold | Section heading |
+| body | 15 | regular | Paragraphs |
+| row | 14 | regular | Table cells |
+| caption | 12 | regular | Locations, metadata |
+| metric | 18 | medium, tabular | Row size |
 
 No rounded design. No all-caps tracking. No monospace family. The largest text
-on a screen is 34 pt.
+on a screen is 34 pt. Caption is the smallest text at 12 pt. Use the system
+leading; do not set `lineSpacing` or a custom line height.
 
 ## Spacing and shape
 
-Base unit 4 pt. Tokens: 4, 8, 12, 16, 24, 32, 40, 48. Page side margin 24 pt at
-the minimum window, 32 pt at wide widths. Content max width 880 pt.
+Base unit 4 pt. Layout spacing uses 4, 8, 12, 16, 24, 32, 40, 48. Inside a
+single component, 0, 1, and 2 are allowed for hairline alignment and optical
+pairs; they are never page rhythm. Page side margin is 24 pt at the minimum
+window, 32 pt at wide widths. The minimum window is 960 x 632. Content max
+width 880 pt.
 
 Radius:
 
 - 0: pages, sections, tables, command bars.
 - 6: native buttons and fields.
-- 8: media thumbnails.
+- 8: media thumbnails and Settings panels.
 - No pill shapes created by the app.
 
 No elevation in the content. Sheets use the system shape and shadow. The command
@@ -131,13 +139,15 @@ Top to bottom:
 1. Page header: `Clean up your Mac`, a one-line subtitle, the amount that can be freed.
 2. Capacity bar: volume name, capacity, used, reclaimable, free, text legend.
 3. Scan state:
-   - never scanned: an empty state, `No scan yet`, with the next action;
+   - never scanned: an empty state, `No scan yet`, with the action in the
+     command bar;
    - scanning: the phase list and a linear progress;
    - finished: the category ledger in two groups, `Safe to remove` and
      `Check first`.
 4. Category ledger: monochrome symbol, name, item count, size. Largest first.
    Clicking a row opens the category.
-5. Command bar: Scan, Stop, or Clean selected.
+5. Command bar: `Scan this Mac`, `Scan again`, `Stop scan`, or `Clean selected`,
+   one per state.
 
 No chart. The ledger is the chart. No uninstall card. Apps is in the
 sidebar.
@@ -218,8 +228,18 @@ An unknown value is shown with its reason and is never drawn as Off.
 
 A searchable inventory: list first, grid second. Every row and cell has a mark
 checkbox, name, publisher or bundle ID, location, version, size, and a text
-status for running or admin. The command bar appears only when apps are marked.
-Opening an app is separate from marking it.
+status for running or admin. The command bar is present on the screen and
+disabled until an app is marked. Opening an app is separate from marking it.
+
+### Homebrew
+
+A searchable inventory of installed Homebrew packages. No scan control; the
+page owns Refresh. Page header `Homebrew`, subtitle `N packages, M marked`.
+Rows carry a checkbox, package name, version, kind (formula or cask), and size
+when Homebrew reports one. The command bar is disabled until a package is
+marked, then reports marked count and `Uninstall`. The confirmation sheet uses
+the same grammar and 520 pt width as the app sheets. A `brew` read failure is an
+error state with a retry, never an empty list.
 
 ### App detail
 
@@ -357,7 +377,7 @@ Full copy is in [design/copy.md](design/copy.md).
 - No invented data.
 - No dead controls.
 - Every empty, loading, and error state is designed.
-- Light and dark mode, keyboard, and 960 x 600 are all checked.
+- Light and dark mode, keyboard, and 960 x 632 are all checked.
 
 ## Rules of thumb
 
@@ -387,7 +407,7 @@ Rules the script enforces:
 
 ```layout-registry
 {
-  "window": {"width": 960, "height": 600, "titlebar": 52},
+  "window": {"width": 960, "height": 632, "titlebar": 52},
   "chrome": [
     {
       "id": "top-status-strip",

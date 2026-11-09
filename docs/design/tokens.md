@@ -30,8 +30,12 @@ and focus, it is being used as decoration.
 Rules:
 
 - `accent` is never a large background. It is a 1 px line, a 2 px focus ring, a
-  checkbox, or a button fill.
+  checkbox, a button fill, or a text action label.
 - `amber` and `red` are text and icon colors. They never fill a card.
+- `inkTertiary` is for disabled text only. Informative text, hints, and
+  captions use `inkSecondary` or `ink`. Checked ratios: `inkSecondary` 5.49:1
+  on light `paper` and 7.17:1 on dark; `inkTertiary` 3.15:1 and 3.95:1, below
+  the 4.5:1 floor.
 - No green. A safe state is a neutral checkmark and plain text.
 - No gradient, except the app icon fill. The icon is the one allowed gradient
   because it is a platform asset, not an in-app surface.
@@ -44,15 +48,15 @@ System font: SF Pro. It is the native macOS voice and needs no download, no
 license, and no fallback. Numbers use `.monospacedDigit()` so columns do not
 shift as they update.
 
-| Token | Size / line | Weight | Use |
+| Token | Size | Weight | Use |
 |---|---|---|---|
-| `display` | 34 / 40 | semibold | The reclaimable total, app size, summary total |
-| `title` | 22 / 28 | semibold | Page title |
-| `section` | 15 / 20 | semibold | Section heading |
-| `body` | 14 / 20 | regular | Paragraphs, form labels |
-| `row` | 13 / 18 | regular | Table cells, list rows |
-| `caption` | 11 / 14 | regular | Locations, metadata, hints |
-| `metric` | 17 / 22 | medium, tabular | Row size, selection total |
+| `display` | 34 | semibold | The reclaimable total, app size, summary total |
+| `title` | 24 | semibold | Page title |
+| `section` | 16 | semibold | Section heading |
+| `body` | 15 | regular | Paragraphs, form labels |
+| `row` | 14 | regular | Table cells, list rows |
+| `caption` | 12 | regular | Locations, metadata, hints |
+| `metric` | 18 | medium, tabular | Row size, selection total |
 
 Rules:
 
@@ -60,11 +64,17 @@ Rules:
 - No all-caps labels with letter spacing.
 - No monospace family. Monospaced digits only.
 - The largest text on a screen is at most 34 pt. There is no 56 pt number.
-- Body text is never smaller than 11 pt.
+- Caption at 12 pt is the smallest text the app ships.
+- Use the system leading. Do not set `lineSpacing` or a custom line height.
+- A view uses a `Typography` value, never `.font(.system(size:))`.
 
 ## Spacing
 
 Base unit: 4 pt.
+
+Layout spacing uses 4, 8, 12, 16, 24, 32, 40, 48. Inside one component, 0, 1,
+and 2 are allowed for hairline alignment and optical pairs. They are never page
+rhythm and never separate sections.
 
 | Token | Value | Use |
 |---|---|---|
@@ -78,7 +88,7 @@ Base unit: 4 pt.
 | `space12` | 48 | Page top and bottom margin |
 
 Page content width: 880 pt maximum, centered above 1100 pt. At the minimum
-window of 960 x 600, side margin is 24 pt.
+window of 960 x 632, side margin is 24 pt.
 
 ## Radius
 
@@ -86,11 +96,12 @@ window of 960 x 600, side margin is 24 pt.
 |---|---|---|
 | `radiusNone` | 0 | Pages, sections, command bars, tables |
 | `radiusControl` | 6 | Buttons, fields, checkboxes (native) |
-| `radiusMedia` | 8 | Photo and video thumbnails |
+| `radiusMedia` | 8 | Photo and video thumbnails, Settings panels |
 | `radiusSheet` | 0 | Sheets use the system shape |
 
 No pill shapes. A capsule is reserved for a macOS system control that already
 ships as a capsule (for example the search field), not for app-created badges.
+No radius outside 0, 6, and 8. A 1 or 3 pt radius is a drift, not a style.
 
 ## Elevation
 
@@ -124,21 +135,25 @@ Rules:
 
 | Token | Value | Use |
 |---|---|---|
+| `iconInline` | 8 to 12 | Glyph inside text: chevron, stop, small badge. Match the line it sits in |
+| `iconAction` | 16 | Buttons, status labels, strip icons |
 | `iconRow` | 22 | Table and list rows |
+| `iconProgress` | 24 | Toolbar scan ring |
 | `iconHeader` | 44 | Page header, app detail header |
-| `iconAction` | 16 | Buttons and status labels |
+| `iconApp` | 48 | App grid cell |
 
 SF Symbols are used at their default weight. Category symbols are monochrome
 and use `inkSecondary` when inactive, `ink` when selected. No multicolor
-symbols.
+symbols. Do not invent a size outside this table; if a glyph needs one, add a
+role and a reason.
 
 ## Table and bar metrics
 
 | Token | Value |
 |---|---|
-| Row height | 36 pt |
-| Table header height | 32 pt |
-| Command bar height | 52 pt plus safe-area bottom |
+| Row height | 40 pt for custom rows. A native `Table` keeps its system height |
+| Table header height | 32 pt for custom headers |
+| Command bar height | 56 pt minimum plus safe-area bottom |
 | Command bar top rule | 1 px `hairline` |
 | Capacity bar height | 10 pt |
 | Capacity bar outline | 1 px `hairline` |

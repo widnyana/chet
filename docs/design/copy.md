@@ -23,17 +23,19 @@ work.
 
 | Screen | Title | Subtitle |
 |---|---|---|
-| Overview, never scanned | `Overview` | `A clear account of this disk` |
-| Overview, results | `Overview` | `N categories, X can be reclaimed` |
+| Home, never scanned | `Clean up your Mac` | `A clear account of this disk` |
+| Home, results | `Clean up your Mac` | `N categories. Pick one to review.` |
 | Caches | `Caches` | `X across N items. Apps rebuild this data.` |
 | Logs | `Logs` | `X across N items. Apps rebuild this data.` |
 | Duplicates | `Duplicates` | `X across N groups. One copy stays in each group.` |
 | Large files | `Large and old files` | `X across N items. Review before removing.` |
-| Applications | `Applications` | `N installed, M marked` |
+| Apps | `Apps` | `N installed, M marked` |
+| Homebrew | `Homebrew` | `N packages, M marked` |
 | App detail | app name | `Version X, bundle ID` |
-| Disk map | `Disk map` | `Where the space is` |
-| Snapshots | `Local snapshots` | `N snapshots. macOS reports size when deleted.` |
+| Storage | `Storage` | `Where your space goes.` |
+| Snapshots | `Local snapshots` | `macOS reports size only when deleted.` |
 | Settings | `Settings` | none |
+| Permission page | `Chet needs Full Disk Access` | one sentence: what macOS hides |
 
 ## Primary actions
 
@@ -43,13 +45,18 @@ work.
 - `Clean`
 - `Move to Trash`
 - `Remove`
+- `Uninstall`
+- `Clear`
+- `Deselect`
 - `Open System Settings`
 - `Reload`
 - `Clear search`
+- `Continue with limited results`
 
 Do not use `Get started`, `Learn more`, `Continue`, or `Done` for an action
 that has a better verb. `Done` is only for closing a sheet or leaving an
-inspection surface.
+inspection surface. The one fixed exception is the permission link
+`Continue with limited results`, whose text the gate test asserts.
 
 ## Risk and status copy
 
@@ -59,8 +66,27 @@ inspection surface.
 - Admin only: `Needs administrator. Chet cannot move this app.`
 - Shared: `Shared with another app. Not selected.`
 - Protected: `Protected. Chet never removes this.`
-- Dry run: `Dry run. No files will be moved.`
+- Dry run, cleaning: `Preview only. Nothing will be removed.`
+- Dry run, uninstall: `Preview only. Nothing will be moved.`
+- Dry run, tweaks: `Preview only. No tweak is changed.`
 - Partial access: `Limited access. Some folders are hidden.`
+
+One word per state. Do not invent a synonym:
+
+| Concept | The only words |
+|---|---|
+| Gate, cleaning | `Preview only. Nothing will be removed.` |
+| Gate, uninstall | `Preview only. Nothing will be moved.` |
+| Gate, tweaks | `Preview only. No tweak is changed.` |
+| Progress title, dry run | `Simulating clean` |
+| Summary title, dry run | `Dry run complete` |
+| Progress labels | `Items`, `Bytes`, `Freed`, `Skipped`, `Failed`, `Current` |
+| Dry-run labels | `Would free`, `Would skip`, `Would fail` |
+| Missing value | `Unknown` |
+| Log action | `Show audit log` |
+
+Singular and plural both sound right: `1 item`, `2 items`, `1 app`, `2 apps`.
+Never ship `1 items`.
 
 ## Empty states
 
@@ -69,6 +95,9 @@ Each one names the cause and the next action.
 - Never scanned: `No scan yet. Run a scan to see what can be reclaimed.`
 - Nothing found: `Nothing to reclaim. This Mac is tidy.`
 - No app results: `No applications found. If this is unexpected, check Full Disk Access.`
+- App read failure: `The applications folder could not be read. Check Full Disk Access, then reload.`
+- Homebrew empty: `No Homebrew packages. Install one with brew, then reload.`
+- Homebrew missing: `Homebrew is not installed. Install it from brew.sh, then reload.`
 - Filter miss: `No application matches "query". Clear the search to see all apps.`
 - No related files: `No related files. The app bundle can still be removed.`
 - No snapshots: `No local snapshots. Time Machine keeps them only while it has room.`
@@ -78,6 +107,7 @@ Each one names the cause and the next action.
 ## Loading states
 
 - `Reading applications`
+- `Reading Homebrew packages`
 - `Measuring the app`
 - `Looking for related files`
 - `Scanning caches and logs`
@@ -89,6 +119,7 @@ A loading state never claims a number.
 ## Error states
 
 - `The applications folder could not be read. Check Full Disk Access, then reload.`
+- `The Homebrew list could not be read. Run brew list in Terminal, then reload.`
 - `The disk map could not be read for this folder. Reveal it in Finder or try another folder.`
 - `The snapshot command failed. macOS returned: [message].`
 - `Chet could not move this item. It may have changed since the scan.`
@@ -133,7 +164,9 @@ Every item is checked again before removal.
 Cancel | Clean
 ```
 
-Dry run adds one line: `Dry run. No files will be moved.`
+Dry run adds one line. Cleaning confirmation:
+`Preview only. Nothing will be removed.` App confirmation:
+`Preview only. Nothing will be moved.`
 
 ## Clean progress copy
 
@@ -188,7 +221,7 @@ Dry run complete
 Nothing was deleted.
 ```
 
-Applications:
+Apps:
 
 ```
 Uninstall complete

@@ -4,61 +4,69 @@
 
 ```
 Sidebar
-  Overview
-  Clean
+  Home
+  Safe to remove
+    <category rows>
+  Check first
     <category rows>
   Configure
     Tweaks
   Tools
-    Applications
-    Disk map
+    Apps
+    Homebrew
+    Storage
 ```
 
 The sidebar selection is the route. The detail pane shows one destination. The
-Applications destination uses its own `NavigationStack` for the app detail, so
-the sidebar does not change while the user moves between the inventory and one
+Apps destination uses its own `NavigationStack` for the app detail, so the
+sidebar does not change while the user moves between the inventory and one
 app.
 
-The scan button is in the toolbar on every destination except Applications and
-Tweaks. The Applications destination owns its own toolbar: Done, search, layout,
-reload. Tweaks uses the toolbar search field only.
+The scan button is in the toolbar on every destination except Home, Apps,
+Homebrew, and Tweaks. Home owns the scan action in its command bar. The Apps
+destination owns its own toolbar: Done, search, layout, reload. Homebrew owns
+search and Reload. Tweaks uses the toolbar search field only.
 
 `Chet > About Chet` opens a separate fixed window. It is not a sidebar
 destination and it does not replace the detail pane.
 
-## Overview
+## Home
 
 Job: answer "what can I reclaim, and what should I do next?".
 
 Top to bottom:
 
-1. `PageHeader`: title `Overview`, subtitle `A clear account of this disk`,
-   metric: the reclaimable total, or `Not measured`.
+1. `PageHeader`: title `Clean up your Mac`; subtitle `A clear account of this
+   disk` before the first scan, `N categories. Pick one to review.` after a
+   scan; metric: the reclaimable total, or `Not measured`.
 2. `CapacityBar`: volume name, capacity, three segments, text legend.
 3. Scan state:
-   - never scanned: a plain `EmptyState` with `Scan this Mac` and a sentence;
+   - never scanned: a plain `EmptyState` with `No scan yet` and a sentence; the
+     command bar carries `Scan this Mac`;
    - scanning: `ScanProgressSection`; Pause and Stop live in the command bar;
-   - finished: `SectionHeader("Reclaimable")` and the category ledger.
+   - finished: `SectionHeader("Safe to remove")` and `SectionHeader("Check first")`, each over its category rows.
 4. Category ledger: one row per category with a monochrome symbol, name, item
-   count, and size. The rows are sorted largest first. Clicking a row opens the
-   category. No chart.
+   count, and size, in those two groups. The rows are sorted largest first.
+   Clicking a row opens the category. No chart.
 5. `CommandBar`:
-   - no scan: primary `Scan this Mac`;
+   - never scanned: primary `Scan this Mac`;
    - scan running: `Stop scan`;
-   - scan finished with a selection: summary and `Clean selected`.
+   - scan finished with a selection: summary and `Clean selected`;
+   - scan finished with nothing selected: `Scan again`.
 
-The overview does not contain an uninstall card. Applications is a sidebar
-destination.
+Home does not contain an uninstall card. Apps is a sidebar destination.
 
 States:
 
-- Empty (never scanned): capacity bar plus a short message and one action.
+- Empty (never scanned): capacity bar plus a short message; the command bar
+  carries `Scan this Mac`.
 - Loading (scanning): progress section plus the categories that have already
   arrived. The ledger grows in place.
 - Partial access: the top status strip explains which folders are hidden.
 - Error (no readable volume): the capacity bar shows `Capacity unavailable` and
   the action is disabled with a reason.
-- Tidy (nothing found): `Nothing to reclaim` and a secondary `Scan again`.
+- Tidy (nothing found): `Nothing to reclaim`; the command bar carries `Scan
+  again`.
 
 ## Category
 
@@ -82,7 +90,7 @@ with flat thumbnails and a checkbox overlay. The command bar is the same.
 
 States:
 
-- Empty: `No entries in this category` and a back link to Overview.
+- Empty: `No entries in this category` and a back link to Home.
 - Loading: the table header remains; rows arrive in place.
 - Filtered to nothing: `No entries match this filter` and a clear action.
 - Partial access: a row-level lock icon plus the top status strip.
@@ -93,8 +101,8 @@ Job: answer "which Time Machine local snapshots can I remove?".
 
 Top to bottom:
 
-1. `PageHeader`: `Local snapshots`, subtitle with count and the macOS
-   limitation that size is reported only on deletion.
+1. `PageHeader`: `Local snapshots`, subtitle
+   `macOS reports size only when deleted.`, metric: the snapshot count.
 2. `LedgerTable`: checkbox, date, relative age, and a `Local` label. There is no
    size column because macOS does not provide one before deletion.
 3. `CommandBar`: selected count and `Clean selected`.
@@ -102,26 +110,27 @@ Top to bottom:
 The sort control is a small text button in the section header: `Newest first`
 or `Oldest first`. No toolbar icon.
 
-States: empty, loading, error from `tmutil` (with the command output in a
-disclosure), and partial access.
+States: empty, loading, error from `tmutil` with a retry action (the raw command
+output stays in a disclosure), and partial access.
 
-## Applications
+## Apps
 
 Job: answer "which app should I remove?".
 
 Top to bottom:
 
-1. Toolbar: `Done` (back to Overview), search field, layout picker (list or
-   grid), Reload.
-2. `PageHeader`: `Applications`, subtitle `N installed, M marked`.
+1. Toolbar: `Done` (back to Home), search field, layout picker (list or grid),
+   Reload.
+2. `PageHeader`: `Apps`, subtitle `N installed, M marked`.
 3. Inventory:
    - list: header row and rows with checkbox, icon, name and bundle ID,
      location, version, size, status;
    - grid: flat cells with checkbox, icon, name, publisher, size and location.
-4. `CommandBar` when at least one app is marked: marked count and bytes, `Clear`,
-   `Remove`.
+4. `CommandBar`: present on the screen, disabled until an app is marked; then
+   marked count and bytes, `Clear`, `Remove`.
 5. During a bulk pass: the command bar becomes `Removing 3 of 7` with the
-   current app name, and the inventory stays interactive.
+   current app name, its primary control disabled, and the inventory stays
+   interactive.
 
 The list is the default. The grid is for visual recognition. The choice persists
 in `UserDefaults`.
@@ -131,10 +140,36 @@ States:
 - Loading: `Reading applications` and a flat skeleton in the chosen layout.
 - Empty: `No applications found` with a `Full Disk Access` action when access is
   the likely cause, or `Reload` otherwise.
+- Error: the applications folder could not be read. Show the cause sentence and
+  `Reload` or `Open System Settings`. Never render a read failure as an empty
+  inventory.
 - Filtered empty: `No application matches "query"` and a `Clear search` action.
 - Running app: `Running` status label. The app can still be marked, but the
   confirmation and the core skip it.
 - Admin-only app: `Needs administrator` status label with a lock.
+
+## Homebrew
+
+Job: answer "which Homebrew package should I remove?".
+
+Top to bottom:
+
+1. Toolbar: search field and `Reload`. No scan control.
+2. `PageHeader`: `Homebrew`, subtitle `N packages, M marked`.
+3. Inventory: checkbox, package name, version, kind (`formula` or `cask`), and
+   size when Homebrew reports one. The list is the only layout.
+4. `CommandBar`: present and disabled until a package is marked; then the marked
+   count and bytes, `Deselect`, and `Uninstall`.
+5. The uninstall confirmation uses the same grammar and 520 pt width as the app
+   uninstall sheet.
+
+States:
+
+- Loading: `Reading Homebrew packages` with a native spinner.
+- Empty: `No Homebrew packages` and `Reload`. This is different from "brew is
+  not installed"; that state names `brew` and opens Homebrew's site.
+- Error: the `brew` read failed. Name the failing command and offer `Reload`.
+- Outdated packages: a text label `Outdated`, never a colored pill.
 
 ## App detail
 
@@ -142,11 +177,12 @@ Job: answer "what belongs to this app, and what will move?".
 
 Top to bottom:
 
-1. `PageHeader`: 44 pt app icon, app name, bundle ID and path as the subtitle,
-   metric: the app bundle size. A `Version` caption and a `Reveal in Finder`
-   secondary button.
-2. If running: an amber `StatusLabel` with `Quit the app before removing it`.
-   If admin-only: an amber `StatusLabel` with the restriction.
+1. `PageHeader`: 44 pt app icon, app name, subtitle `Version X, bundle ID`,
+   metric: the app bundle size. The path is a separate selectable row. A
+   `Reveal in Finder` secondary button sits with the path.
+2. If running: an amber `StatusLabel` `Running`, then one sentence: `Quit the
+   app before removing it`. If admin-only: `Needs administrator`, then
+   `Chet cannot move this app.`
 3. App bundle row: checkbox `Remove app bundle`, size, and a note that it is the
    only row that targets the app itself.
 4. Related files: `SectionHeader` with `Exact matches only`, `All selectable`,
@@ -163,20 +199,22 @@ States:
   removable.
 - Dry run: the confirmation and summary say `would be moved`.
 
-## Disk map
+## Storage
 
 Job: answer "where is the space?".
 
 Top to bottom:
 
-1. `DiskMapChrome`: breadcrumb and a neutral-ramp legend, hairline.
-2. Treemap canvas.
-3. While scanning: the detailed scan strip: phase, linear progress, current
+1. `PageHeader`: `Storage`, subtitle `Where your space goes.`, metric: the
+   current folder size when one is open.
+2. `DiskMapChrome`: breadcrumb and a neutral-ramp legend, hairline.
+3. Treemap canvas.
+4. While scanning: the detailed scan strip: phase, linear progress, current
    folder, files and bytes, folder trail, Pause and Stop.
-4. Empty (never scanned): `Scan this Mac to see where the space is` with a
-   primary scan action.
-5. Hover: a plain label with folder name and size.
-6. Click: zoom into a folder. Right-click: Reveal in Finder.
+5. Empty (never scanned): `The disk map appears after a scan.` with a primary
+   scan action.
+6. Hover: a plain label with folder name and size.
+7. Click: zoom into a folder. Right-click: Reveal in Finder.
 
 The map uses one encoding: size share as a neutral ramp. Darker means a larger
 share in light mode; lighter means a larger share in dark mode. The labels use
@@ -268,16 +306,16 @@ Job: get Full Disk Access or let the user continue honestly.
 
 Top to bottom:
 
-1. Title: `Chet needs access to the folders it measures`.
+1. Title: `Chet needs Full Disk Access`.
 2. One paragraph: what macOS hides and why the app needs it.
 3. Three plain rows: open Privacy & Security, turn on Chet under Full Disk
    Access, come back here. Numbers in `inkSecondary`, no circles.
 4. Primary `Open System Settings`.
-5. Link `Continue without access`.
+5. Link `Continue with limited results`.
 6. Waiting state: native spinner and `Checking for access`.
 
-The page polls the access probe and dismisses itself when access lands. It does
-not pulse.
+The page uses a 48 pt inset and max width 520. The page polls the access probe
+and dismisses itself when access lands. It does not pulse.
 
 ## Clean flow: confirmation, progress, summary
 
@@ -293,9 +331,10 @@ The clean flow is one sheet with three states, in order:
    was cleaned and lists skipped or failed items.
 
 The confirmation and summary sheets follow the component specs. They never
-claim success before the operation completes. The dry-run state changes every
-verb. The Applications uninstall sheets use the same sheet grammar and width;
-they do not use this clean progress.
+claim success before the operation completes. Cancel is the default button in
+the confirmation; the destructive button never takes Return. The dry-run state
+changes every verb. The Apps uninstall sheets use the same sheet grammar
+and width; they do not use this clean progress.
 
 ## Error and partial states
 

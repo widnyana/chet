@@ -1,7 +1,7 @@
 # Chet design system
 
 Status: canonical direction for the UI redesign.
-Date: 2026-11-08.
+Date: 2026-11-09.
 Scope: every SwiftUI surface, the Metal disk map, the app icon, and the copy
 inside the app.
 
@@ -34,23 +34,37 @@ MOTION 1.
 
 | File | What it answers |
 |---|---|
-| [audit.md](audit.md) | What is wrong with the current UI, with file references |
+| [audit.md](audit.md) | Historical: what was wrong before the redesign, with the old file references |
 | [principles.md](principles.md) | The design position and the rules that follow from it |
 | [tokens.md](tokens.md) | Color, type, spacing, radius, elevation, motion |
 | [components.md](components.md) | The reusable pieces and their states |
 | [screens.md](screens.md) | Each screen, what it must do, and how it is composed |
 | [copy.md](copy.md) | Voice, labels, empty states, and error text |
 | [references.md](references.md) | Sources and the reasoning behind the direction |
-| [ui-guidelines.md](ui-guidelines.md) | The rules for adding or changing UI, the layer model on macOS 26 and later, and the API facts they rest on |
+| [ui-guidelines.md](ui-guidelines.md) | How to behave when changing UI, the layer model, the pitfalls, and the verification recipes |
 
 The shipped summary is [../DESIGN.md](../DESIGN.md). It is the file the layout
 checker reads.
 
+## Read this before a UI change
+
+1. `ui-guidelines.md` for the working agreement, pitfalls, and gate.
+2. `screens.md` for the job of the screen.
+3. `components.md` and `tokens.md` for the pieces and values.
+4. `copy.md` for every string.
+5. `references.md` only when the reason behind a rule is unclear.
+
+One concept has one value across these files. If two docs disagree, the change
+is not ready: fix the docs first, then write the view. If the code disagrees
+with the docs, the docs are the target. The local, untracked `UI-FINDINGS.md`
+at the repo root records the gaps. Never copy a gap into new work, and never
+invent a third value to avoid the conflict.
+
 ## The five design rules
 
-1. **One job per screen.** Overview answers "what can I reclaim?". A category
+1. **One job per screen.** Home answers "what can I reclaim?". A category
    answers "which of these should I remove?". The app browser answers "which app
-   should I remove?". The disk map answers "where is the space?".
+   should I remove?". The Storage page answers "where is the space?".
 2. **Numbers are the content.** Every total, count, and byte figure uses
    tabular digits and a stable place. Numbers do not bounce, animate, or compete
    with decoration.
@@ -70,7 +84,7 @@ checker reads.
   uses them.
 - Floating action bars. They become full-width command bars.
 - Sparkle and magic icons. They describe neither cleaning nor disk space.
-- The bar chart on Overview. The capacity bar and the category ledger already
+- The bar chart on Home. The capacity bar and the category ledger already
   answer the question.
 - Decorative status dots and endless pulses.
 - Bounce and symbol effects on completion screens.

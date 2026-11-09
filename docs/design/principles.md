@@ -23,11 +23,12 @@ Every screen has one thing the eye lands on first.
 
 | Screen | Focal point |
 |---|---|
-| Overview | The reclaimable total and the capacity bar |
+| Home | The reclaimable total and the capacity bar |
 | Category | The size of the category and the table of entries |
-| Applications | The inventory itself, with the search field |
+| Apps | The inventory itself, with the search field |
+| Homebrew | The package inventory, with the search field |
 | App detail | The app name and the size of what will move |
-| Disk map | The map canvas |
+| Storage | The map canvas |
 | Settings | The single toggle |
 
 Everything else is secondary and stays secondary. A screen with two focal
@@ -49,6 +50,7 @@ The surface is paper. The content is ink. The one accent is **ink blue**. It is
 used for:
 
 - the primary action,
+- a text action such as `Select` or `Read again`,
 - the selected state of a checkbox or row,
 - the reclaimable segment of the capacity bar,
 - focus rings,
@@ -106,14 +108,15 @@ every size, and it does not ask the app to perform a brand. The identity comes
 from the ledger structure, not from a display face.
 
 - Display: 34 pt semibold, tabular digits.
-- Title: 22 pt semibold.
-- Section: 15 pt semibold.
-- Body: 14 pt regular.
-- Row: 13 pt regular.
-- Caption: 11 pt regular.
+- Title: 24 pt semibold.
+- Section: 16 pt semibold.
+- Body: 15 pt regular.
+- Row: 14 pt regular.
+- Caption: 12 pt regular.
 
 No rounded design. No all-caps tracking. No monospace headings. Monospaced
-digits are a property of numbers, not a costume.
+digits are a property of numbers, not a costume. Use the system leading; do not
+set a custom line height.
 
 ## Dark mode
 
@@ -127,10 +130,11 @@ checked at the same time, not one after the other.
 
 - Every control is reachable by keyboard, in visual order.
 - Focus is always visible. The focus ring uses the accent.
-- All text meets WCAG AA against its actual background.
+- All text meets WCAG AA against its actual background. `inkTertiary` is for
+  disabled text only; informative hints use `inkSecondary`.
 - Color is never the only carrier of meaning: status has text and an icon.
 - Motion respects Reduce Motion. There are no loops.
-- The minimum window is 960 x 600. Nothing clips or overlaps there.
+- The minimum window is 960 x 632. Nothing clips or overlaps there.
 - Screen readers get labels for icon-only buttons and a value for every row.
 
 ## Motion
@@ -149,7 +153,7 @@ The scan is background work. The interface does not perform it.
 
 The capacity bar is the repeated gesture. It appears:
 
-- on Overview as the full disk breakdown,
+- on Home as the full disk breakdown,
 - in a category header as a thin share-of-reclaimable line,
 - in the disk map legend as the four-step ramp,
 - in the app detail header as the share of the app that will move.

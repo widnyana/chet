@@ -1,5 +1,10 @@
 # Current UI audit
 
+Historical record. The audit was written against the pre-rename tree at
+`Mackit/Views/`, which no longer exists. Paths and file references below are
+kept as evidence for the redesign decision. For current rules, use
+[ui-guidelines.md](ui-guidelines.md) and [components.md](components.md).
+
 Date: 2026-11-08.
 Scope: the shipped SwiftUI app in `Mackit/Views/`, the app icon, and the copy
 visible inside the app. The audit is the reason for the redesign, not a list of

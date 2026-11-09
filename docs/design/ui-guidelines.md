@@ -19,10 +19,60 @@ Read it in this order when you add or change a screen:
 2. Compose existing components from [components.md](components.md). Do not
    restyle a row at the call site.
 3. Apply the layer rules in section 2 and the surface rules in section 3.
-4. Run the review gate in section 12.
+4. Check the pitfalls below before writing the first line of the view.
+5. Run the review gate in section 12 and the recipes in section 13.
 
 If this file disagrees with [../DESIGN.md](../DESIGN.md), DESIGN.md wins and
 this file is wrong. Fix it here.
+
+### The working agreement
+
+- The design docs are the target. `UI-FINDINGS.md` at the repo root is the gap
+  list: it records where the shipped code has not caught up. It is local and
+  untracked. Do not copy a gap into new work because it already exists.
+- One concept has one value. If code and docs disagree, do not invent a third
+  value. Use the value in this doc set and leave the code gap in the findings.
+  If the doc itself is stale, update the doc in the same change.
+- Never add a color, radius, spacing value, font size, icon size, or animation
+  at a call site. If the table has no token, the change needs a token, a reason,
+  and an entry in [tokens.md](tokens.md) first.
+- Native first. A custom control needs a written reason and a keyboard and
+  VoiceOver path. A hand-drawn control that imitates a system control is a
+  regression, not a design.
+- One focal point, one primary action. If a screen needs two, it is two screens.
+  The global scan control in the toolbar is a tool, not a second primary
+  action; the command bar still carries the content action.
+- Copy is code. Strings live in `CategoryCopy`, `ScanStepCopy`, `AppCopy`, and
+  `TweakCopy`. A view does not retype them.
+- A disabled control is visible and inert. A control that disappears is a
+  layout jump, and a control that does nothing is a defect.
+- The action names the consequence. `Clean`, `Move to Trash`, `Remove`,
+  `Uninstall`. Not `Continue` or `Done` when a better verb exists.
+
+### Build order
+
+1. Decide the screen's question and its one focal point.
+2. Pick the surface: content, native control, sheet, or status strip.
+3. Pick the component. If none fits, extend the owning component before you
+   write a new view.
+4. Pick the tokens. No literals for type, color, spacing, radius, or icons.
+5. Write the four states: empty, loading, error, and the normal case.
+6. Add the keyboard path, the accessibility label, and the help text.
+7. Check light, dark, 960 x 632, Reduce Motion, Reduce Transparency, Increase
+   Contrast, and both ends of the system glass slider.
+8. Update the doc that owns the change: tokens, components, screens, or copy.
+
+### When to ask, and when to decide
+
+Decide and state the choice when the answer is already in these docs. Ask one
+question, once, only when:
+
+- the screen has two equally valid jobs and the split changes navigation;
+- a new token value is needed and no existing token covers it;
+- the copy changes a promise, a consequence, or a destructive verb.
+
+Do not ask for permission to follow a rule in this file. Do not invent a value
+to avoid the question.
 
 ## 1. Three tests
 
@@ -70,7 +120,7 @@ Two hard rules follow from this table:
   background on `NavigationSplitView`, a toolbar, or a sheet fights Liquid
   Glass and the scroll edge effect.
 - Do not place a floating control over content unless the content genuinely
-  needs to pass under it. Chet has one such case today: the disk map hover
+  needs to pass under it. Chet has one such case today: the Storage map hover
   label, and it uses `paperRaised` plus a hairline, not glass.
 
 ## 3. Liquid Glass
@@ -145,8 +195,9 @@ version fails a readability check on the map. Then all of these apply:
   `DestructiveActionButton`, and `SecondaryActionButton` still set it: known
   deviation, fix on the next touch of `DesignSystem.swift`.
 - Do not hardcode the height of a native control. `controlSize` drives it.
-  Chet's own metrics (36 pt row, 52 pt command bar, 32 pt header) live in
-  `Metrics` and apply to Chet surfaces only.
+  Chet's own metrics (40 pt custom row, 56 pt command bar, 32 pt custom table
+  header) live in `Metrics` and apply to Chet surfaces only. A native `Table`
+  keeps the system row height.
 - No capsule created by the app. A capsule is allowed only where the system
   already ships one, such as the search field.
 
@@ -155,9 +206,9 @@ version fails a readability check on the map. Then all of these apply:
 Palette cap: three cores (paper, ink, hairline family) plus one accent and two
 signals. Full values are in [tokens.md](tokens.md).
 
-- The accent appears in exactly four places: the primary action, the selected
-  state, the reclaimable capacity segment, and the focus ring. A fifth place is
-  decoration; remove it.
+- The accent appears in exactly five roles: the primary action, a text action
+  (`Select`, `Read again`, a sort label), the selected state, the reclaimable
+  capacity segment, and the focus ring. Anything else is decoration; remove it.
 - Amber means review, running, or attention. Red means destructive or
   protected. Neither ever fills a card or a strip background.
 - No green. A safe state is a neutral checkmark and plain text.
@@ -218,7 +269,7 @@ response, not its label.
 - Every control is reachable by Tab in visual order, and the focus ring is
   visible at every stop.
 - A custom icon-only control gets a real frame, at least the row height
-  (36 pt), so the pointer target matches what the row looks like. A glyph with
+  (40 pt), so the pointer target matches what the row looks like. A glyph with
   a tight frame is a hit-target bug. `IconActionButton` currently has no frame:
   known deviation.
 - Every icon-only control has `accessibilityLabel` and `.help`.
@@ -231,9 +282,8 @@ response, not its label.
 - Increase Contrast: hairlines and control borders must stay visible.
   Reduce Transparency: nothing to do, because the content layer has no custom
   transparency.
-- The supported minimum is 960 x 632, per `AGENTS.md`. Nothing clips,
-  overlaps, or scrolls sideways there. `DESIGN.md` still says 960 x 600; the
-  larger value is the one to test.
+- The supported minimum is 960 x 632. Nothing clips, overlaps, or scrolls
+  sideways there. The layout registry uses the same size.
 
 ## 10. Slop filter
 
@@ -260,6 +310,61 @@ These are the tells that the sources agree on, restated for this app.
 | Dark interface because it looks technical | Follow the system appearance |
 | Uniform spacing and rhythm in every section | Vary space by grouping. Rhythm 2: clear breaks between capacity, ledger, command bar |
 | Hover as the only route to an action | The action is also in the context menu or the command bar |
+
+## Pitfalls that already shipped
+
+Each row is a mistake found in this tree. Read it before you write a view.
+
+| Wrong | Right | Why |
+|---|---|---|
+| Painting `Theme.paper` behind content placed in the sidebar | Delete the fill; keep the hairline | The sidebar is system chrome. An opaque slab kills the system material and selection treatment |
+| Building a second capacity bar in the sidebar | Reuse `CapacityBarView`, or add one compact variant to it | Two bars drift: height, radius, segment colors, and the missing reclaimable segment |
+| A scan button in the toolbar, inline, and in the command bar | The command bar owns the primary action | Three calls to action make none of them primary. One per screen |
+| Rendering the primary control only while `!isWorking` | Keep it, disabled, with the spinner beside it | Removing a control moves the layout and hides what is happening |
+| Binding the destructive sheet button to Return | Cancel takes Return and Escape; destructive takes neither | A sheet opens with Return as default. One stray key moves files to the Trash |
+| Drawing an unknown tweak as an Off switch | Replace the control with the reason text | Off says the value is known to be false. Unknown is not false |
+| Leaving the detail sheet enabled when the row is disabled | Apply the same `isSupported` gate to both | The row says the app cannot read the value. The sheet then writes it |
+| Building an empty state from `ContentUnavailableView` with a symbol | Title, one sentence, one action, no large icon | The component adds a large decorative symbol the design forbids |
+| An icon-only button with no frame | 40 x 40 frame plus `contentShape` | The glyph becomes a 12 pt click target |
+| A hint in `inkTertiary` | Use `inkSecondary` | Tertiary is 3.15:1 on light paper. Hints are informative, not disabled |
+| Setting `buttonBorderShape` or a 6 pt radius on a native button | Let the system draw the shape | The fixed radius fights the current control shape and the window corner |
+| One-off `.font(.system(size:))` values | Use a `Typography` token | The scale already exists. A new size makes it unknowable |
+| Rendering a read failure as an empty list | Separate error state with cause and retry | Empty says "nothing here". A failure says "the app could not look" |
+| A synonym for the dry-run gate | Use the exact sentence in [copy.md](copy.md) | The AX tests assert the gate text. Synonyms break the test and the promise |
+| A sixth table column for a row menu | Use the context menu | The ledger is five columns by design |
+| A native row highlight plus a checkbox | Checkbox selects; `accentSoft` marks the row | Two selection models make the user ask which one removes files |
+| A fixed 32 pt page margin at every width | Responsive margin: 24 at 960, 32 wide | Wide margins waste the minimum window; 24 at wide widths breaks alignment |
+| A decorative icon or dot with no state | Hide it from VoiceOver, or remove it | A `lock.shield` becomes an AX element named `lock.shield` with no meaning |
+| A claim like "sends nothing off it" with no evidence | State the behavior, or point to the code path | The anti-slop rule applies to privacy too |
+
+## Field notes
+
+Small techniques that prevent the pitfalls above.
+
+- Use `Spacer(minLength: Spacing.s3)` beside a long label. A bare `Spacer` lets
+  the label collapse the trailing control.
+- A path or a long name gets `.lineLimit(1)`, `.truncationMode(.middle)`, and
+  `.help(fullValue)`. Middle truncation keeps both ends of a path readable.
+- Put `.contentShape(Rectangle())` only on a control that should own the whole
+  area. A row that is not a button keeps its checkbox as the only click target.
+- A running destructive task uses `.interactiveDismissDisabled(true)`. Escape
+  must not close it; the summary is the exit.
+- Use `.confirmationDialog` or `.alert` for a decision with two outcomes. Use a
+  sheet when the user must read a ledger before deciding.
+- Use a native `Table` for a comparison table. Use `ColumnTable` only when the
+  header must stay pinned over a custom row. Do not build both in one screen.
+- A checkbox is `Toggle(..., isOn:).toggleStyle(.checkbox).labelsHidden()` with
+  an explicit `.accessibilityLabel("Select <name>")`.
+- A composed status uses `.accessibilityElement(children: .combine)`. A purely
+  decorative image gets `.accessibilityHidden(true)`.
+- A color that changes with appearance comes from `Color(nsColor:)` with a
+  dynamic provider. Never use `Color.white` or `.black` for text.
+- A determinate `ProgressView(value:)` needs a real denominator. Without one,
+  use the native indeterminate spinner and a sentence.
+- Every control gets an accessibility identifier at creation time, next to its
+  label. Backfilling identifiers after the test breaks is slower.
+- `DRY_RUN=1` is the only safe way to exercise a removal path. Check the gate
+  sentence before you touch the control.
 
 ## 11. Asking an agent for UI work
 
@@ -298,17 +403,55 @@ A UI change is done when all of these are true.
 - [ ] No background on system chrome.
 - [ ] Every control is native unless a written reason exists, and every native
       control keeps its system shape and size.
+- [ ] The command bar is present whenever the screen can act, and disabled with
+      a reason when it cannot.
+- [ ] A destructive sheet defaults to Cancel. The destructive button does not
+      take Return.
+- [ ] Every icon-only control has a 40 x 40 frame, a label, and help text.
+- [ ] No informative text uses `inkTertiary`.
 - [ ] Every state in section 7 exists and was looked at, not assumed.
 - [ ] Light and dark mode checked at 960 x 632.
 - [ ] Keyboard only pass, focus visible at every stop.
 - [ ] Reduce Motion, Reduce Transparency, and Increase Contrast checked.
 - [ ] System glass slider checked at both ends.
-- [ ] Copy has no em dash, no AI words, no invented numbers.
+- [ ] Copy has no em dash, no AI words, no invented numbers, and matches
+      [copy.md](copy.md) word for word.
 - [ ] `mise run build`, `mise run lint`, and `mise run layout` pass, with no
       floating chrome reported.
+- [ ] The owning doc was updated in the same change: tokens, components,
+      screens, or copy.
 - [ ] A screenshot of the changed screen exists for both modes.
 
-## 13. Corrections against the sources
+## 13. Verification recipes
+
+Run these. Do not report a state you did not see.
+
+1. **Build and check.** `mise run build`, `mise run lint`, `mise run layout`.
+   All three pass. The layout checker reads the registry in
+   [../DESIGN.md](../DESIGN.md).
+2. **Launch a test copy.** `open -n --env DRY_RUN=1 <app>` for anything that can
+   remove files. Never launch without the gate for a destructive path.
+3. **Drive by identifier.** Build the AX driver once:
+   `swiftc -O scripts/axdrv.swift -o /tmp/axdrv`. Then
+   `/tmp/axdrv --pid <pid> dump --json`, `press id=home.scan`,
+   `select id=sidebar.tweaks`, `texts`. The map of identifiers is in
+   [../../AGENTS.md](../../AGENTS.md).
+4. **Keyboard.** Tab through the screen in visual order. Every stop has a
+   visible focus ring. Space activates a control, Return activates the default,
+   Escape closes a sheet. A destructive default is a fail.
+5. **Modes.** Check light and dark. Turn on Reduce Motion, Reduce Transparency,
+   and Increase Contrast. Move the system glass appearance slider to both ends
+   in System Settings > Appearance. The app must not change its own contrast,
+   opacity, or motion in response.
+6. **Size.** Set the window to 960 x 632. Nothing clips, overlaps, or scrolls
+   sideways. Check the page header, the command bar, and the last table row.
+7. **Copy.** Grep the changed strings and compare them with
+   [copy.md](copy.md). The gate sentence, the dry-run verbs, and the status
+   words are exact, not paraphrased.
+8. **Record the limit.** If a state was not observed, write it in the change or
+   the findings. "Should work" is not a check.
+
+## 14. Corrections against the sources
 
 The sources below were read on 2026-11-09. Several details had aged out. These
 are checked against the 27.2 SDK, not against the articles. The geometry and
@@ -326,7 +469,7 @@ macOS 26.0 deployment target.
 | `ToolbarSpacer(.fixed, spacing: 20)` | Wrong signature | `ToolbarSpacer(.fixed, placement:)`. `SpacerSizing` has no spacing value |
 | `.glassProminent` with `.circle` needs `clipShape(Circle())` | Beta-era artifact, not reproduced on 27.2 | Do not add the workaround without a reproduction |
 | `.regularMaterial` cards as a glass look | Obsolete as a glass substitute | It is a standard material for the content layer. It does not follow the glass slider |
-| Minimum 44 pt target | iOS number | On macOS use the native control size, and give a custom icon control a 36 pt frame |
+| Minimum 44 pt target | iOS number | On macOS use the native control size, and give a custom icon control a 40 pt frame |
 | Tab bars, `tabBarMinimizeBehavior`, bottom accessories, sheet zoom transitions | iOS and iPadOS features | Not applicable. Chet uses `NavigationSplitView` and system sheets |
 | "Add Liquid Glass to cards and content" | Contradicts Apple | HIG: do not use Liquid Glass in the content layer |
 | A two-state Clear/Tinted glass setting | Out of date since macOS 27 | One continuous system slider. Apps follow it; they do not imitate it |
@@ -347,7 +490,7 @@ Current SDK notes that matter here:
   chrome. Re-check screenshots after an SDK bump instead of assuming nothing
   moved.
 
-## 14. Sources
+## 15. Sources
 
 | Source | Date | What it contributes | What we reject from it |
 |---|---|---|---|
@@ -362,8 +505,9 @@ Current SDK notes that matter here:
 | [WWDC26, What's new in SwiftUI](https://developer.apple.com/videos/play/wwdc2026/269/) | Jun 2026 | 27 look refresh, toolbar overflow and priority, `appearsActive`, interactive glass on macOS | Nothing |
 | [9to5Mac, macOS 27 glass control](https://9to5mac.com/2026/09/22/macos-27-gives-you-more-control-over-liquid-glass/) | Sep 2026 | The system-wide appearance slider, its location, and its effect on chrome | Nothing |
 
-## 15. Change log
+## 16. Change log
 
 | Date | Change |
 |---|---|
 | 2026-11-09 | First version. Merges the five requested sources, corrects the APIs against the 27.2 SDK, and ties the rules to this app's tokens and components |
+| 2026-11-09 | Second version. Adds the working agreement, the shipped-pitfalls catalog, and the verification recipes. Aligns the type scale, row, command bar, window, gate copy, and Homebrew destination across the doc set |

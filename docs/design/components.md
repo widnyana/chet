@@ -9,18 +9,21 @@ reimplement them.
 Anatomy:
 
 ```
-title (title)
-subtitle (body, inkSecondary)                         metric (display, right)
+[icon 44] title (title)
+          subtitle (body, inkSecondary)               metric (display, right)
 hairline
 ```
 
 Rules:
 
 - One page title. It names the job, not the category ID.
+- The icon is optional and only for an object page: an app or About. It is
+  44 pt and uses the page's own asset.
 - The subtitle is one sentence. It may name the risk or the count.
 - The metric is the number the page is about. It is optional; when present it
   is right-aligned and tabular.
-- The header sits 24 pt from the top and 24 pt from the page side margin.
+- The header sits 24 pt from the top. Its side inset is the page margin: 24 pt
+  at the minimum window, 32 pt at wide widths.
 - No icon badge, no eyebrow, no pill above the title.
 
 States:
@@ -65,7 +68,7 @@ Rules:
 
 - Height 10 pt. Segments have a 1 px `paper` gap, and the bar has a 1 px
   `hairline` outline so the free end stays visible on paper.
-- The bar is the only chart on Overview.
+- The bar is the only chart on Home.
 - The legend is text: `Used 320 GB`, `Can be reclaimed 12.4 GB`, `Free 88 GB`.
 - The reclaimable segment is the accent. It is the only accent on the page
   besides the primary action.
@@ -88,7 +91,8 @@ Columns, in order:
 
 Rules:
 
-- Header height 32 pt, row height 36 pt.
+- Header height 32 pt. Custom rows are 40 pt; a native `Table` keeps its system
+  row height and is not forced.
 - No alternating row backgrounds.
 - One hairline under the header. Rows use the native separator or no line.
 - Selected rows use `accentSoft`.
@@ -96,6 +100,7 @@ Rules:
   opens the item. The row itself is not a button.
 - Column widths are stable. The name column takes the remaining space.
 - Sorting is available from the column header. The default is largest first.
+- No extra unnamed action column. More actions live in the context menu.
 
 ## CommandBar
 
@@ -108,7 +113,7 @@ A full-width bar at the bottom of the content area:
 
 Rules:
 
-- Height 52 pt plus the safe-area bottom.
+- Height 56 pt minimum plus the safe-area bottom. Two lines of summary need it.
 - Background `paper`, top 1 px `hairline`.
 - No radius, no floating, no bottom padding.
 - Left: the selection summary in two lines: the byte total in `metric`, the
@@ -117,8 +122,10 @@ Rules:
   names the consequence: `Clean`, `Move to Trash`, or `Remove`.
 - The destructive button in a confirmation sheet uses the red tint. The command
   bar button uses the accent, because it opens the review, not the deletion.
-- Disabled when the selection is empty or an operation is running. A caption
-  beside it says why when the reason is not obvious.
+- The bar is present whenever the screen can act. It is disabled when the
+  selection is empty or an operation is running. The primary control stays in
+  place and is disabled; it is never removed, so the layout cannot jump.
+- A caption beside it says why when the reason is not obvious.
 - The bar is the same component on every screen.
 
 ## StatusLabel
@@ -150,8 +157,10 @@ one action (secondary or primary) when an action exists
 ```
 
 Use the screen's normal margins. No illustration, no large icon, no decorative
-circle. The copy names the cause and the next step. First run, filtered to
-nothing, and permission denied are different states with different copy.
+circle. Do not build an empty state from `ContentUnavailableView`'s default
+symbol, because that renders a large icon. The copy names the cause and the next
+step. First run, filtered to nothing, and permission denied are different states
+with different copy.
 
 ## LoadingState
 
@@ -171,6 +180,7 @@ nothing, and permission denied are different states with different copy.
 ## PrimaryButton
 
 - Native `.borderedProminent` with the accent tint, control size `.large`.
+- Do not set `buttonBorderShape`. The system draws the current control shape.
 - Label is a verb and an optional SF Symbol that names the action.
 - One primary button per screen.
 - The keyboard shortcut is shown in the help text, not inside the label.
@@ -186,15 +196,17 @@ nothing, and permission denied are different states with different copy.
 A full-width strip directly under the toolbar, above the content:
 
 ```
-icon (16) + message (callout)                         [action] [dismiss]
+icon (16) + message (row)                           [action] [dismiss]
 ```
 
 Uses:
 
 - Full Disk Access is limited: amber icon, message, `Open Settings`, dismiss.
 - Scan finished: neutral icon, the result, dismiss. Auto-dismiss after 4 s.
-- Dry run is engaged: amber icon, `Dry run: no files will be moved`, no dismiss.
-- Applications workspace: no scan strip.
+- Dry run is engaged: amber icon, `Preview only. Nothing will be removed.`, no
+  dismiss. The uninstall workspace uses `Preview only. Nothing will be moved.`
+  The Tweaks page owns `Preview only. No tweak is changed.`
+- Apps and Homebrew workspaces: no scan strip.
 
 Rules:
 
@@ -205,11 +217,17 @@ Rules:
 
 ## Toolbar scan control
 
+Shown on category, Snapshots, and Storage. Home owns scan in its command bar;
+Apps, Homebrew, and Tweaks have no scan control. The scan control is a global
+tool, not the screen's primary content action; a screen may show it while its
+command bar carries `Clean` or `Remove`.
+
 - Idle: one `Scan` or `Scan again` button.
 - Scanning: one 24 pt progress ring with a stop glyph inside. The ring is the
   loading indicator; the glyph is the action. No text, no second button.
-- The control uses symmetric padding (8 pt horizontal, 6 pt vertical) so it
-  stays centered in its toolbar slot and cannot overflow the window.
+- The button owns a 40 pt square frame and `contentShape`; the ring stays 24 pt
+  drawn size. Symmetric 8 pt padding keeps it centered in the toolbar slot
+  without shrinking the click area.
 - Hover help and the accessibility label both say `Stop the scan`.
 - The detailed phase, bytes, and folder trail live in the page, never in the
   toolbar.
@@ -230,7 +248,8 @@ Pause and Stop live in the command bar, not in the section.
 Rules:
 
 - No card. The section sits between the capacity bar and the ledger.
-- The phase list is a plain ledger: one row per phase, 28 pt.
+- The phase list is a plain ledger: one row per phase with 4 pt vertical
+  padding.
 - The result of the scan replaces this section with the ledger.
 - The detailed folder trail belongs to the disk map only.
 
@@ -255,8 +274,8 @@ Home / Library / Caches                     Darker means a larger share
 Grid cell:
 
 ```
-[checkbox]                    [icon 52]
-                              name (callout, 2 lines)
+[checkbox]                    [icon 48]
+                              name (row, 2 lines)
                               publisher (caption)
                               size · location (caption, tabular)
 ```
@@ -316,12 +335,14 @@ Each item is checked again before it moves.       (caption)
 
 Rules:
 
-- Width 520 pt. System sheet background.
+- Width 520 pt. System sheet background. Flow sheets are 520 pt; detail sheets
+  are 540 pt; 480 pt is not used.
 - No huge icon, no sparkle, no glass.
 - The rows are a ledger, not cards.
-- The destructive button uses the red tint. Cancel is the default focus and
-  Escape closes the sheet.
-- The dry-run notice is a plain line in the sheet when active.
+- The destructive button uses the red tint. Cancel is the default button and
+  takes Return and Escape. The destructive button never takes Return.
+- The dry-run notice is the exact line: `Preview only. Nothing will be
+  removed.` The uninstall sheet uses `Preview only. Nothing will be moved.`
 - The running warning is an amber `StatusLabel`, not a colored block.
 
 ## SummarySheet
@@ -338,6 +359,7 @@ Clean complete                                    (title)
 ```
 
 - No 56 pt icon, no bounce, no rounded 40 pt number.
+- Width 520 pt, same as the confirmation sheet.
 - Dry run changes the title to `Dry run complete` and the verb to `would be
   freed`, `would be moved`.
 - The problems list is a plain table with the reason in secondary ink.
@@ -389,11 +411,11 @@ Rules:
 ## PermissionPage
 
 ```
-Chet needs access to the folders it measures.    (title)
+Chet needs Full Disk Access.                       (title)
 macOS hides these folders from apps.               (body)
 [short list of what access unlocks]                (body)
 [Open System Settings]                             (primary)
-[Continue without access]                          (link)
+[Continue with limited results]                    (link)
 Checking for access...                             (caption + spinner)
 ```
 
@@ -401,20 +423,22 @@ Checking for access...                             (caption + spinner)
 - The three steps are plain rows with a small number in `inkSecondary`, not
   colored circles.
 - The waiting state is a native small `ProgressView` plus text.
-- The page uses the paper background, 28 pt margins, max width 520.
+- The page uses the paper background, a 48 pt inset, and max width 520. The 48
+  pt is the gate's deliberate inset, not a page margin.
 
 ## SettingsRow
 
-The one settings toggle:
+Settings is a panel list, not a `Form`.
 
 ```
 Include caches and build folders                 [toggle]
 Search inside caches and build folders. Off by default.
 ```
 
-- Native `Form` with `.grouped` style.
-- The caption explains the consequence and the default.
-- No extra sections.
+- Use `SettingsPanel` with a `Grid`, `SettingsRow`, `SettingsNote`, and
+  `SettingsDivider`. The row height and padding live in `SettingsGrid`.
+- The caption explains the consequence and the default in one line.
+- No extra sections, no card per preference, no form wrapper.
 
 ## PreferenceRow
 
