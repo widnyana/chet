@@ -233,6 +233,9 @@ picker, and the text link on the permission screen.
 
 ## Reuse the components
 
+Read [docs/design/composition.md](docs/design/composition.md) before adding a page,
+layout, or component. It is the short decision tree and review gate.
+
 A screen composes shared components. It does not rebuild a pattern, and it does not set
 spacing on a call site.
 

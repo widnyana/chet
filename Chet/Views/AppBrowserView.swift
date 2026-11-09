@@ -91,7 +91,6 @@ struct AppBrowserView: View {
             if model.isLoadingApps {
                 LoadingStateView(message: "Reading applications")
                     .pageHorizontalPadding()
-                Spacer()
             } else if let error = model.loadError, model.apps.isEmpty {
                 ErrorStateView(
                     title: "The applications folder could not be read.",
@@ -101,7 +100,6 @@ struct AppBrowserView: View {
                 )
                 .help(error)
                 .pageHorizontalPadding()
-                Spacer()
             } else if model.apps.isEmpty {
                 noApps
                     .pageHorizontalPadding()
@@ -188,6 +186,18 @@ struct AppBrowserView: View {
         switch sort {
         case .name:
             ordered = apps.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        case .location:
+            ordered = apps.sorted {
+                let left = model.locationLabel($0)
+                let right = model.locationLabel($1)
+                return left == right
+                    ? $0.name.localizedStandardCompare($1.name) == .orderedAscending
+                    : left.localizedStandardCompare(right) == .orderedAscending
+            }
+        case .version:
+            ordered = apps.sorted {
+                ($0.version ?? "").localizedStandardCompare($1.version ?? "") == .orderedAscending
+            }
         case .size:
             ordered = apps.sorted { (model.appSizes[$0.url] ?? -1) < (model.appSizes[$1.url] ?? -1) }
         case .status:
@@ -260,7 +270,7 @@ struct AppBrowserView: View {
 
 /// The sortable columns of the Applications list. Every column is sortable (repo rule).
 private enum AppSort {
-    case name, size, status
+    case name, location, version, size, status
 }
 
 /// Stable column metrics shared by the header and the rows.
@@ -286,9 +296,9 @@ private struct AppListHeader: View {
                 Color.clear.frame(width: AppColumns.icon)
                 sortButton("Name", .name)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                Text("Location")
+                sortButton("Location", .location)
                     .frame(width: AppColumns.location, alignment: .leading)
-                Text("Version")
+                sortButton("Version", .version)
                     .frame(width: AppColumns.version, alignment: .leading)
                 sortButton("Size", .size)
                     .frame(width: AppColumns.size, alignment: .trailing)
@@ -366,6 +376,7 @@ private struct AppRow: View {
         }
         .frame(minHeight: Metrics.rowHeight)
         .pageHorizontalPadding()
+        .background(model.markedApps.contains(app.url) ? Theme.accentSoft : Color.clear)
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { model.select(app) }
         .contextMenu { appContextMenu(for: app, model: model) }

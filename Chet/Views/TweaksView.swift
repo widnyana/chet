@@ -24,7 +24,8 @@ struct TweaksView: View {
                 content
             }
             .pageHorizontalPadding()
-            .padding(.vertical, Spacing.s8)
+            .padding(.top, Spacing.s6)
+            .padding(.bottom, Spacing.s6)
             .frame(maxWidth: Metrics.contentMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .center)
         }

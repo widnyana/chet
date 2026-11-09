@@ -221,7 +221,7 @@ struct StatusStrip: View {
                     IconActionButton(systemImage: "xmark", label: dismiss.label, action: dismiss.perform)
                 }
             }
-            .padding(.horizontal, Metrics.pageMargin)
+            .pageHorizontalPadding()
             .padding(.vertical, Spacing.s3)
             .frame(minHeight: 48)
             .background(.bar)

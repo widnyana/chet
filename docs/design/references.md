@@ -81,7 +81,7 @@ Each line is the one-line reason required by R-31.
 | 34 pt maximum number | The number is important but the screen is a tool, not a poster. |
 | No cards | Cards add a second background and a third border. Hairlines and space are enough. |
 | One command bar | The action must be in the same place on every screen. Floating capsules make the action move. |
-| No glass | Glass flattens hierarchy when it is everywhere. The native sidebar material is the only material. |
+| No custom glass | Glass flattens hierarchy when it is everywhere. Native Liquid Glass on chrome is the only material. |
 | No overview chart | The category ledger is the chart. A bar chart repeats it and adds chartjunk. |
 | Capacity bar | The disk is the product's subject. One bar with a text legend answers the top-level question. |
 | Ledger table | Tables are the right tool for comparing size, date, and risk across many files. |

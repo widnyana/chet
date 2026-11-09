@@ -49,7 +49,7 @@ struct TopStatusStrip: View {
                     .font(Typography.caption)
                     .foregroundStyle(Theme.inkSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, Metrics.pageMargin)
+                    .pageHorizontalPadding()
                     .padding(.vertical, Spacing.s2)
             }
             Hairline()

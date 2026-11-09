@@ -43,7 +43,7 @@ struct DiskMapView: View {
                         tone: .amber)
                     Spacer()
                 }
-                .padding(.horizontal, Spacing.s6)
+                .pageHorizontalPadding()
                 .padding(.bottom, Spacing.s2)
             }
             // Top section: the diagram. It grows live while the scan runs.
@@ -88,7 +88,7 @@ struct DiskMapView: View {
                 )
                 .accessibilityHint("Click a folder block to open it.")
                 .clipShape(.rect(corners: .fixed(Metrics.panelRadius)))
-                .padding(.horizontal, Spacing.s6)
+                .pageHorizontalPadding()
                 .padding(.bottom, Spacing.s3)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .overlay(alignment: .bottomLeading) {
@@ -222,7 +222,7 @@ struct DiskMapView: View {
                 }
             }
         }
-        .padding(.horizontal, Spacing.s6)
+        .pageHorizontalPadding()
         .padding(.bottom, Spacing.s3)
     }
 
@@ -325,7 +325,7 @@ struct DiskMapView: View {
                     .accessibilityIdentifier("storage.resume")
                 }
             }
-            .padding(.horizontal, Spacing.s6)
+            .pageHorizontalPadding()
             .padding(.vertical, Spacing.s2)
             .background(Theme.paper)
         }
@@ -379,7 +379,7 @@ struct DiskMapChrome: View {
                 Spacer()
                 legend
             }
-            .padding(.horizontal, Spacing.s6)
+            .pageHorizontalPadding()
             .padding(.vertical, Spacing.s2)
             Hairline()
         }

@@ -20,7 +20,7 @@ struct AppCleanerDetailView: View {
             )
             .pageHorizontalPadding()
             .padding(.top, Spacing.s6)
-            .padding(.bottom, Spacing.s2)
+            .padding(.bottom, Spacing.s3)
             details
             if model.isRunning {
                 warningRow("Running. Quit it before removing.", icon: "bolt.fill", tone: .amber)

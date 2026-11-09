@@ -78,7 +78,6 @@ struct ItemNameCell: View {
                 }
             }
         }
-        .padding(.vertical, Spacing.s1)
         .help(item.url.path)
         .accessibilityElement(children: .combine)
     }

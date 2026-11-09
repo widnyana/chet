@@ -8,6 +8,7 @@ Detailed references: [design/README.md](design/README.md),
 [design/screens.md](design/screens.md),
 [design/copy.md](design/copy.md),
 [design/references.md](design/references.md),
+[design/composition.md](design/composition.md),
 [design/ui-guidelines.md](design/ui-guidelines.md).
 
 ## The design read
@@ -235,8 +236,9 @@ disabled until an app is marked. Opening an app is separate from marking it.
 
 A searchable inventory of installed Homebrew packages. No scan control; the
 page owns Refresh. Page header `Homebrew`, subtitle `N packages, M marked`.
-Rows carry a checkbox, package name, version, kind (formula or cask), and size
-when Homebrew reports one. The command bar is disabled until a package is
+Rows carry a checkbox, a package icon, package name, kind (formula or cask),
+version, size, and status. The columns use the same widths as Apps so the two
+inventories align. The command bar is disabled until a package is
 marked, then reports marked count and `Uninstall`. The confirmation sheet uses
 the same grammar and 520 pt width as the app sheets. A `brew` read failure is an
 error state with a retry, never an empty list.
@@ -370,7 +372,7 @@ Full copy is in [design/copy.md](design/copy.md).
 
 - No em dash in app copy or new design documents.
 - No sparkle, star, magic, or orb icon.
-- No gradient, glow, glass, or shadow as a default.
+- No custom gradient, glow, glass, or shadow. System Liquid Glass on chrome is the only material.
 - No card grid, no bento, no card per preference, no chart that repeats the ledger.
 - No pill for every small fact.
 - No decorative dot and no endless pulse.

@@ -13,10 +13,7 @@ struct HomebrewView: View {
         VStack(spacing: 0) {
             PageHeader(
                 title: "Homebrew",
-                subtitle: subtitle,
-                metric: model.packages.isEmpty
-                    ? nil : model.totalBytes.formatted(.byteCount(style: .file)),
-                metricLabel: "on disk"
+                subtitle: subtitle
             )
             .accessibilityIdentifier("homebrew.header")
             .pageHorizontalPadding()
@@ -59,7 +56,10 @@ struct HomebrewView: View {
             Button("Upgrade") { model.upgrade() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Homebrew replaces the selected packages with the latest versions.")
+            Text(
+                DryRun.enabled
+                    ? "Preview only. Nothing will be changed. Homebrew would replace the selected packages with the latest versions."
+                    : "Homebrew replaces the selected packages with the latest versions.")
         }
         .confirmationDialog(
             "Remove old versions?", isPresented: $confirmingCleanup, titleVisibility: .visible
@@ -67,7 +67,10 @@ struct HomebrewView: View {
             Button("Remove", role: .destructive) { model.cleanup() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This deletes old package versions and the download cache. Current versions stay.")
+            Text(
+                DryRun.enabled
+                    ? "Preview only. Nothing will be removed. This would delete old package versions and the download cache. Current versions stay."
+                    : "This deletes old package versions and the download cache. Current versions stay.")
         }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
@@ -78,6 +81,14 @@ struct HomebrewView: View {
                 }
                 .help("Search for a formula or cask to install")
                 .accessibilityIdentifier("homebrew.install")
+
+                Button {
+                    model.load()
+                } label: {
+                    Label("Reload", systemImage: "arrow.clockwise")
+                }
+                .disabled(model.isLoading)
+                .help("Read the Homebrew list again")
 
                 Menu {
                     Button("Update catalog", systemImage: "arrow.triangle.2.circlepath") {
@@ -92,15 +103,10 @@ struct HomebrewView: View {
                         confirmingCleanup = true
                     }
                     .disabled(!model.canAct)
-                    Divider()
-                    Button("Reload", systemImage: "arrow.clockwise") {
-                        model.load()
-                    }
-                    .disabled(model.isLoading)
                 } label: {
                     Label("More", systemImage: "ellipsis.circle")
                 }
-                .help("Update, upgrade, clean up, or reload")
+                .help("Update, upgrade, or clean up")
             }
         }
     }
@@ -117,23 +123,37 @@ struct HomebrewView: View {
                 title: "Homebrew is not installed",
                 message: "Install it from brew.sh, then reload.",
                 actionTitle: "Open brew.sh",
-                action: { NSWorkspace.shared.open(URL(string: "https://brew.sh")!) })
+                action: { NSWorkspace.shared.open(URL(string: "https://brew.sh")!) }
+            )
+            .pageHorizontalPadding()
         } else if model.isLoading && model.packages.isEmpty {
             LoadingStateView(message: "Reading Homebrew packages")
+                .pageHorizontalPadding()
         } else if let error = model.loadError, model.packages.isEmpty {
-            EmptyStateView(
+            ErrorStateView(
                 title: "The Homebrew list could not be read.",
                 message: "Run brew list in Terminal, then reload.",
                 actionTitle: "Reload",
                 action: { model.load() }
             )
             .help(error)
+            .pageHorizontalPadding()
         } else if model.packages.isEmpty {
             EmptyStateView(
                 title: "No Homebrew packages",
                 message: "Install one with brew, then reload.",
                 actionTitle: "Reload",
-                action: { model.load() })
+                action: { model.load() }
+            )
+            .pageHorizontalPadding()
+        } else if visiblePackages.isEmpty {
+            EmptyStateView(
+                title: "No package matches \"\(query)\"",
+                message: "Clear the search to see all packages.",
+                actionTitle: "Clear search",
+                action: { query = "" }
+            )
+            .pageHorizontalPadding()
         } else {
             list
         }
@@ -184,6 +204,7 @@ struct HomebrewView: View {
         VStack(spacing: 0) {
             HStack(spacing: HomebrewColumns.spacing) {
                 Color.clear.frame(width: HomebrewColumns.mark)
+                Color.clear.frame(width: HomebrewColumns.icon)
                 sortButton("Name", .name).frame(maxWidth: .infinity, alignment: .leading)
                 sortButton("Kind", .kind).frame(width: HomebrewColumns.kind, alignment: .leading)
                 sortButton("Version", .version)
@@ -213,10 +234,11 @@ struct HomebrewView: View {
 /// Stable column metrics shared by the Homebrew header and its rows.
 private enum HomebrewColumns {
     static let mark: CGFloat = 20
-    static let kind: CGFloat = 64
-    static let version: CGFloat = 110
-    static let size: CGFloat = 80
-    static let status: CGFloat = 140
+    static let icon: CGFloat = 22
+    static let kind: CGFloat = 140
+    static let version: CGFloat = 80
+    static let size: CGFloat = 82
+    static let status: CGFloat = 118
     static let spacing: CGFloat = Spacing.s3
 }
 
@@ -237,6 +259,11 @@ private struct HomebrewRow: View {
             .frame(width: HomebrewColumns.mark)
             .accessibilityLabel("Select \(package.title) to uninstall")
             .accessibilityIdentifier("homebrew.select.\(package.id)")
+            Image(systemName: package.kind == .cask ? "shippingbox.fill" : "shippingbox")
+                .font(.system(size: 16, weight: .regular))
+                .foregroundStyle(Theme.inkSecondary)
+                .frame(width: HomebrewColumns.icon)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
                 Text(package.title).font(Typography.row).foregroundStyle(Theme.ink).lineLimit(1)
                 if !package.desc.isEmpty {
@@ -258,8 +285,7 @@ private struct HomebrewRow: View {
         }
         .frame(minHeight: Metrics.rowHeight)
         .pageHorizontalPadding()
-        .padding(.vertical, Spacing.s1)
-        .background(model.marked.contains(package.id) ? Theme.accentSoft : Theme.paper)
+        .background(model.marked.contains(package.id) ? Theme.accentSoft : Color.clear)
     }
 
     @ViewBuilder private var statusLabel: some View {

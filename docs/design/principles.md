@@ -169,7 +169,7 @@ These are not style preferences. They are the rules the redesign must satisfy.
 - No em dash in app copy or design documents. Use a period, comma, colon, or
   parentheses.
 - No sparkle, star, magic, or orb icon.
-- No gradient, glow, or glass as a default.
+- No custom gradient, glow, or glass as a default. System Liquid Glass on chrome is the only material.
 - No card grid, no bento, no bar chart that repeats the ledger.
 - No pill for every small fact.
 - No decorative dot and no endless pulse.
