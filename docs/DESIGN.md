@@ -222,8 +222,9 @@ on the right. The words are for someone who has never opened a terminal: no cach
   files`, panel `Big files` with `Big file size`, panel `Old files` with `Unchanged for`.
   Every note states the effect in one line.
 - `Folders`: panel `Folders to skip` with `Skip a Folder…`, panel `Folders you add` with
-  `Add a Folder…`, panel `Other drives`. Empty states `No folders are skipped.` and
-  `No folders added yet.`
+  `Add a Folder…` and a per-folder `Keep…` button that marks items the scan must never
+  remove (shown as `Keeping N items`), panel `Other drives`. Empty states
+  `No folders are skipped.` and `No folders added yet.`
 - A set `DRY_RUN` shows one amber label above the panes: `Preview only. Nothing is deleted.`
 
 Panels are the app's only raised surface: radius 10, `paperRaised`, hairline border. Every

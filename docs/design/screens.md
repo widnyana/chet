@@ -189,7 +189,8 @@ The pane name is not repeated in the title bar.
    `Speed` with the `Threads` pop-up and the note `Auto uses one thread per core.`
 2. `Sizes`: panels `Copies`, `Big files`, `Old files`; sliders with the value on the right.
 3. `Folders`: panels `Folders to skip`, `Folders you add`, `Other drives`; picker buttons sit
-   at the panel's bottom right.
+   at the panel's bottom right. Each folder in `Folders you add` has a `Keep…` button to mark
+   items inside it the scan must never remove.
 
 A set `DRY_RUN` adds one amber label above the panes: `Preview only. Nothing is deleted.`
 
