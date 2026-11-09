@@ -1,0 +1,57 @@
+import Foundation
+
+/// Runs short-lived command-line tools (diskutil, tmutil, brew) with a wall-clock timeout.
+enum Subprocess {
+    struct Result {
+        let status: Int32
+        let out: String
+        let err: String
+        var ok: Bool { status == 0 }
+        /// Error lines when the command failed, else stdout, for surfacing a failure to the user.
+        var message: String {
+            let trimmed = err.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? out.trimmingCharacters(in: .whitespacesAndNewlines) : trimmed
+        }
+    }
+
+    /// Runs `tool` with `args`, draining both pipes concurrently so a full stderr buffer cannot
+    /// stall the child. Terminates the child past `timeout`, which reports as a non-zero status.
+    static func run(
+        _ tool: String, _ args: [String], env: [String: String]? = nil, timeout: TimeInterval = 20
+    ) -> Result {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: tool)
+        process.arguments = args
+        if let env { process.environment = env }
+        let outPipe = Pipe()
+        let errPipe = Pipe()
+        process.standardOutput = outPipe
+        process.standardError = errPipe
+        process.standardInput = FileHandle.nullDevice
+        do {
+            try process.run()
+        } catch {
+            return Result(status: -1, out: "", err: error.localizedDescription)
+        }
+
+        var errData = Data()
+        let group = DispatchGroup()
+        group.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+            group.leave()
+        }
+        let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
+
+        // ponytail: wall-clock watchdog, one-shot CLI calls only, no per-call thread pool.
+        let watchdog = DispatchWorkItem { if process.isRunning { process.terminate() } }
+        DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: watchdog)
+        process.waitUntilExit()
+        watchdog.cancel()
+        group.wait()
+        return Result(
+            status: process.terminationStatus,
+            out: String(decoding: outData, as: UTF8.self),
+            err: String(decoding: errData, as: UTF8.self))
+    }
+}
