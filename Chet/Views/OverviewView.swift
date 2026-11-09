@@ -39,9 +39,9 @@ struct OverviewView: View {
     }
 
     private var subtitle: String {
-        if model.isScanning { return "Looking for files you can remove." }
+        if model.isScanning { return "Scanning caches, logs, and large files." }
         guard model.lastScan != nil else {
-            return "Find files you can remove. Nothing leaves this Mac."
+            return "Scan for caches, logs, and large files. Nothing is removed until you choose."
         }
         if model.totalBytes == 0 { return "Your Mac is tidy." }
         return "You can free \(model.totalBytes.formatted(.byteCount(style: .file)))."
@@ -73,8 +73,8 @@ struct OverviewView: View {
                     PrimaryActionButton(
                         title: model.lastScan == nil ? "Scan" : "Scan again",
                         systemImage: "magnifyingglass",
-                        help: "Find files you can remove (Command-R)",
-                        accessibilityLabel: "Scan for files you can remove",
+                        help: "Scan for caches, logs, and large files (Command-R)",
+                        accessibilityLabel: "Scan for caches, logs, and large files",
                         action: { model.scan() }
                     )
                     .accessibilityIdentifier("home.scan")

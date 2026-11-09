@@ -36,8 +36,8 @@ struct ScanStatusView: View {
             PrimaryActionButton(
                 title: model.lastScan == nil ? "Scan" : "Scan again",
                 systemImage: "magnifyingglass",
-                help: "Find files you can remove (Command-R)",
-                accessibilityLabel: "Scan for files you can remove",
+                help: "Scan for caches, logs, and large files (Command-R)",
+                accessibilityLabel: "Scan for caches, logs, and large files",
                 action: { model.scan() }
             )
             .accessibilityIdentifier("toolbar.scan")
