@@ -142,7 +142,13 @@ final class ScanModel {
         }
     }
     nonisolated static let helperLifetimeKey = "helperLifetimeMinutes"
-    var categories: [CategoryState] = []
+    var categories: [CategoryState] = [] {
+        didSet { reindexItems() }
+    }
+    /// First item per URL (a file can sit in several categories) and the sum over those, kept in
+    /// step with `categories` so reads during render are O(1) / O(selected).
+    private(set) var itemsByURL: [URL: ScanItem] = [:]
+    private(set) var totalBytes: Int64 = 0
     /// Category id -> groups, for duplicates and similar media.
     var groups: [String: [ItemGroup]] = [:]
     var snapshots: [LocalSnapshot] = []
@@ -213,21 +219,23 @@ final class ScanModel {
         "system-caches": "System caches", "system-logs": "System logs",
     ]
 
-    /// Selected items, each URL once (a file can show up in more than one category).
-    var selectedItems: [ScanItem] {
-        var seen = Set<URL>()
-        return categories.flatMap(\.items).filter { selected.contains($0.url) && seen.insert($0.url).inserted }
-    }
-
-    var selectedBytes: Int64 { selectedItems.reduce(0) { $0 + $1.reclaimableBytes } }
-
-    /// Everything found, each file counted once.
-    var totalBytes: Int64 {
-        var seen = Set<URL>()
-        return categories.flatMap(\.items).filter { seen.insert($0.url).inserted }.reduce(0) {
-            $0 + $1.reclaimableBytes
+    private func reindexItems() {
+        var map: [URL: ScanItem] = [:]
+        var total: Int64 = 0
+        for category in categories {
+            for item in category.items where map[item.url] == nil {
+                map[item.url] = item
+                total += item.reclaimableBytes
+            }
         }
+        itemsByURL = map
+        totalBytes = total
     }
+
+    /// Selected items, each URL once (a file can show up in more than one category).
+    var selectedItems: [ScanItem] { selected.compactMap { itemsByURL[$0] } }
+
+    var selectedBytes: Int64 { selected.reduce(0) { $0 + (itemsByURL[$1]?.reclaimableBytes ?? 0) } }
 
     func refreshAccess() {
         access = FullDiskAccess.status()
@@ -347,7 +355,9 @@ final class ScanModel {
     func beginClean(_ items: [ScanItem]? = nil) {
         report = nil
         cleanProgress = nil
-        confirmItems = items ?? selectedItems
+        confirmItems =
+            items
+            ?? selectedItems.sorted { ($0.reclaimableBytes, $1.url.path) > ($1.reclaimableBytes, $0.url.path) }
         confirmSnapshots = confirmItems.isEmpty ? Array(selectedSnapshots) : []
     }
 

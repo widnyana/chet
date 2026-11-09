@@ -11,9 +11,7 @@ extension ScanModel {
 
     /// URL form, for the row bindings and the bulk selectors.
     func canSelect(_ url: URL) -> Bool {
-        guard let item = categories.lazy.flatMap(\.items).first(where: { $0.url == url }) else {
-            return true
-        }
+        guard let item = itemsByURL[url] else { return true }
         return canSelect(item)
     }
 
