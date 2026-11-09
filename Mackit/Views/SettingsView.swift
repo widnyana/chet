@@ -32,8 +32,7 @@ struct SettingsView: View {
                     StatusLabel(
                         text: "Dry run on. Cleaning only simulates.",
                         systemImage: "eye.slash",
-                        tone: .amber,
-                        help: "DRY_RUN is set in the environment or a .env file")
+                        tone: .amber)
                 }
 
                 scanSection
@@ -88,14 +87,9 @@ struct SettingsView: View {
                 get: { model.includeTempInDuplicates },
                 set: { model.includeTempInDuplicates = $0 }))
             {
-                VStack(alignment: .leading, spacing: Spacing.s1) {
-                    Text("Search caches and build folders")
-                        .font(Typography.body)
-                        .foregroundStyle(Theme.ink)
-                    Text("Off by default.")
-                        .font(Typography.caption)
-                        .foregroundStyle(Theme.inkSecondary)
-                }
+                Text("Search caches and build folders")
+                    .font(Typography.body)
+                    .foregroundStyle(Theme.ink)
             }
             .accessibilityLabel("Search caches and build folders")
             Hairline()
@@ -135,8 +129,9 @@ struct SettingsView: View {
                                 .truncationMode(.middle)
                             Spacer(minLength: Spacing.s2)
                             Button("Remove") { model.removeExcludedPath(path) }
-                                .buttonStyle(.link)
+                                .buttonStyle(.borderless)
                                 .font(Typography.caption)
+                                .foregroundStyle(Theme.inkSecondary)
                                 .accessibilityLabel("Stop excluding \(path)")
                         }
                         .padding(.vertical, Spacing.s2)
@@ -185,8 +180,9 @@ struct SettingsView: View {
                                 .truncationMode(.middle)
                             Spacer(minLength: Spacing.s2)
                             Button("Remove") { model.removeUserRule(userRule.id) }
-                                .buttonStyle(.link)
+                                .buttonStyle(.borderless)
                                 .font(Typography.caption)
+                                .foregroundStyle(Theme.inkSecondary)
                                 .accessibilityLabel("Remove rule for \(userRule.path)")
                         }
                         .padding(.vertical, Spacing.s2)

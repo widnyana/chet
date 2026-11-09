@@ -233,6 +233,10 @@ results are not repeated here; the Overview already reports them.
 A set `DRY_RUN` shows one amber status label under the header. Radius 0, hairlines under
 section headers, no cards, and the accent tints controls only.
 
+Every section is the same shape: header, hairline, then the control that section needs. That
+is a deliberate RHYTHM 1, the System Settings convention, so a reader learns the page once.
+Variety comes from the controls, not from six different layouts.
+
 ### Permission page
 
 A sentence, three plain steps, one primary button, one link, and a native
