@@ -96,14 +96,12 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .fixedSize()
                 }
             }
         }
     }
 
     // MARK: - Sizes
-
     private var sizesPane: some View {
         pane {
             SettingsPanel(title: "Copies") {
@@ -159,7 +157,7 @@ struct SettingsView: View {
         SettingsRow(label: title) {
             HStack(spacing: Spacing.s2) {
                 Slider(value: binding, in: range, step: step)
-                    .frame(width: 150)
+                    .frame(maxWidth: .infinity)
                     .controlSize(.small)
                     .accessibilityLabel(title)
                     .accessibilityValue(value)
@@ -179,56 +177,46 @@ struct SettingsView: View {
             SettingsPanel(title: "Folders to skip") {
                 SettingsNote("Mackit never looks inside these, and never deletes here.")
                 if model.excludedPaths.isEmpty {
-                    SettingsDivider()
                     SettingsNote("No folders are skipped.")
                 } else {
                     ForEach(model.excludedPaths, id: \.self) { path in
                         SettingsDivider()
                         SettingsRow(label: path) {
                             Button("Remove") { model.removeExcludedPath(path) }
-                                .buttonStyle(.borderless)
-                                .font(Typography.caption)
-                                .foregroundStyle(Theme.inkSecondary)
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
                                 .accessibilityLabel("Stop skipping \(path)")
                         }
                     }
                 }
                 SettingsDivider()
-                HStack {
-                    Spacer()
+                SettingsActionRow {
                     Button("Skip a Folder…") { chooseExcludedFolders() }
                         .controlSize(.small)
                         .accessibilityLabel("Choose a folder to skip")
                 }
-                .padding(.horizontal, Spacing.s3)
-                .padding(.bottom, Spacing.s2)
             }
             SettingsPanel(title: "Folders you add") {
                 SettingsNote("Everything inside is listed, you approve it, then it goes to the Trash.")
                 if model.userRules.isEmpty {
-                    SettingsDivider()
                     SettingsNote("No folders added yet.")
                 } else {
                     ForEach(model.userRules) { userRule in
                         SettingsDivider()
                         SettingsRow(label: userRule.path) {
                             Button("Remove") { model.removeUserRule(userRule.id) }
-                                .buttonStyle(.borderless)
-                                .font(Typography.caption)
-                                .foregroundStyle(Theme.inkSecondary)
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
                                 .accessibilityLabel("Remove folder \(userRule.path)")
                         }
                     }
                 }
                 SettingsDivider()
-                HStack {
-                    Spacer()
+                SettingsActionRow {
                     Button("Add a Folder…") { chooseRuleFolders() }
                         .controlSize(.small)
                         .accessibilityLabel("Add a folder to check")
                 }
-                .padding(.horizontal, Spacing.s3)
-                .padding(.bottom, Spacing.s2)
             }
             SettingsPanel(title: "Other drives") {
                 SettingsRow(
@@ -307,14 +295,22 @@ private struct SettingsPanel<Content: View>: View {
     }
 }
 
-/// One setting: label and optional detail on the left, the control on the right.
+/// The row grid every panel uses: one control column on the right, one row height. Nothing
+/// in the page sets its own width or height; if a control needs a size, it fills this column.
+private enum SettingsGrid {
+    static let control: CGFloat = 200
+    static let row: CGFloat = 34
+}
+
+/// One setting: label and optional detail on the left, the control in the shared column on
+/// the right. Center alignment, because a 24 point field has no text baseline to match.
 private struct SettingsRow<Control: View>: View {
     let label: String
     var detail: String?
     @ViewBuilder var control: Control
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: Spacing.s3) {
+        HStack(alignment: .center, spacing: Spacing.s3) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(label)
                     .font(Typography.body)
@@ -329,9 +325,25 @@ private struct SettingsRow<Control: View>: View {
             }
             Spacer(minLength: Spacing.s3)
             control
+                .frame(width: SettingsGrid.control, alignment: .trailing)
         }
+        .frame(minHeight: SettingsGrid.row)
         .padding(.horizontal, Spacing.s3)
-        .padding(.vertical, Spacing.s2)
+    }
+}
+
+/// The row used for a panel's own action, aligned to the same control column as a setting.
+private struct SettingsActionRow<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        HStack(spacing: Spacing.s2) {
+            Spacer(minLength: 0)
+            content
+                .frame(width: SettingsGrid.control, alignment: .trailing)
+        }
+        .frame(minHeight: SettingsGrid.row)
+        .padding(.horizontal, Spacing.s3)
     }
 }
 
@@ -343,8 +355,10 @@ private struct SettingsNote: View {
         Text(text)
             .font(Typography.caption)
             .foregroundStyle(Theme.inkSecondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, Spacing.s3)
-            .padding(.bottom, Spacing.s2)
+            .padding(.top, Spacing.s1)
+            .padding(.bottom, Spacing.s1)
     }
 }
 
