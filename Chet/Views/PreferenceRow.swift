@@ -7,12 +7,14 @@ struct PreferenceNote: Identifiable {
     let text: String
     let systemImage: String
     let tone: StatusTone
+    var help: String?
 
-    init(_ text: String, systemImage: String, tone: StatusTone) {
+    init(_ text: String, systemImage: String, tone: StatusTone, help: String? = nil) {
         self.id = text
         self.text = text
         self.systemImage = systemImage
         self.tone = tone
+        self.help = help
     }
 }
 
@@ -60,7 +62,9 @@ struct PreferenceRow<Accessory: View>: View {
                         .font(Typography.caption)
                         .foregroundStyle(Theme.inkSecondary)
                     ForEach(notes) { note in
-                        StatusLabel(text: note.text, systemImage: note.systemImage, tone: note.tone)
+                        StatusLabel(
+                            text: note.text, systemImage: note.systemImage, tone: note.tone,
+                            help: note.help)
                     }
                 }
             }

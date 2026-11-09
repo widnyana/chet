@@ -36,6 +36,9 @@ struct TweaksView: View {
         .sheet(item: $detail) { tweak in
             TweakDetailView(tweak: tweak)
         }
+        .sheet(item: $model.pendingConfirmation) { pending in
+            TweakConfirmView(pending: pending)
+        }
         .accessibilityIdentifier("tweaks.page")
     }
 
@@ -88,7 +91,7 @@ struct TweaksView: View {
                     text: TweakCopy.restart(target), systemImage: "arrow.clockwise", tone: .amber)
                 Spacer(minLength: Spacing.s3)
                 if target.processName != nil {
-                    SecondaryActionButton(title: "Restart \(TweakCopy.processName(target))") {
+                    SecondaryActionButton(title: "Restart \(TweakCopy.processName(target))", isEnabled: !model.isGated) {
                         model.restart(target)
                     }
                 }
@@ -185,6 +188,12 @@ private struct TweakRow: View {
             notes.append(
                 PreferenceNote(restartLine, systemImage: "arrow.clockwise", tone: .amber))
         }
+        if let failure = model.failure(for: reading.id) {
+            notes.append(
+                PreferenceNote(
+                    "Could not change", systemImage: "xmark.octagon", tone: .red,
+                    help: failure))
+        }
         return notes
     }
 
@@ -237,6 +246,20 @@ private struct TweakRow: View {
                 .pickerStyle(.menu)
                 .disabled(!reading.isSupported)
                 .accessibilityIdentifier("tweak.choice.\(reading.id)")
+            case .range:
+                TweakRangeControl(reading: reading)
+            case .text(let placeholder):
+                TweakTextControl(reading: reading, placeholder: placeholder)
+            case .inspect:
+                if let url = settingsURL {
+                    SecondaryActionButton(
+                        title: "Open Settings",
+                        help: "Open the System Settings pane for \(reading.tweak.name)"
+                    ) {
+                        NSWorkspace.shared.open(url)
+                    }
+                    .accessibilityIdentifier("tweak.inspect.\(reading.id)")
+                }
             case .folder:
                 HStack(spacing: Spacing.s2) {
                     Text(TweakCopy.state(reading.state))
@@ -253,6 +276,11 @@ private struct TweakRow: View {
         }
     }
 
+    private var settingsURL: URL? {
+        if case .probe(let probe) = reading.tweak.target { return probe.settingsURL }
+        return nil
+    }
+
     private func chooseFolder() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
@@ -266,5 +294,115 @@ private struct TweakRow: View {
         }
         guard panel.runModal() == .OK, let url = panel.url else { return }
         model.set(reading.tweak, to: .string(url.path))
+    }
+}
+
+/// A numeric preference. The write happens once, when the drag ends, so a slider gesture
+/// does not produce one write per tick.
+private struct TweakRangeControl: View {
+    @Environment(TweaksModel.self) private var model
+    let reading: TweakReading
+    @State private var value: Double = 0
+
+    private var range: ClosedRange<Double> {
+        if case .range(let minimum, let maximum, _, _) = reading.tweak.control {
+            return minimum...maximum
+        }
+        return 0...1
+    }
+
+    private var step: Double {
+        if case .range(_, _, let step, _) = reading.tweak.control { return step }
+        return 1
+    }
+
+    private var unit: String? {
+        if case .range(_, _, _, let unit) = reading.tweak.control { return unit }
+        return nil
+    }
+
+    private var current: Double {
+        switch reading.current ?? reading.tweak.defaultValue {
+        case .integer(let number): Double(number)
+        case .number(let number): number
+        default: range.lowerBound
+        }
+    }
+
+    private var readout: String {
+        let base = step >= 1 ? String(Int(value.rounded())) : String(format: "%.1f", value)
+        return unit.map { "\(base) \($0)" } ?? base
+    }
+
+    var body: some View {
+        HStack(spacing: Spacing.s2) {
+            Slider(value: $value, in: range, step: step) { editing in
+                if !editing { commit() }
+            }
+            .controlSize(.small)
+            .accessibilityIdentifier("tweak.range.\(reading.id)")
+            Text(readout)
+                .font(Typography.caption)
+                .monospacedDigit()
+                .foregroundStyle(Theme.inkSecondary)
+                .frame(width: 58, alignment: .trailing)
+        }
+        .onAppear { value = current }
+        .onChange(of: reading.current) { _, _ in value = current }
+        .disabled(!reading.isSupported || model.isGated)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(reading.tweak.name)
+        .accessibilityValue(readout)
+    }
+
+    private func commit() {
+        guard !model.isGated, reading.isSupported else { return }
+        if case .defaults(_, _, let type) = reading.tweak.target, type == .integer {
+            model.set(reading.tweak, to: .integer(Int(value.rounded())))
+        } else {
+            model.set(reading.tweak, to: .number(value))
+        }
+    }
+}
+
+/// A free-text preference. Committed on Return or when focus leaves the field. Clearing
+/// the field removes the key, which restores the macOS default.
+private struct TweakTextControl: View {
+    @Environment(TweaksModel.self) private var model
+    let reading: TweakReading
+    let placeholder: String
+    @State private var text = ""
+    @FocusState private var focused: Bool
+
+    private var stored: String {
+        if case .string(let value) = reading.current ?? reading.tweak.defaultValue { return value }
+        return ""
+    }
+
+    var body: some View {
+        TextField(placeholder, text: $text)
+            .textFieldStyle(.roundedBorder)
+            .font(Typography.caption)
+            .focused($focused)
+            .onSubmit(commit)
+            .onChange(of: focused) { _, isFocused in
+                if !isFocused { commit() }
+            }
+            .onAppear { text = stored }
+            .onChange(of: reading.current) { _, _ in text = stored }
+            .disabled(!reading.isSupported || model.isGated)
+            .accessibilityIdentifier("tweak.text.\(reading.id)")
+            .accessibilityLabel(reading.tweak.name)
+    }
+
+    private func commit() {
+        guard !model.isGated, reading.isSupported else { return }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            if reading.isCustomized { model.reset(reading.tweak) }
+            return
+        }
+        if trimmed == stored, reading.isCustomized { return }
+        model.set(reading.tweak, to: .string(trimmed))
     }
 }

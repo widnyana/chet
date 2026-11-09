@@ -100,14 +100,16 @@ struct TweaksTests {
             #expect(!tweak.impact.isEmpty)
             #expect(!tweak.configurationLabel.isEmpty)
 
-            let type: TweakValueType
+            let type: TweakValueType?
             switch tweak.target {
             case .defaults(_, _, let declared): type = declared
             case .fileHidden: type = .boolean
+            case .probe: type = nil
             }
 
             switch tweak.control {
             case .toggle(let on, let off):
+                #expect(type != nil, "\(tweak.id): a toggle needs a value target")
                 #expect(on.type == type, "\(tweak.id): on value does not match the key type")
                 if let off { #expect(off.type == type, "\(tweak.id): off value does not match") }
             case .choice(let options):
@@ -117,12 +119,39 @@ struct TweaksTests {
                 }
             case .folder:
                 #expect(type == .string, "\(tweak.id): a folder needs a string key")
+            case .range:
+                #expect(
+                    type == .integer || type == .number,
+                    "\(tweak.id): a range needs a numeric key")
+            case .text:
+                #expect(type == .string, "\(tweak.id): text needs a string key")
+            case .inspect:
+                #expect(type == nil, "\(tweak.id): an inspect control must use a probe target")
             }
 
-            if let fallback = tweak.defaultValue {
+            for companion in tweak.companions {
+                guard case .defaults(_, _, let companionType) = companion else {
+                    Issue.record("\(tweak.id): a companion must be a defaults target")
+                    continue
+                }
+                guard case .toggle(let on, _) = tweak.control else {
+                    Issue.record("\(tweak.id): companions need a toggle control")
+                    continue
+                }
+                #expect(on.type == companionType, "\(tweak.id): companion type mismatch")
+            }
+
+            if let fallback = tweak.defaultValue, let type {
                 #expect(fallback.type == type, "\(tweak.id): default type mismatch")
                 if case .choice(let options) = tweak.control {
                     #expect(options.contains { $0.value == fallback }, "\(tweak.id): default is not an option")
+                }
+            }
+
+            if tweak.control == .inspect {
+                guard case .probe = tweak.target else {
+                    Issue.record("\(tweak.id): an inspect control must use a probe target")
+                    continue
                 }
             }
         }
@@ -197,7 +226,9 @@ struct TweaksTests {
         defer { _ = Subprocess.run("/usr/bin/defaults", ["delete", probe]) }
 
         let blocked = TweakEngine.set(tweak, to: .boolean(true), history: history, dryRun: false)
+        #expect(blocked.needsConfirmation)
         #expect(blocked.record.error?.contains("confirmation") == true)
+        #expect(history.load().isEmpty)
         #expect(TweakEngine.read(tweak).current == nil)
 
         let allowed = TweakEngine.set(
@@ -223,6 +254,18 @@ struct TweaksTests {
         #expect(reset.record.error == TweakError.gated.message)
         #expect(history.load().isEmpty)
         #expect(!TweakEngine.restart(.finder, dryRun: true))
+
+        // The gate also precedes the unsupported failure, which would otherwise write a
+        // failure record for a path that does not exist.
+        let missing = Tweak(
+            id: "test.missing", category: .finder, name: "Missing", summary: "Summary",
+            detail: "Detail", impact: "Impact",
+            target: .fileHidden(path: dir.url.appendingPathComponent("nope").path),
+            control: .toggle(on: .boolean(false), off: .boolean(true)),
+            defaultValue: .boolean(false))
+        let gatedUnsupported = TweakEngine.set(missing, to: .boolean(true), history: history, dryRun: true)
+        #expect(gatedUnsupported.record.error == TweakError.gated.message)
+        #expect(history.load().isEmpty)
     }
 
     @Test func fileHiddenFlagRoundTrips() throws {
@@ -246,6 +289,151 @@ struct TweaksTests {
         let shown = TweakEngine.set(tweak, to: .boolean(false), history: history, dryRun: false)
         #expect(shown.reading.state == .on)
         #expect(!shown.reading.isCustomized)
+    }
+
+    // MARK: Probes
+
+    @Test func parseProbeMapsEveryOutput() {
+        #expect(TweakEngine.parseProbe("Firewall is enabled. (State = 1)", for: .firewall) == .on)
+        #expect(TweakEngine.parseProbe("Firewall is disabled. (State = 0)", for: .firewall) == .off)
+        #expect(TweakEngine.parseProbe("FileVault is On.", for: .fileVault) == .on)
+        #expect(TweakEngine.parseProbe("FileVault is Off.", for: .fileVault) == .off)
+        #expect(TweakEngine.parseProbe("assessments enabled", for: .gatekeeper) == .on)
+        #expect(TweakEngine.parseProbe("assessments disabled", for: .gatekeeper) == .off)
+        #expect(TweakEngine.parseProbe("1", for: .automaticUpdates) == .on)
+        #expect(TweakEngine.parseProbe("0", for: .automaticUpdates) == .off)
+        #expect(
+            TweakEngine.parseProbe("/Library/Developer/CommandLineTools", for: .xcodeTools)
+                == .value("/Library/Developer/CommandLineTools"))
+        #expect(TweakEngine.parseProbe("UserShell: /bin/zsh", for: .loginShell) == .value("/bin/zsh"))
+        #expect(TweakEngine.parseProbe("Homebrew 4.6.1", for: .homebrew) == .value("Homebrew 4.6.1"))
+        #expect(TweakEngine.parseProbe("1", for: .virtualization) == .value("Supported"))
+        #expect(TweakEngine.parseProbe("0", for: .virtualization) == .value("Not supported"))
+        #expect(TweakEngine.parseProbe("something else", for: .firewall) == nil)
+    }
+
+    @Test func probeReadingsComeBackFromThisMac() throws {
+        for id in ["developer.virtualization", "developer.homebrew", "developer.login-shell"] {
+            let tweak = try #require(TweakCatalog.all.first { $0.id == id })
+            let reading = TweakEngine.read(tweak)
+            #expect(reading.isSupported, "\(id) should be readable on this Mac")
+            if case .unknown(let reason) = reading.state {
+                Issue.record("\(id) is unknown: \(reason)")
+            }
+        }
+    }
+
+    @Test func inspectionTweaksRefuseWrites() throws {
+        let dir = try TempDir()
+        let history = TweakHistory(url: dir.url.appendingPathComponent("tweaks.log"))
+        let tweak = try #require(TweakCatalog.all.first { $0.id == "security.firewall" })
+        let change = TweakEngine.set(tweak, to: .boolean(true), history: history, dryRun: false)
+        #expect(change.record.error == TweakError.inspectionOnly.message)
+        #expect(!change.needsConfirmation)
+        #expect(history.load().isEmpty)
+        let reset = TweakEngine.reset(tweak, history: history, dryRun: false)
+        #expect(reset.record.error == TweakError.inspectionOnly.message)
+        #expect(history.load().isEmpty)
+    }
+
+    // MARK: Lifecycle
+
+    @Test func unchangedWriteIsNotRecorded() throws {
+        let dir = try TempDir()
+        let history = TweakHistory(url: dir.url.appendingPathComponent("tweaks.log"))
+        let probe = domain()
+        let tweak = toggleTweak(domain: probe)
+        defer { _ = Subprocess.run("/usr/bin/defaults", ["delete", probe]) }
+
+        let first = TweakEngine.set(tweak, to: .boolean(true), history: history, dryRun: false)
+        #expect(!first.unchanged)
+        let second = TweakEngine.set(tweak, to: .boolean(true), history: history, dryRun: false)
+        #expect(second.unchanged)
+        #expect(second.record.error == nil)
+        #expect(history.load().count == 1)
+    }
+
+    @Test func companionsWriteVerifyAndRestore() throws {
+        let dir = try TempDir()
+        let history = TweakHistory(url: dir.url.appendingPathComponent("tweaks.log"))
+        let primary = domain()
+        let companion = domain()
+        defer {
+            _ = Subprocess.run("/usr/bin/defaults", ["delete", primary])
+            _ = Subprocess.run("/usr/bin/defaults", ["delete", companion])
+        }
+        let tweak = Tweak(
+            id: "test.companions", category: .keyboard, name: "Companion", summary: "Summary",
+            detail: "Detail", impact: "Impact",
+            target: .defaults(domain: primary, key: "on", type: .boolean),
+            control: .toggle(on: .boolean(true), off: .boolean(false)),
+            companions: [.defaults(domain: companion, key: "on", type: .boolean)],
+            defaultValue: .boolean(false))
+
+        let first = TweakEngine.set(tweak, to: .boolean(true), history: history, dryRun: false)
+        #expect(first.record.error == nil)
+        #expect(TweakEngine.read(tweak).current == .boolean(true))
+        #expect(TweakEngine.companionValues(tweak) == [.boolean(true)])
+
+        let off = TweakEngine.set(tweak, to: .boolean(false), history: history, dryRun: false)
+        #expect(off.reading.current == .boolean(false))
+        #expect(TweakEngine.companionValues(tweak) == [.boolean(false)])
+
+        let rolledBack = TweakEngine.rollback(off.record, tweak: tweak, history: history, dryRun: false)
+        #expect(rolledBack.record.error == nil)
+        #expect(rolledBack.reading.current == .boolean(true))
+        #expect(TweakEngine.companionValues(tweak) == [.boolean(true)])
+        #expect(history.load().last?.action == .rollback)
+    }
+
+    @Test func rollbackRefusesAMismatchedRecord() throws {
+        let dir = try TempDir()
+        let history = TweakHistory(url: dir.url.appendingPathComponent("tweaks.log"))
+        let probe = domain()
+        defer { _ = Subprocess.run("/usr/bin/defaults", ["delete", probe]) }
+        let tweak = Tweak(
+            id: "test.integer", category: .keyboard, name: "Number", summary: "Summary",
+            detail: "Detail", impact: "Impact",
+            target: .defaults(domain: probe, key: "n", type: .integer),
+            control: .range(min: 1, max: 15, step: 1, unit: nil),
+            defaultValue: .integer(6))
+        let bad = TweakRecord(tweakID: tweak.id, action: .set, before: .string("wrong"), after: nil)
+        let change = TweakEngine.rollback(bad, tweak: tweak, history: history, dryRun: false)
+        #expect(change.record.error?.contains("does not match") == true)
+        #expect(TweakEngine.read(tweak).current == nil)
+        #expect(history.load().isEmpty)
+    }
+
+    @Test func rangeAndTextControlsWriteTypedValues() throws {
+        let dir = try TempDir()
+        let history = TweakHistory(url: dir.url.appendingPathComponent("tweaks.log"))
+        let numberDomain = domain()
+        let textDomain = domain()
+        defer {
+            _ = Subprocess.run("/usr/bin/defaults", ["delete", numberDomain])
+            _ = Subprocess.run("/usr/bin/defaults", ["delete", textDomain])
+        }
+
+        let ranged = Tweak(
+            id: "test.range", category: .keyboard, name: "Rate", summary: "Summary",
+            detail: "Detail", impact: "Impact",
+            target: .defaults(domain: numberDomain, key: "rate", type: .integer),
+            control: .range(min: 1, max: 15, step: 1, unit: nil),
+            defaultValue: .integer(6))
+        let number = TweakEngine.set(ranged, to: .integer(9), history: history, dryRun: false)
+        #expect(number.reading.current == .integer(9))
+        #expect(number.reading.state == .value("9"))
+
+        let texted = Tweak(
+            id: "test.text", category: .screenshots, name: "Name", summary: "Summary",
+            detail: "Detail", impact: "Impact",
+            target: .defaults(domain: textDomain, key: "name", type: .string),
+            control: .text(placeholder: "Screenshot"),
+            defaultValue: .string("Screenshot"))
+        let text = TweakEngine.set(texted, to: .string("Shot"), history: history, dryRun: false)
+        #expect(text.reading.current == .string("Shot"))
+        #expect(text.reading.state == .value("Shot"))
+        #expect(text.reading.isCustomized)
     }
 
     // MARK: Helpers

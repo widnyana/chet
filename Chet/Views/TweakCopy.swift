@@ -11,6 +11,7 @@ enum TweakCopy {
         case .custom(let text): "Set to \(text)"
         case .unsupported(let reason): reason
         case .unknown(let reason): reason
+        case .error: "Could not change"
         }
     }
 
@@ -49,6 +50,10 @@ enum TweakCopy {
         case .reset: "Reset to the macOS default"
         case .rollback: "Reverted"
         }
+    }
+
+    static func value(_ value: TweakValue?) -> String {
+        value?.display ?? "the macOS default"
     }
 
     static func riskTone(_ risk: TweakRisk) -> StatusTone {

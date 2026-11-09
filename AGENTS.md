@@ -25,9 +25,26 @@ Trash, or restarts an app. Build the gate into the test, not around it:
   `Preview only. No tweak is changed.` on Tweaks.
 - Every tweak control must report `enabled: false`. A press on a disabled control is a no-op;
   verify the underlying key did not change.
-- The confirmation sheet, `Revert last change`, and real apply paths are unreachable under the
-  gate. Their refusal is covered by `ChetCore` tests; do not launch without `DRY_RUN=1` to
-  exercise them.
+- The confirmation sheet and `Revert last change` stay disabled under the gate. Render them
+  with the preview hook; engine refusal is covered by `ChetCore` tests. Do not launch without
+  `DRY_RUN=1`.
+- A `DEBUG` build with `CHET_TWEAK_PREVIEW=confirm` opens the confirmation sheet for the first
+  medium-risk tweak after load. `CHET_TWEAK_PREVIEW=revert` opens the revert dialog when a
+  tweak detail sheet appears. Both change no preference. Release builds do not contain the
+  hook. Start the preview directly:
+  `DRY_RUN=1 CHET_TWEAK_PREVIEW=confirm /tmp/ChetUITest.app/Contents/MacOS/chet &`.
+  `open --env` with two flags did not carry the second variable.
+
+## Tweaks coverage
+
+The catalog has 55 entries: Finder 11, Dock 8, Keyboard 10, Trackpad 2, Screenshots 5,
+Appearance 6, Windows 5, Security 4 read-only checks, Developer 4 read-only checks.
+
+Absent because they need root, a private format, or an unverified key: power, network,
+notifications and focus, security and developer entries beyond the four read-only checks
+each, pointer speed and acceleration, Dock bounce and lock, screenshot selection and
+recording location, window tiling, appearance accent/highlight/automatic/date format/font
+rendering, and keyboard emoji substitution.
 
 ## First launch
 

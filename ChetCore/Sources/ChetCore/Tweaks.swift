@@ -43,18 +43,24 @@ public enum TweakCategory: String, CaseIterable, Sendable, Hashable {
     case finder
     case dock
     case keyboard
+    case trackpad
     case screenshots
     case appearance
     case windows
+    case security
+    case developer
 
     public var title: String {
         switch self {
         case .finder: "Finder"
         case .dock: "Dock"
         case .keyboard: "Keyboard"
+        case .trackpad: "Trackpad"
         case .screenshots: "Screenshots"
         case .appearance: "Appearance"
         case .windows: "Windows"
+        case .security: "Security"
+        case .developer: "Developer"
         }
     }
 }
@@ -86,11 +92,71 @@ public enum TweakRestart: String, Codable, Sendable, Hashable, CaseIterable {
     }
 }
 
+/// A read-only status check for security and developer settings. The engine owns the command
+/// or defaults read; the catalog only names the check, so no shell string is data.
+public enum TweakProbe: String, Sendable, Hashable, CaseIterable {
+    case firewall
+    case fileVault
+    case gatekeeper
+    case automaticUpdates
+    case xcodeTools
+    case loginShell
+    case homebrew
+    case virtualization
+
+    public var name: String {
+        switch self {
+        case .firewall: "Application firewall"
+        case .fileVault: "FileVault"
+        case .gatekeeper: "Gatekeeper"
+        case .automaticUpdates: "Automatic update checks"
+        case .xcodeTools: "Xcode command line tools"
+        case .loginShell: "Login shell"
+        case .homebrew: "Homebrew"
+        case .virtualization: "Virtualization support"
+        }
+    }
+
+    /// What the check reads, shown in the details sheet.
+    public var source: String {
+        switch self {
+        case .firewall: "socketfilterfw --getglobalstate"
+        case .fileVault: "fdesetup status"
+        case .gatekeeper: "spctl --status"
+        case .automaticUpdates: "com.apple.SoftwareUpdate AutomaticCheckEnabled"
+        case .xcodeTools: "xcode-select -p"
+        case .loginShell: "dscl . -read /Users/<you> UserShell"
+        case .homebrew: "Homebrew --version"
+        case .virtualization: "sysctl kern.hv_support"
+        }
+    }
+
+    public var settingsURL: URL? {
+        let pane: String
+        switch self {
+        case .firewall: pane = "x-apple.systempreferences:com.apple.preference.security?Firewall"
+        case .fileVault:
+            pane = "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_FileVault"
+        case .gatekeeper: pane = "x-apple.systempreferences:com.apple.preference.security?Security"
+        case .automaticUpdates:
+            pane = "x-apple.systempreferences:com.apple.Software-Update-Settings.extension"
+        case .xcodeTools:
+            pane = "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_DeveloperTools"
+        case .loginShell: pane = "x-apple.systempreferences:com.apple.Users-Groups-Settings.extension"
+        case .homebrew: return nil
+        case .virtualization: return nil
+        }
+        return URL(string: pane)
+    }
+}
+
 public enum TweakTarget: Sendable, Hashable {
     /// A key in a preferences domain, such as `com.apple.finder` and `ShowPathbar`.
     case defaults(domain: String, key: String, type: TweakValueType)
     /// The hidden user flag on a path, read with `stat` and written with `chflags`.
     case fileHidden(path: String)
+    /// A read-only status check. There is nothing to write.
+    case probe(TweakProbe)
 }
 
 public struct TweakOption: Sendable, Hashable {
@@ -108,6 +174,23 @@ public enum TweakControl: Sendable, Hashable {
     case toggle(on: TweakValue, off: TweakValue?)
     case choice([TweakOption])
     case folder
+    /// A slider. The key type (integer or number) decides how the value is written.
+    case range(min: Double, max: Double, step: Double, unit: String?)
+    /// A free-text preference, committed when editing ends.
+    case text(placeholder: String)
+    /// Read-only status with an action that opens the relevant System Settings pane.
+    case inspect
+}
+
+extension TweakTarget {
+    /// The domain and key, path, or check this target reads and writes.
+    public var configurationLabel: String {
+        switch self {
+        case .defaults(let domain, let key, _): "\(domain) · \(key)"
+        case .fileHidden(let path): path
+        case .probe(let probe): probe.source
+        }
+    }
 }
 
 public struct Tweak: Identifiable, Sendable, Hashable {
@@ -124,6 +207,8 @@ public struct Tweak: Identifiable, Sendable, Hashable {
     public let restart: TweakRestart
     public let target: TweakTarget
     public let control: TweakControl
+    /// Additional keys written with the same value, such as the Bluetooth trackpad domain.
+    public let companions: [TweakTarget]
     /// The value macOS ships with. Nil means the key is absent by default.
     public let defaultValue: TweakValue?
     public let minimumMajorVersion: Int?
@@ -131,8 +216,8 @@ public struct Tweak: Identifiable, Sendable, Hashable {
     public init(
         id: String, category: TweakCategory, name: String, summary: String, detail: String,
         impact: String, risk: TweakRisk = .low, target: TweakTarget, control: TweakControl,
-        defaultValue: TweakValue? = nil, restart: TweakRestart = .none,
-        minimumMajorVersion: Int? = nil
+        companions: [TweakTarget] = [], defaultValue: TweakValue? = nil,
+        restart: TweakRestart = .none, minimumMajorVersion: Int? = nil
     ) {
         self.id = id
         self.category = category
@@ -144,17 +229,13 @@ public struct Tweak: Identifiable, Sendable, Hashable {
         self.restart = restart
         self.target = target
         self.control = control
+        self.companions = companions
         self.defaultValue = defaultValue
         self.minimumMajorVersion = minimumMajorVersion
     }
 
     /// The preferences domain and key, or the path, for the details sheet.
-    public var configurationLabel: String {
-        switch target {
-        case .defaults(let domain, let key, _): "\(domain) · \(key)"
-        case .fileHidden(let path): path
-        }
-    }
+    public var configurationLabel: String { target.configurationLabel }
 }
 
 // MARK: - State
@@ -167,6 +248,9 @@ public enum TweakState: Sendable, Equatable {
     case custom(String)
     case unsupported(String)
     case unknown(String)
+    /// The last attempt at this tweak failed. The reading keeps the value read before the
+    /// attempt, so the row still shows what the system holds.
+    case error(String)
 }
 
 public struct TweakReading: Sendable, Identifiable {
@@ -213,11 +297,14 @@ public struct TweakRecord: Codable, Sendable, Identifiable, Equatable {
     public let action: Action
     public let before: TweakValue?
     public let after: TweakValue?
+    /// Values of `Tweak.companions` before the change, in catalog order.
+    public let beforeCompanions: [TweakValue?]?
     public let error: String?
 
     public init(
         id: UUID = UUID(), tweakID: String, at: Date = Date(), action: Action,
-        before: TweakValue?, after: TweakValue?, error: String? = nil
+        before: TweakValue?, after: TweakValue?, beforeCompanions: [TweakValue?]? = nil,
+        error: String? = nil
     ) {
         self.id = id
         self.tweakID = tweakID
@@ -225,6 +312,7 @@ public struct TweakRecord: Codable, Sendable, Identifiable, Equatable {
         self.action = action
         self.before = before
         self.after = after
+        self.beforeCompanions = beforeCompanions
         self.error = error
     }
 }
@@ -283,6 +371,7 @@ public enum TweakError: Error, Equatable {
     case commandFailed(String)
     case verificationFailed(String)
     case gated
+    case inspectionOnly
 }
 
 extension TweakError {
@@ -294,6 +383,7 @@ extension TweakError {
         case .commandFailed(let text): text
         case .verificationFailed(let text): text
         case .gated: "Preview only. No tweak is changed."
+        case .inspectionOnly: "This is a read-only check. Open System Settings to change it."
         }
     }
 }
@@ -301,6 +391,24 @@ extension TweakError {
 public struct TweakChange: Sendable {
     public let record: TweakRecord
     public let reading: TweakReading
+    /// The system already held the requested value. Nothing was written or recorded.
+    public let unchanged: Bool
+    /// A medium or high risk change that waits for the user to confirm it.
+    public let needsConfirmation: Bool
+    /// The change was appended to the history ledger. Unchanged, gated, refused, and
+    /// unconfirmed changes are never recorded.
+    public let recorded: Bool
+
+    public init(
+        record: TweakRecord, reading: TweakReading, unchanged: Bool = false,
+        needsConfirmation: Bool = false, recorded: Bool = false
+    ) {
+        self.record = record
+        self.reading = reading
+        self.unchanged = unchanged
+        self.needsConfirmation = needsConfirmation
+        self.recorded = recorded
+    }
 }
 
 // MARK: - Engine
@@ -347,6 +455,8 @@ public enum TweakEngine {
                 return TweakReading(
                     tweak: tweak, state: .unknown(error.localizedDescription), current: nil)
             }
+        case .probe(let probe):
+            return probeReading(tweak, probe: probe)
         }
     }
 
@@ -356,61 +466,100 @@ public enum TweakEngine {
         _ tweak: Tweak, to value: TweakValue?, confirmed: Bool = false,
         history: TweakHistory = TweakHistory(), dryRun: Bool = DryRun.enabled
     ) -> TweakChange {
-        apply(tweak, value, nil, confirmed: confirmed, history: history, dryRun: dryRun)
+        apply(tweak, plan(tweak, value), nil, confirmed: confirmed, history: history, dryRun: dryRun)
+    }
+
+    /// The value written to the primary target and to every companion.
+    struct TweakPlan: Sendable {
+        let primary: TweakValue?
+        let companions: [TweakValue?]
+    }
+
+    static func plan(_ tweak: Tweak, _ value: TweakValue?) -> TweakPlan {
+        TweakPlan(
+            primary: value,
+            companions: Array(repeating: value, count: tweak.companions.count))
     }
 
     static func apply(
-        _ tweak: Tweak, _ value: TweakValue?, _ action: TweakRecord.Action?, confirmed: Bool,
+        _ tweak: Tweak, _ plan: TweakPlan, _ action: TweakRecord.Action?, confirmed: Bool,
         history: TweakHistory, dryRun: Bool
     ) -> TweakChange {
         let before = read(tweak)
+        // The DRY_RUN gate refuses the write and records nothing: it precedes every history
+        // write, including the unsupported and unknown failures below.
+        if dryRun {
+            return TweakChange(
+                record: TweakRecord(
+                    tweakID: tweak.id, action: action ?? (plan.primary == nil ? .reset : .set),
+                    before: before.current, after: nil, error: TweakError.gated.message),
+                reading: before)
+        }
+        if case .probe = tweak.target {
+            return refused(tweak, before, .inspectionOnly, action)
+        }
         if case .unsupported(let reason) = before.state {
             return failed(tweak, before, .unsupported(reason), action, history)
         }
         if case .unknown(let reason) = before.state {
             return failed(tweak, before, .unknownState(reason), action, history)
         }
-        // The DRY_RUN gate refuses the write and records nothing: a preview must not leave a
-        // change in the ledger that never happened.
-        if dryRun {
+        if tweak.risk >= .medium, !confirmed {
             return TweakChange(
                 record: TweakRecord(
-                    tweakID: tweak.id, action: action ?? (value == nil ? .reset : .set),
-                    before: before.current, after: nil, error: TweakError.gated.message),
-                reading: before)
+                    tweakID: tweak.id, action: action ?? (plan.primary == nil ? .reset : .set),
+                    before: before.current, after: nil,
+                    error: TweakError.confirmationRequired("\(tweak.name) needs a confirmation before it changes.")
+                        .message),
+                reading: before, needsConfirmation: true)
         }
-        if tweak.risk >= .medium, !confirmed {
-            return failed(
-                tweak, before,
-                .confirmationRequired("\(tweak.name) needs a confirmation before it changes."),
-                action, history)
+
+        let beforeCompanions = companionValues(tweak)
+        let alreadyThere =
+            matches(before.current, plan.primary)
+            && zip(beforeCompanions, plan.companions).allSatisfy { matches($0.0, $0.1) }
+        if alreadyThere {
+            let record = TweakRecord(
+                tweakID: tweak.id, action: action ?? (plan.primary == nil ? .reset : .set),
+                before: before.current, after: before.current,
+                beforeCompanions: beforeCompanions)
+            return TweakChange(record: record, reading: before, unchanged: true)
         }
 
         do {
-            try write(tweak.target, value: value)
+            try write(tweak.target, value: plan.primary)
+            for (target, value) in zip(tweak.companions, plan.companions) {
+                try write(target, value: value)
+            }
         } catch let error as TweakError {
-            return failed(tweak, before, error, action, history)
+            restore(tweak, before: before.current, companions: beforeCompanions)
+            return failed(tweak, read(tweak), error, action, history)
         } catch {
+            restore(tweak, before: before.current, companions: beforeCompanions)
             return failed(
-                tweak, before, .commandFailed(error.localizedDescription), action, history)
+                tweak, read(tweak), .commandFailed(error.localizedDescription), action, history)
         }
 
         let after = read(tweak)
-        let verified = after.isSupported && matches(after.current, value)
+        let afterCompanions = companionValues(tweak)
+        let verified =
+            after.isSupported && matches(after.current, plan.primary)
+            && zip(afterCompanions, plan.companions).allSatisfy { matches($0.0, $0.1) }
         guard verified else {
-            try? write(tweak.target, value: before.current)
+            restore(tweak, before: before.current, companions: beforeCompanions)
             let restored = read(tweak)
             let detail =
-                "Expected \(value?.display ?? "the system default") but read "
+                "Expected \(plan.primary?.display ?? "the system default") but read "
                 + "\(after.current?.display ?? "nothing"). Restored the earlier value."
             return failed(tweak, restored, .verificationFailed(detail), action, history)
         }
 
         let record = TweakRecord(
-            tweakID: tweak.id, action: action ?? (value == nil ? .reset : .set),
-            before: before.current, after: after.current)
+            tweakID: tweak.id, action: action ?? (plan.primary == nil ? .reset : .set),
+            before: before.current, after: after.current,
+            beforeCompanions: beforeCompanions)
         history.append(record)
-        return TweakChange(record: record, reading: after)
+        return TweakChange(record: record, reading: after, recorded: true)
     }
 
     /// Removes the key, or clears the hidden flag for a file tweak, then verifies.
@@ -418,21 +567,78 @@ public enum TweakEngine {
         _ tweak: Tweak, confirmed: Bool = false, history: TweakHistory = TweakHistory(),
         dryRun: Bool = DryRun.enabled
     ) -> TweakChange {
-        let value: TweakValue?
         switch tweak.target {
-        case .defaults: value = nil
-        case .fileHidden: value = .boolean(false)
+        case .defaults:
+            return set(tweak, to: nil, confirmed: confirmed, history: history, dryRun: dryRun)
+        case .fileHidden:
+            return set(
+                tweak, to: .boolean(false), confirmed: confirmed, history: history, dryRun: dryRun)
+        case .probe:
+            return refused(tweak, read(tweak), .inspectionOnly, .reset)
         }
-        return set(tweak, to: value, confirmed: confirmed, history: history, dryRun: dryRun)
     }
 
-    /// Puts a recorded earlier value back.
+    /// Puts a recorded earlier state back, after checking that the record can belong to this
+    /// tweak. A record whose value types do not match is refused, not applied.
+    public static func rollback(
+        _ record: TweakRecord, tweak: Tweak, history: TweakHistory = TweakHistory(),
+        dryRun: Bool = DryRun.enabled
+    ) -> TweakChange {
+        let companions =
+            record.beforeCompanions ?? Array(repeating: nil, count: tweak.companions.count)
+        guard record.tweakID == tweak.id,
+            typeMatches(record.before, tweak.target),
+            companions.count == tweak.companions.count,
+            zip(companions, tweak.companions).allSatisfy({ typeMatches($0.0, $0.1) })
+        else {
+            return refused(
+                tweak, read(tweak),
+                .verificationFailed("The record does not match this tweak. Nothing was restored."),
+                .rollback)
+        }
+        return apply(
+            tweak, TweakPlan(primary: record.before, companions: companions), .rollback,
+            confirmed: true, history: history, dryRun: dryRun)
+    }
+
     public static func rollback(
         _ record: TweakRecord, history: TweakHistory = TweakHistory(), dryRun: Bool = DryRun.enabled
     ) -> TweakChange? {
         guard let tweak = TweakCatalog.all.first(where: { $0.id == record.tweakID }) else { return nil }
-        return apply(
-            tweak, record.before, .rollback, confirmed: true, history: history, dryRun: dryRun)
+        return rollback(record, tweak: tweak, history: history, dryRun: dryRun)
+    }
+
+    static func typeMatches(_ value: TweakValue?, _ target: TweakTarget) -> Bool {
+        guard let value else { return true }
+        switch target {
+        case .defaults(_, _, let type): return value.type == type
+        case .fileHidden: return value.type == .boolean
+        case .probe: return false
+        }
+    }
+
+    static func companionValues(_ tweak: Tweak) -> [TweakValue?] {
+        tweak.companions.map { target in
+            switch target {
+            case .defaults(let domain, let key, let type):
+                if case .success(let value) = readDefaults(domain: domain, key: key, type: type) {
+                    return value
+                }
+                return nil
+            case .fileHidden(let path):
+                if case .success(let hidden) = readHidden(path) { return .boolean(hidden) }
+                return nil
+            case .probe:
+                return nil
+            }
+        }
+    }
+
+    static func restore(_ tweak: Tweak, before: TweakValue?, companions: [TweakValue?]) {
+        try? write(tweak.target, value: before)
+        for (target, value) in zip(tweak.companions, companions) {
+            try? write(target, value: value)
+        }
     }
 
     /// Restarts the app that reads the changed preference. Returns false when there is
@@ -462,6 +668,16 @@ public enum TweakEngine {
             guard let value else { return .value("Desktop") }
             if case .string(let path) = value { return .value(abbreviate(path)) }
             return .custom(value.display)
+        case .range(_, _, _, let unit):
+            guard let value else { return .value("Not set") }
+            return .value(unit.map { "\(value.display) \($0)" } ?? value.display)
+        case .text:
+            guard let value, case .string(let text) = value, !text.isEmpty else {
+                return .value("Not set")
+            }
+            return .value(text)
+        case .inspect:
+            return .unknown("This is a read-only check.")
         }
     }
 
@@ -538,6 +754,104 @@ public enum TweakEngine {
         return .success(flags & 0x8000 != 0)
     }
 
+    // MARK: Probes
+
+    struct ProbeCommand {
+        let tool: String
+        let args: [String]
+    }
+
+    static func probeReading(_ tweak: Tweak, probe: TweakProbe) -> TweakReading {
+        if probe == .automaticUpdates {
+            switch readDefaults(
+                domain: "com.apple.SoftwareUpdate", key: "AutomaticCheckEnabled", type: .boolean)
+            {
+            case .success(let value):
+                let state: TweakState = value == .boolean(true) ? .on : .off
+                return TweakReading(tweak: tweak, state: state, current: nil)
+            case .failure(let error):
+                return TweakReading(
+                    tweak: tweak, state: .unknown(error.localizedDescription), current: nil)
+            }
+        }
+
+        guard let command = probeCommand(probe) else {
+            return TweakReading(
+                tweak: tweak, state: .unknown("Nothing to read for this check."), current: nil)
+        }
+        let result = Subprocess.run(command.tool, command.args, timeout: 10)
+        if !result.ok {
+            if probe == .xcodeTools || probe == .homebrew {
+                return TweakReading(tweak: tweak, state: .value("Not installed"), current: nil)
+            }
+            let message = result.message.isEmpty ? "The check did not run." : result.message
+            return TweakReading(tweak: tweak, state: .unknown(message), current: nil)
+        }
+        guard let state = parseProbe(result.out, for: probe) else {
+            return TweakReading(
+                tweak: tweak, state: .unknown("The output was not recognised."), current: nil)
+        }
+        return TweakReading(tweak: tweak, state: state, current: nil)
+    }
+
+    static func probeCommand(_ probe: TweakProbe) -> ProbeCommand? {
+        switch probe {
+        case .firewall:
+            ProbeCommand(
+                tool: "/usr/libexec/ApplicationFirewall/socketfilterfw",
+                args: ["--getglobalstate"])
+        case .fileVault:
+            ProbeCommand(tool: "/usr/bin/fdesetup", args: ["status"])
+        case .gatekeeper:
+            ProbeCommand(tool: "/usr/sbin/spctl", args: ["--status"])
+        case .xcodeTools:
+            ProbeCommand(tool: "/usr/bin/xcode-select", args: ["-p"])
+        case .loginShell:
+            ProbeCommand(
+                tool: "/usr/bin/dscl",
+                args: [".", "-read", "/Users/\(NSUserName())", "UserShell"])
+        case .homebrew:
+            ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"]
+                .first { FileManager.default.isExecutableFile(atPath: $0) }
+                .map { ProbeCommand(tool: $0, args: ["--version"]) }
+        case .virtualization:
+            ProbeCommand(tool: "/usr/sbin/sysctl", args: ["-n", "kern.hv_support"])
+        case .automaticUpdates:
+            nil
+        }
+    }
+
+    /// Pure parse of a probe command's stdout, so the mapping is tested without the machine.
+    public static func parseProbe(_ output: String, for probe: TweakProbe) -> TweakState? {
+        let text = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch probe {
+        case .firewall:
+            if text.localizedCaseInsensitiveContains("enabled") { return .on }
+            if text.localizedCaseInsensitiveContains("disabled") { return .off }
+        case .fileVault:
+            if text.contains("FileVault is On") { return .on }
+            if text.contains("FileVault is Off") { return .off }
+        case .gatekeeper:
+            if text.localizedCaseInsensitiveContains("assessments enabled") { return .on }
+            if text.localizedCaseInsensitiveContains("assessments disabled") { return .off }
+        case .automaticUpdates:
+            guard let value = parse(text, type: .boolean) else { return nil }
+            return value == .boolean(true) ? .on : .off
+        case .xcodeTools:
+            return .value(text.isEmpty ? "Not installed" : text)
+        case .loginShell:
+            guard let range = text.range(of: "UserShell: ") else { return nil }
+            return .value(String(text[range.upperBound...]))
+        case .homebrew:
+            guard let first = text.split(whereSeparator: \.isNewline).first else { return nil }
+            return .value(String(first))
+        case .virtualization:
+            if text == "1" { return .value("Supported") }
+            if text == "0" { return .value("Not supported") }
+        }
+        return nil
+    }
+
     static func write(_ target: TweakTarget, value: TweakValue?) throws {
         switch target {
         case .defaults(let domain, let key, _):
@@ -561,7 +875,21 @@ public enum TweakEngine {
             let hidden = value == .boolean(true)
             let result = Subprocess.run(chflagsTool, [hidden ? "hidden" : "nohidden", path])
             guard result.ok else { throw TweakError.commandFailed(result.message) }
+        case .probe:
+            throw TweakError.inspectionOnly
         }
+    }
+
+    /// A refusal that is not a user-visible attempt: nothing was written and the ledger
+    /// stays untouched.
+    static func refused(
+        _ tweak: Tweak, _ reading: TweakReading, _ error: TweakError,
+        _ action: TweakRecord.Action?
+    ) -> TweakChange {
+        TweakChange(
+            record: TweakRecord(
+                tweakID: tweak.id, action: action ?? .set, before: reading.current, after: nil,
+                error: error.message), reading: reading)
     }
 
     static func failed(
@@ -572,7 +900,7 @@ public enum TweakEngine {
             tweakID: tweak.id, action: action ?? .set, before: reading.current, after: nil,
             error: error.message)
         history.append(record)
-        return TweakChange(record: record, reading: reading)
+        return TweakChange(record: record, reading: reading, recorded: true)
     }
 }
 
@@ -584,7 +912,9 @@ public enum TweakCatalog {
     static let global = "NSGlobalDomain"
     static let home = FileManager.default.homeDirectoryForCurrentUser
 
-    public static let all: [Tweak] = finder + dock + keyboard + screenshots + appearance + windows
+    public static let all: [Tweak] =
+        finder + dock + keyboard + trackpad + screenshots + appearance + windows + security
+        + developer
 
     // MARK: Finder
 
@@ -672,6 +1002,46 @@ public enum TweakCatalog {
             target: .fileHidden(path: home.appendingPathComponent("Library").path),
             control: .toggle(on: .boolean(false), off: .boolean(true)),
             defaultValue: .boolean(false)),
+        Tweak(
+            id: "finder.extension-warning",
+            category: .finder,
+            name: "Warn before changing an extension",
+            summary: "Ask before a file's extension is changed.",
+            detail:
+                "Changing an extension can change which app opens a file. macOS asks first by default.",
+            impact: "Finder",
+            target: .defaults(
+                domain: "com.apple.finder", key: "FXEnableExtensionChangeWarning", type: .boolean),
+            control: .toggle(on: .boolean(true), off: .boolean(false)),
+            defaultValue: .boolean(true), restart: .finder),
+        Tweak(
+            id: "finder.ds-store-network",
+            category: .finder,
+            name: "Keep .DS_Store off network folders",
+            summary: "Do not write Finder metadata to shared network folders.",
+            detail:
+                "A .DS_Store file stores icon positions. On a network share it appears for everyone who opens the folder.",
+            impact: "Network folders",
+            target: .defaults(
+                domain: "com.apple.finder", key: "DSDontWriteNetworkStores", type: .boolean),
+            control: .toggle(on: .boolean(true), off: .boolean(false)),
+            defaultValue: .boolean(false)),
+        Tweak(
+            id: "finder.default-view",
+            category: .finder,
+            name: "Default folder view",
+            summary: "Choose how a new Finder window shows its folder.",
+            detail: "New windows open in this view until you choose another one for that folder.",
+            impact: "Finder windows",
+            target: .defaults(
+                domain: "com.apple.finder", key: "FXPreferredViewStyle", type: .string),
+            control: .choice([
+                TweakOption(label: "Icon", value: .string("icnv")),
+                TweakOption(label: "List", value: .string("Nlsv")),
+                TweakOption(label: "Column", value: .string("clmv")),
+                TweakOption(label: "Gallery", value: .string("glyv")),
+            ]),
+            defaultValue: .string("icnv"), restart: .finder),
     ]
 
     // MARK: Dock
@@ -728,6 +1098,40 @@ public enum TweakCatalog {
                 TweakOption(label: "Scale", value: .string("scale")),
             ]),
             defaultValue: .string("genie"), restart: .dock),
+        Tweak(
+            id: "dock.hidden-apps",
+            category: .dock,
+            name: "Show hidden apps in the Dock",
+            summary: "Keep a hidden app in the Dock as a dimmed icon.",
+            detail:
+                "A hidden app keeps running. This leaves its icon visible so you can bring it back.",
+            impact: "Dock",
+            target: .defaults(domain: "com.apple.dock", key: "showhidden", type: .boolean),
+            control: .toggle(on: .boolean(true), off: .boolean(false)),
+            defaultValue: .boolean(false), restart: .dock),
+        Tweak(
+            id: "dock.autohide-speed",
+            category: .dock,
+            name: "Dock hide speed",
+            summary: "Choose how fast the Dock slides away.",
+            detail:
+                "Lower values move the Dock faster. macOS uses about half a second until you change it.",
+            impact: "Dock animation",
+            target: .defaults(
+                domain: "com.apple.dock", key: "autohide-time-modifier", type: .number),
+            control: .range(min: 0.1, max: 2, step: 0.1, unit: "s"),
+            defaultValue: .number(0.5), restart: .dock),
+        Tweak(
+            id: "dock.reveal-delay",
+            category: .dock,
+            name: "Dock reveal delay",
+            summary: "Choose how long a hidden Dock waits before it appears.",
+            detail:
+                "Lower values reveal the Dock sooner. macOS uses about half a second until you change it.",
+            impact: "Dock animation",
+            target: .defaults(domain: "com.apple.dock", key: "autohide-delay", type: .number),
+            control: .range(min: 0, max: 1.5, step: 0.1, unit: "s"),
+            defaultValue: .number(0.5), restart: .dock),
     ]
 
     // MARK: Keyboard
@@ -815,6 +1219,65 @@ public enum TweakCatalog {
             target: .defaults(
                 domain: global, key: "NSAutomaticTextCompletionEnabled", type: .boolean),
             control: .toggle(on: .boolean(true), off: .boolean(false)), defaultValue: .boolean(true)),
+        Tweak(
+            id: "keyboard.repeat-rate",
+            category: .keyboard,
+            name: "Key repeat rate",
+            summary: "Choose how fast a held key repeats.",
+            detail: "Lower numbers repeat faster. 1 is fastest and 15 is slowest.",
+            impact: "Text input in every app",
+            target: .defaults(domain: global, key: "KeyRepeat", type: .integer),
+            control: .range(min: 1, max: 15, step: 1, unit: nil),
+            defaultValue: .integer(6)),
+        Tweak(
+            id: "keyboard.initial-delay",
+            category: .keyboard,
+            name: "Delay before keys repeat",
+            summary: "Choose how long a key must be held before it repeats.",
+            detail: "Lower numbers start repeating sooner. macOS uses 25 until you change it.",
+            impact: "Text input in every app",
+            target: .defaults(domain: global, key: "InitialKeyRepeat", type: .integer),
+            control: .range(min: 10, max: 60, step: 5, unit: nil),
+            defaultValue: .integer(25)),
+    ]
+
+    // MARK: Trackpad
+
+    private static let trackpad: [Tweak] = [
+        Tweak(
+            id: "trackpad.tap-to-click",
+            category: .trackpad,
+            name: "Tap to click",
+            summary: "Tap the trackpad once to click instead of pressing it.",
+            detail: "A single tap acts as a click. Pressing the trackpad still works.",
+            impact: "Trackpad",
+            target: .defaults(
+                domain: "com.apple.AppleMultitouchTrackpad", key: "Clicking", type: .boolean),
+            control: .toggle(on: .boolean(true), off: .boolean(false)),
+            companions: [
+                .defaults(
+                    domain: "com.apple.driver.AppleBluetoothMultitouch.trackpad", key: "Clicking",
+                    type: .boolean)
+            ],
+            defaultValue: .boolean(false)),
+        Tweak(
+            id: "trackpad.three-finger-drag",
+            category: .trackpad,
+            name: "Three-finger drag",
+            summary: "Drag an item with three fingers.",
+            detail:
+                "Dragging with three fingers moves the window or selection under the pointer. A one-finger drag then selects instead of moving.",
+            impact: "Trackpad",
+            target: .defaults(
+                domain: "com.apple.AppleMultitouchTrackpad", key: "TrackpadThreeFingerDrag",
+                type: .boolean),
+            control: .toggle(on: .boolean(true), off: .boolean(false)),
+            companions: [
+                .defaults(
+                    domain: "com.apple.driver.AppleBluetoothMultitouch.trackpad",
+                    key: "TrackpadThreeFingerDrag", type: .boolean)
+            ],
+            defaultValue: .boolean(false)),
     ]
 
     // MARK: Screenshots
@@ -865,6 +1328,17 @@ public enum TweakCatalog {
             target: .defaults(
                 domain: "com.apple.screencapture", key: "show-thumbnail", type: .boolean),
             control: .toggle(on: .boolean(true), off: .boolean(false)), defaultValue: .boolean(true)),
+        Tweak(
+            id: "screenshots.filename",
+            category: .screenshots,
+            name: "Screenshot name",
+            summary: "Set the name new screenshots start with.",
+            detail:
+                "A number is added after the name. Clearing it removes the key and uses the macOS default, Screenshot.",
+            impact: "New screenshots",
+            target: .defaults(domain: "com.apple.screencapture", key: "name", type: .string),
+            control: .text(placeholder: "Screenshot"),
+            defaultValue: .string("Screenshot")),
     ]
 
     // MARK: Appearance
@@ -926,8 +1400,10 @@ public enum TweakCatalog {
             category: .appearance,
             name: "Automatically hide the menu bar",
             summary: "Reveal the menu bar only when the pointer reaches the top edge.",
-            detail: "The menu bar slides away. It applies the next time you log in.",
+            detail:
+                "The menu bar slides away, so every app menu needs a pointer trip to the top edge. It applies the next time you log in.",
             impact: "Menu bar",
+            risk: .medium,
             target: .defaults(domain: global, key: "_HIHideMenuBar", type: .boolean),
             control: .toggle(on: .boolean(true), off: .boolean(false)), restart: .login),
     ]
@@ -961,6 +1437,32 @@ public enum TweakCatalog {
             ]),
             defaultValue: .string("Maximize")),
         Tweak(
+            id: "windows.document-tabs",
+            category: .windows,
+            name: "Open documents in tabs",
+            summary: "Choose when an app opens documents in tabs instead of windows.",
+            detail:
+                "Automatic groups documents when a window is already open. Always groups them whenever the app supports tabs.",
+            impact: "Document windows",
+            target: .defaults(domain: global, key: "AppleWindowTabbingMode", type: .string),
+            control: .choice([
+                TweakOption(label: "Automatic", value: .string("automatic")),
+                TweakOption(label: "Always", value: .string("always")),
+                TweakOption(label: "Manually", value: .string("manual")),
+            ]),
+            defaultValue: .string("automatic")),
+        Tweak(
+            id: "windows.restore-state",
+            category: .windows,
+            name: "Reopen windows after quitting",
+            summary: "Restore the windows an app had open when it quit.",
+            detail:
+                "The app reopens its last windows the next time you launch it. Turn this off to start with an empty window.",
+            impact: "Every app",
+            target: .defaults(domain: global, key: "NSQuitAlwaysKeepsWindows", type: .boolean),
+            control: .toggle(on: .boolean(true), off: .boolean(false)),
+            defaultValue: .boolean(true)),
+        Tweak(
             id: "windows.stage-manager",
             category: .windows,
             name: "Stage Manager",
@@ -971,5 +1473,85 @@ public enum TweakCatalog {
             target: .defaults(domain: "com.apple.WindowManager", key: "GloballyEnabled", type: .boolean),
             control: .toggle(on: .boolean(true), off: .boolean(false)), defaultValue: .boolean(false),
             minimumMajorVersion: 13),
+    ]
+
+    // MARK: Security
+
+    private static let security: [Tweak] = [
+        Tweak(
+            id: "security.firewall",
+            category: .security,
+            name: "Application firewall",
+            summary: "Check whether the firewall accepts incoming connections per app.",
+            detail:
+                "The application firewall blocks incoming connections for apps you have not allowed. It is off by default. Change it in Network settings.",
+            impact: "Incoming connections",
+            target: .probe(.firewall), control: .inspect),
+        Tweak(
+            id: "security.filevault",
+            category: .security,
+            name: "FileVault",
+            summary: "Check whether the startup disk is encrypted.",
+            detail:
+                "FileVault encrypts the startup disk so its contents cannot be read without your password. Turn it on in Privacy and Security settings.",
+            impact: "Disk encryption",
+            target: .probe(.fileVault), control: .inspect),
+        Tweak(
+            id: "security.gatekeeper",
+            category: .security,
+            name: "Gatekeeper",
+            summary: "Check whether downloaded apps must be verified before they run.",
+            detail:
+                "Gatekeeper checks the signature of an app the first time it opens. Chet never turns it off.",
+            impact: "App launching",
+            target: .probe(.gatekeeper), control: .inspect),
+        Tweak(
+            id: "security.automatic-updates",
+            category: .security,
+            name: "Automatic update checks",
+            summary: "Check whether macOS looks for software updates on its own.",
+            detail:
+                "macOS checks for updates in the background when this is on. Install updates in Software Update settings.",
+            impact: "Software updates",
+            target: .probe(.automaticUpdates), control: .inspect),
+    ]
+
+    // MARK: Developer
+
+    private static let developer: [Tweak] = [
+        Tweak(
+            id: "developer.xcode-tools",
+            category: .developer,
+            name: "Xcode command line tools",
+            summary: "Show where the command line tools are installed.",
+            detail:
+                "Build tools such as clang and make come from this install. Install them with xcode-select --install.",
+            impact: "Developer tools",
+            target: .probe(.xcodeTools), control: .inspect),
+        Tweak(
+            id: "developer.login-shell",
+            category: .developer,
+            name: "Login shell",
+            summary: "Show the shell a new terminal session starts.",
+            detail: "Change it in Users and Groups settings, or with chsh.",
+            impact: "Shell",
+            target: .probe(.loginShell), control: .inspect),
+        Tweak(
+            id: "developer.homebrew",
+            category: .developer,
+            name: "Homebrew",
+            summary: "Show the installed Homebrew version and prefix.",
+            detail: "Homebrew installs packages under its prefix, /opt/homebrew on Apple Silicon.",
+            impact: "Packages",
+            target: .probe(.homebrew), control: .inspect),
+        Tweak(
+            id: "developer.virtualization",
+            category: .developer,
+            name: "Virtualization support",
+            summary: "Check whether this Mac can run virtual machines.",
+            detail:
+                "The hypervisor framework needs hardware support. This Mac reports whether it is available.",
+            impact: "Virtual machines",
+            target: .probe(.virtualization), control: .inspect),
     ]
 }

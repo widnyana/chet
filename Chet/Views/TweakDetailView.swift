@@ -1,3 +1,4 @@
+import AppKit
 import ChetCore
 import SwiftUI
 
@@ -8,8 +9,19 @@ struct TweakDetailView: View {
     @Environment(TweaksModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     let tweak: Tweak
+    @State private var revertRecord: TweakRecord?
 
     private var reading: TweakReading? { model.reading(for: tweak.id) }
+
+    private var isInspection: Bool {
+        if case .probe = tweak.target { return true }
+        return false
+    }
+
+    private var probeURL: URL? {
+        if case .probe(let probe) = tweak.target { return probe.settingsURL }
+        return nil
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
@@ -32,6 +44,31 @@ struct TweakDetailView: View {
         .frame(width: 540, alignment: .leading)
         .background(Theme.paper)
         .accessibilityIdentifier("tweak.detail.\(tweak.id)")
+        .confirmationDialog(
+            "Revert the last change?",
+            isPresented: Binding(
+                get: { revertRecord != nil },
+                set: { if !$0 { revertRecord = nil } }),
+            titleVisibility: .visible,
+            presenting: revertRecord
+        ) { record in
+            Button("Revert") {
+                model.rollback(record, tweak: tweak)
+                revertRecord = nil
+            }
+            Button("Cancel", role: .cancel) { revertRecord = nil }
+        } message: { record in
+            Text("Puts \(TweakCopy.value(record.before)) back for \(tweak.name).")
+        }
+        #if DEBUG
+            .onAppear {
+                guard ProcessInfo.processInfo.environment["CHET_TWEAK_PREVIEW"] == "revert" else {
+                    return
+                }
+                revertRecord = TweakRecord(
+                    tweakID: tweak.id, action: .set, before: tweak.defaultValue, after: nil)
+            }
+        #endif
     }
 
     private var header: some View {
@@ -59,9 +96,21 @@ struct TweakDetailView: View {
             Hairline()
             DefinitionRow(label: "Applies", value: TweakCopy.restart(tweak.restart))
             Hairline()
-            DefinitionRow(label: "Configuration", value: tweak.configurationLabel, monospaced: true)
+            DefinitionRow(
+                label: isInspection ? "Checked by" : "Configuration",
+                value: tweak.configurationLabel, monospaced: true)
+            ForEach(Array(tweak.companions.enumerated()), id: \.offset) { _, target in
+                Hairline()
+                DefinitionRow(label: "Also writes", value: target.configurationLabel, monospaced: true)
+            }
             Hairline()
             DefinitionRow(label: "Last change", value: lastChangeText)
+            if isInspection {
+                Hairline()
+                DefinitionRow(
+                    label: "Note",
+                    value: "Chet only reads this. A change is made in System Settings.")
+            }
         }
     }
 
@@ -72,6 +121,24 @@ struct TweakDetailView: View {
     }
 
     @ViewBuilder private var actions: some View {
+        if isInspection {
+            HStack {
+                if let probeURL {
+                    SecondaryActionButton(
+                        title: "Open Settings",
+                        help: "Open the System Settings pane for \(tweak.name)"
+                    ) {
+                        NSWorkspace.shared.open(probeURL)
+                    }
+                }
+                Spacer(minLength: Spacing.s3)
+            }
+        } else {
+            editActions
+        }
+    }
+
+    @ViewBuilder private var editActions: some View {
         HStack(spacing: Spacing.s3) {
             SecondaryActionButton(
                 title: "Reset to Default",
@@ -85,7 +152,7 @@ struct TweakDetailView: View {
                     title: "Revert last change",
                     help: "Put back the value from before the last change"
                 ) {
-                    model.rollback(record, tweak: tweak)
+                    revertRecord = record
                 }
             }
             Spacer(minLength: Spacing.s3)

@@ -17,6 +17,13 @@ enum TweakFilter: String, CaseIterable, Identifiable {
     }
 }
 
+/// A change that waits for the user to confirm it.
+struct PendingChange: Identifiable {
+    let tweak: Tweak
+    let value: TweakValue?
+    var id: String { tweak.id }
+}
+
 /// Reads the catalog on a background task, applies one tweak at a time, and keeps the
 /// recorded history. Every write goes through `TweakEngine`, which verifies by reading back.
 @MainActor
@@ -36,6 +43,11 @@ final class TweaksModel {
     var errorMessage: String?
     /// The last restart that failed, shown with the error.
     var restartFailure: TweakRestart?
+    /// A medium or high risk change that the sheet is asking about.
+    var pendingConfirmation: PendingChange?
+    /// Per-row failure text. A failed change leaves the previous state in place and the
+    /// reason here, until the next successful change or a dismiss.
+    private(set) var failures: [String: String] = [:]
 
     private let historyStore = TweakHistory()
     private let catalog = TweakCatalog.all
@@ -107,6 +119,9 @@ final class TweaksModel {
         readings = loaded
         history = await Task.detached { store.load() }.value
         isLoading = false
+        #if DEBUG
+            applyPreviewIfRequested()
+        #endif
     }
 
     func reload() async {
@@ -131,21 +146,22 @@ final class TweaksModel {
             let change = await Task.detached(priority: .userInitiated) {
                 TweakEngine.set(tweak, to: value, history: store)
             }.value
-            finish(change, tweak: tweak)
+            finish(change, tweak: tweak, requested: value)
         }
     }
 
     /// Flips a toggle to the other declared value, or back to the default when "off" is
     /// the absent key.
     func toggle(_ tweak: Tweak) {
+        set(tweak, to: nextValue(for: tweak))
+    }
+
+    private func nextValue(for tweak: Tweak) -> TweakValue? {
         let isOn = reading(for: tweak.id)?.state == .on
-        let next: TweakValue?
         if case .toggle(let on, let off) = tweak.control {
-            next = isOn ? off : on
-        } else {
-            next = isOn ? nil : tweak.defaultValue
+            return isOn ? off : on
         }
-        set(tweak, to: next)
+        return isOn ? nil : tweak.defaultValue
     }
 
     func reset(_ tweak: Tweak) {
@@ -157,8 +173,29 @@ final class TweaksModel {
             let change = await Task.detached(priority: .userInitiated) {
                 TweakEngine.reset(tweak, history: store)
             }.value
-            finish(change, tweak: tweak)
+            finish(change, tweak: tweak, requested: nil)
         }
+    }
+
+    /// The sheet confirmed a medium or high risk change.
+    func confirmPendingChange() {
+        guard let pending = pendingConfirmation else { return }
+        pendingConfirmation = nil
+        guard !isGated else { return refuse() }
+        guard !busy.contains(pending.tweak.id) else { return }
+        busy.insert(pending.tweak.id)
+        let store = historyStore
+        Task {
+            let change = await Task.detached(priority: .userInitiated) {
+                TweakEngine.set(
+                    pending.tweak, to: pending.value, confirmed: true, history: store)
+            }.value
+            finish(change, tweak: pending.tweak, requested: pending.value)
+        }
+    }
+
+    func cancelPendingChange() {
+        pendingConfirmation = nil
     }
 
     func rollback(_ record: TweakRecord, tweak: Tweak) {
@@ -168,14 +205,9 @@ final class TweaksModel {
         let store = historyStore
         Task {
             let change = await Task.detached(priority: .userInitiated) {
-                TweakEngine.rollback(record, history: store)
+                TweakEngine.rollback(record, tweak: tweak, history: store)
             }.value
-            if let change {
-                finish(change, tweak: tweak)
-            } else {
-                busy.remove(tweak.id)
-                errorMessage = "Could not find \(tweak.name) in the catalog."
-            }
+            finish(change, tweak: tweak, requested: record.before)
         }
     }
 
@@ -204,21 +236,28 @@ final class TweaksModel {
         guard !targets.isEmpty else { return 0 }
         let store = historyStore
         let changes = await Task.detached(priority: .userInitiated) {
-            targets.map { TweakEngine.reset($0, confirmed: true, history: store, dryRun: false) }
+            targets.map { TweakEngine.reset($0, confirmed: true, history: store) }
         }.value
-        var failures = 0
+        var failuresCount = 0
         for change in changes {
             if let index = readings.firstIndex(where: { $0.id == change.record.tweakID }) {
                 readings[index] = change.reading
             }
-            history.append(change.record)
-            if change.record.error != nil { failures += 1 }
+            if change.recorded { history.append(change.record) }
+            if let error = change.record.error {
+                failures[change.record.tweakID] = error
+                failuresCount += 1
+            } else {
+                failures[change.record.tweakID] = nil
+            }
         }
-        if failures > 0 {
-            errorMessage = "\(failures) tweaks could not be reset."
+        if failuresCount > 0 {
+            errorMessage = "\(failuresCount) tweaks could not be reset."
         }
-        return targets.count - failures
+        return targets.count - failuresCount
     }
+
+    func failure(for id: String) -> String? { failures[id] }
 
     func dismissError() {
         errorMessage = nil
@@ -229,16 +268,38 @@ final class TweaksModel {
         errorMessage = TweakError.gated.message
     }
 
-    private func finish(_ change: TweakChange, tweak: Tweak) {
+    #if DEBUG
+        /// Renders a write-path surface under DRY_RUN without writing anything. Debug builds
+        /// only; release builds do not contain this function.
+        private func applyPreviewIfRequested() {
+            guard ProcessInfo.processInfo.environment["CHET_TWEAK_PREVIEW"] == "confirm" else {
+                return
+            }
+            guard let tweak = catalog.first(where: { $0.risk >= .medium }) else { return }
+            pendingConfirmation = PendingChange(tweak: tweak, value: nextValue(for: tweak))
+        }
+    #endif
+
+    private func finish(_ change: TweakChange, tweak: Tweak, requested: TweakValue?) {
         busy.remove(tweak.id)
+        if change.needsConfirmation {
+            pendingConfirmation = PendingChange(tweak: tweak, value: requested)
+            return
+        }
         if let index = readings.firstIndex(where: { $0.id == tweak.id }) {
             readings[index] = change.reading
         }
-        history.append(change.record)
+        if change.recorded { history.append(change.record) }
+        if change.unchanged {
+            failures[tweak.id] = nil
+            return
+        }
         if let error = change.record.error {
+            failures[tweak.id] = error
             errorMessage = "\(tweak.name): \(error)"
             return
         }
+        failures[tweak.id] = nil
         if tweak.restart != .none {
             pendingRestarts[tweak.restart, default: []].insert(tweak.id)
         }
