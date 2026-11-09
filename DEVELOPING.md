@@ -14,6 +14,21 @@ mise run lint     # format check
 The main window remembers its frame. Keep it at `960 x 632`, the supported minimum, instead
 of full screen. The design is checked at that size.
 
+## Testing rule
+
+Every UI test runs with `DRY_RUN=1`. No test writes a preference, removes a file, empties the
+Trash, or restarts an app. Build the gate into the test, not around it:
+
+- Launch the test copy with `open -n --env DRY_RUN=1 <app>`. Do not rely on the repo `.env`:
+  a copied app outside the repo does not walk up to it.
+- Expect `Preview only. Nothing will be removed.` on Home and
+  `Preview only. No tweak is changed.` on Tweaks.
+- Every tweak control must report `enabled: false`. A press on a disabled control is a no-op;
+  verify the underlying key did not change.
+- The confirmation sheet, `Revert last change`, and real apply paths are unreachable under the
+  gate. Their refusal is covered by `ChetCore` tests; do not launch without `DRY_RUN=1` to
+  exercise them.
+
 ## First launch
 
 `ContentView` decides between the permission gate and the app:
@@ -266,7 +281,7 @@ identifiers of the controls inside it. Put the identifier on the control you wil
 | `storage.header`, `storage.pause`, `storage.resume` | Storage |
 | `list.selectAll` | category table select-all |
 | `tweaks.header`, `tweaks.page`, `tweaks.reload`, `tweaks.loading`, `tweaks.empty` | Tweaks page |
-| `tweak.toggle.<tweak id>`, `tweak.choice.<tweak id>`, `tweak.folder.<tweak id>`, `tweak.inspect.<tweak id>` | tweak controls |
+| `tweak.toggle.<tweak id>`, `tweak.choice.<tweak id>`, `tweak.range.<tweak id>`, `tweak.text.<tweak id>`, `tweak.folder.<tweak id>`, `tweak.inspect.<tweak id>` | tweak controls |
 | `tweak.detail.<tweak id>`, `tweak.confirm.<tweak id>` | tweak sheets |
 | `settings.pane.whatToFind`, `settings.pane.limits`, `settings.pane.folders`, `settings.pane.tweaks` | Settings panes |
 
@@ -326,6 +341,14 @@ ends every instance. During a selector session, launch by path instead and kill 
 - **`screencapture -R` captures the screen, not the window.** Capture by window id from
   `CGWindowList`; a window on another Space still has a valid id.
 - **`open -a` activates an existing instance.** Use `open -n <path>` to launch one more.
+- **Menu clicks target a process by name.** With several Chet instances, `click menu item
+  "Settings…"` can hit the wrong one. Activate the test copy by its unique bundle id and send
+  Cmd-, with a key event instead:
+
+```sh
+osascript -e 'tell application id "id.web.widnyana.chet.uitest" to activate'
+swift /tmp/key.swift 43 cmd      # virtual key 43 is comma
+```
 - **Window position changes between launches.** Never hard-code click coordinates; read them
   with `axdrv frame` or the selector JSON.
 - **A `.env` with `DRY_RUN=1` turns every removal into a preview** and disables tweak controls.
