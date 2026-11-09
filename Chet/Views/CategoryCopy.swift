@@ -71,7 +71,7 @@ enum CategoryCopy {
             explanation: "Extra copies of files. One copy stays."),
         "large-files": Entry(
             title: "Large files", section: .review,
-            explanation: "Big files, and files you have not used in a year."),
+            explanation: "Large files, and large files left untouched for a long time."),
         "leftovers": Entry(
             title: "Leftover app files", section: .review,
             explanation: "Data left by apps you removed."),

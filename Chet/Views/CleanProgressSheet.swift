@@ -50,7 +50,7 @@ struct CleanProgressSheet: View {
             ProgressView(value: itemFraction)
                 .tint(Theme.accent)
             detailBox(progress, dryRun: dryRun)
-            Text("Chet checks each file again before removing it. Files and folders are both checked.")
+            Text("Chet checks every file and folder again before removing it.")
                 .font(Typography.caption)
                 .foregroundStyle(Theme.inkSecondary)
         }

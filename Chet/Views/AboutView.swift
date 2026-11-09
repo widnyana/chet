@@ -20,7 +20,7 @@ struct AboutView: View {
             VStack(alignment: .leading, spacing: Spacing.s6) {
                 PageHeader(
                     title: "Chet",
-                    subtitle: "Finds and removes junk that apps can rebuild, or files you confirm.",
+                    subtitle: "Shows what takes space, and removes only what you pick.",
                     metric: build?.version,
                     metricLabel: build?.version == nil ? nil : "version",
                     icon: NSApplication.shared.applicationIconImage)
@@ -53,7 +53,7 @@ struct AboutView: View {
                 AboutInfoRow(
                     label: "Full Disk Access",
                     value: model.access == .granted ? "Granted" : "Not granted",
-                    detail: model.access == .granted ? nil : "Some folders stay hidden until you grant it.",
+                    detail: model.access == .granted ? nil : "Some folders stay hidden until you grant access.",
                     tone: model.access == .granted ? .neutral : .amber,
                     systemImage: model.access == .granted ? "checkmark.circle" : "exclamationmark.triangle",
                     actionTitle: model.access == .granted ? nil : "Open Settings",

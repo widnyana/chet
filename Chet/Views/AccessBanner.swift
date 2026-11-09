@@ -14,7 +14,7 @@ struct TopStatusStrip: View {
             if DryRun.enabled {
                 strip(
                     icon: "exclamationmark.triangle",
-                    text: "Preview only. No files will be moved.",
+                    text: "Preview only. Nothing will be removed.",
                     tone: .amber,
                     actionTitle: nil,
                     action: nil,
@@ -54,7 +54,7 @@ struct TopStatusStrip: View {
                     action: { model.bannerDismissed = true })
             }
             if model.grantAttempts >= 2 {
-                Text("Chet may appear more than once in the list. Remove the old entry.")
+                Text("Chet may be listed twice in Full Disk Access. Remove the old entry.")
                     .font(Typography.caption)
                     .foregroundStyle(Theme.inkSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)

@@ -13,12 +13,12 @@ struct OnboardingView: View {
                 Image(systemName: "lock.shield")
                     .font(.system(size: 28, weight: .regular))
                     .foregroundStyle(Theme.inkSecondary)
-                Text("Chet needs permission to find junk.")
+                Text("Chet needs Full Disk Access")
                     .accessibilityIdentifier("gate.title")
                     .font(Typography.title)
                     .foregroundStyle(Theme.ink)
                 Text(
-                    "macOS keeps some folders private, like caches and Mail downloads. Chet needs Full Disk Access to see them. Your files stay on this Mac."
+                    "macOS keeps some folders private, like caches and Mail downloads. Chet needs Full Disk Access to read them. The scan runs on this Mac and sends nothing off it."
                 )
                 .font(Typography.body)
                 .foregroundStyle(Theme.inkSecondary)
@@ -43,7 +43,7 @@ struct OnboardingView: View {
                     Button("Continue with limited results") { model.accessSkipped = true }
                         .buttonStyle(.link)
                         .accessibilityIdentifier("gate.continue")
-                    Text("Without access, Chet finds less. It never removes anything you did not choose.")
+                    Text("Without access, Chet finds less. It only removes what you pick.")
                         .font(Typography.caption)
                         .foregroundStyle(Theme.inkSecondary)
                         .fixedSize(horizontal: false, vertical: true)

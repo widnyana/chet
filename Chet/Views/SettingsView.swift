@@ -108,7 +108,7 @@ struct SettingsView: View {
 
     private func optionalCopy(_ step: ScanStep) -> (title: String, detail: String) {
         switch step {
-        case .largeFiles: ("Big files", "Files you may not need, including old ones.")
+        case .largeFiles: ("Large files", "Files above the size limit, or older than the age limit.")
         case .duplicates: ("Duplicate files", "Files with identical contents.")
         case .leftovers: ("Files from removed apps", "Data left after an app was deleted.")
         case .photos: ("Similar photos", "Copies and near-copies of the same photo.")
@@ -144,18 +144,18 @@ struct SettingsView: View {
                     .accessibilityLabel("Look inside temporary app files")
                 }
             }
-            SettingsPanel(title: "Big files") {
-                SettingsNote("Files this big are listed even if you used them today.")
+            SettingsPanel(title: "Large files") {
+                SettingsNote("Files this large are listed even if you used them today.")
                 SettingsDivider()
                 sliderRow(
-                    title: "Big file size", value: "\(model.largeFileMinSizeMB) MB",
+                    title: "Large file size", value: "\(model.largeFileMinSizeMB) MB",
                     binding: Binding(
                         get: { Double(model.largeFileMinSizeMB) },
                         set: { model.largeFileMinSizeMB = Int($0) }),
                     range: 50...2000, step: 50)
             }
             SettingsPanel(title: "Old files") {
-                SettingsNote("Files you have not used for this long are listed.")
+                SettingsNote("Large files you have not used for this long are listed.")
                 SettingsDivider()
                 sliderRow(
                     title: "Unchanged for", value: "\(model.largeFileOldAgeDays) days",
@@ -286,7 +286,7 @@ struct SettingsView: View {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = true
         panel.prompt = "Add"
-        panel.message = "Choose folders Chet should check for files you can remove."
+        panel.message = "Choose folders. Chet lists what each one contains."
         panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
         guard panel.runModal() == .OK else { return }
         for url in panel.urls {

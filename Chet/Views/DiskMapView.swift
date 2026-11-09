@@ -37,7 +37,7 @@ struct DiskMapView: View {
             if !model.readErrors.isEmpty {
                 HStack(spacing: Spacing.s2) {
                     StatusLabel(
-                        text: "Some folders could not be read. Sizes may be smaller than real.",
+                        text: "Some folders could not be read. Sizes may be too small.",
                         systemImage: "exclamationmark.triangle",
                         tone: .amber)
                     Spacer()

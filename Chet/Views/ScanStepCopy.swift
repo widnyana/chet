@@ -7,7 +7,7 @@ enum ScanStepCopy {
         switch step {
         case .rules: "Caches and logs"
         case .index: "Measuring folders"
-        case .largeFiles: "Big files"
+        case .largeFiles: "Large files"
         case .duplicates: "Duplicate files"
         case .leftovers: "Leftover app files"
         case .photos: "Similar photos"

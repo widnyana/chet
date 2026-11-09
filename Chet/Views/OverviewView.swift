@@ -93,9 +93,8 @@ struct OverviewView: View {
 
     private var neverScanned: some View {
         EmptyStateView(
-            title: "See what you can remove",
-            message:
-                "Chet looks for caches, old files, duplicates, and other files apps can rebuild. Nothing is removed without your approval.",
+            title: "No scan yet",
+            message: "A scan measures your folders and shows what takes space.",
             systemImage: "internaldrive")
         .accessibilityIdentifier("home.empty")
     }
@@ -106,8 +105,8 @@ struct OverviewView: View {
         VStack(alignment: .leading, spacing: Spacing.s6) {
             if safe.isEmpty && review.isEmpty {
                 EmptyStateView(
-                    title: "Your Mac is tidy",
-                    message: "Nothing to remove. Scan again after you use more apps.",
+                    title: "Nothing found",
+                    message: "Scan again after you use more apps.",
                     systemImage: "checkmark.circle")
             }
             if !safe.isEmpty { ledger("Safe to remove", safe) }

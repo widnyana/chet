@@ -191,7 +191,7 @@ final class ScanModel {
         "trash": "Trash", "caches": "User caches", "logs": "Logs and crash reports", "xcode": "Xcode build data",
         "xcode-archives": "Xcode archives", "package-caches": "Package manager caches",
         "browser": "Browser caches", "mail-downloads": "Mail downloads", "installers": "Old installers",
-        "ios-backups": "iOS device backups", "duplicates": "Duplicates", "large-files": "Large and old files",
+        "ios-backups": "iOS device backups", "duplicates": "Duplicates", "large-files": "Large files",
         "leftovers": "App leftovers", "similar-photos": "Similar photos", "blurry-photos": "Blurry photos",
         "similar-videos": "Similar videos", "tagged-caches": "Tagged cache folders",
         "snapshots": "Time Machine local snapshots", "dev-garbage": "Project build dirs",
