@@ -191,10 +191,14 @@ package list changes.
 
 ### P2, quadratic pair searches
 
-- `PerceptualHash.cpuPairs` (`PerceptualHash.swift:143-149`) is O(n^2) comparisons.
-  At 100k photos that is 5 x 10^9 hamming distances on the CPU. The GPU path
-  (`gpuPairs`) tiles the search but allocates one fixed 1M-pair buffer and throws when
-  the cap is exceeded.
+- `PerceptualHash.cpuPairs` is O(n^2) comparisons, and measured on 26,487 real hashes
+  at distance 10 that is cheap: 350,767,341 comparisons in 0.254 s on one core, 0.133 s
+  on the tiled GPU. A pigeonhole bucket index was implemented and measured at 0.52 s
+  (56 percent of pairs still compared, because real hashes cluster) and 10.2 s with a
+  `Set` based dedupe, so it was not shipped.
+- The GPU pair search allocated one fixed 1,048,576 pair buffer and threw past it. That
+  library produces 12,818,664 pairs, so the throw was reachable. Fixed by draining the
+  buffer per tile, which caps a tile at 2,097,152 pairs and needs 16 MB.
 - `SimilarVideos.scan` (`SimilarVideos.swift:72-74`) is O(v^2) duration and frame-hash
   comparisons. Videos are fewer, but libraries of thousands still hurt.
 - Fix: bucket by hash prefix (multi-index or BK-tree) before pair checks, and turn the
@@ -264,23 +268,26 @@ on this machine; "read" means seen in the source and not yet profiled.
 |P2 app inventory O(k^2) filter|Landed: ancestors are found by walking parent paths. `isShared` uses a dot-prefix index, so it is O(dots) per entry instead of O(installed apps).|
 |P2 app size measurement|Open. Still one app at a time.|
 |P2 video pair search|Landed for the common case: sweep in duration order, stop at the 2% window. Worst case is still O(v^2) when all durations match.|
-|P2 photo pair search|Open. The pair kernel is still O(n^2) work in tiles. The photo step's memory and speed moved: landed in `8f99ef2` and `ae542f6` (one threadgroup per image, decode into the batch buffer, one buffer set per scan, 6 decode workers). Photos 329 s to 84 s, step footprint 6.9 GB to 1.23 GB.|
-|P2 subprocess output cap, GPU hasher buffers|Open.|
+|P2 photo pair search|Landed for the pair buffer: `gpuPairs` drains each tile, so the pair count is bounded by the library and not by one allocation. 26,487 hashes, distance 10: 12,818,664 pairs in 0.133 s, longest submission 0.99 ms. The bucket index was measured and rejected (0.52 s, 523 MB). The photo step also moved in `8f99ef2` and `ae542f6` (one threadgroup per image, decode into the batch buffer, one buffer set per scan, 6 decode workers): photos 329 s to 84 s, step footprint 6.9 GB to 1.23 GB. Re-measured after the allocator relief: photo step 77.2 s, whole scan 172.9 s, peak RSS 1.29 GB against the 1.5 GB gate.|
+|P2 subprocess output cap|Open.|
+|P2 GPU hasher buffers|Landed: `GPUHasher` keeps one scratch buffer pair behind a lock and reallocates only when `chunkBytes` changes, instead of 64 MiB per file. `GPUHasherTests.digestReusesOneScratchSet` covers it.|
 
 ### Speed findings
 
-**Photo pair search, why bucketing is weak at the default.** `SimilarPhotos.maxDistance` is 10
-bits on a 64-bit hash. An exact-chunk split (pigeonhole) needs 11 chunks of about 6 bits, so
-a bucket holds about n/64 hashes on uniform data. That is roughly a 6x cut from n^2, and real
-photo hashes are not uniform. A BK-tree or a multi-index with verification is the realistic
-route, or lowering the distance. Not measured; this is arithmetic on the defaults.
+**Photo pair search, measured, and why the index lost.** `SimilarPhotos.maxDistance` is 10
+bits on a 64-bit hash. An exact-chunk split (pigeonhole) needs 11 chunks of 5 and 6 bits, and
+on uniform hashes that would compare 20 percent of the pairs. On the real folder it compared
+56 percent (197,688,254 of 350,767,341), because wallpapers, screenshots, and flat frames
+collapse into the same few hash values. With the candidate cut that thin, the plain comparison
+wins: 0.254 s on one core and 0.133 s tiled on the GPU beat the index at 0.52 s. The dedupe
+was the other half of the lesson: a `Set<UInt64>` of verified pairs cost 10.2 s and 1.1 GB,
+because each `contains` probes a table that no longer fits in cache. An index only pays once
+the comparison count is large enough to outweigh 11 dictionary builds.
 
-**Photo decoding is serial.** `SimilarPhotos.scan` decodes one image at a time
-(`PerceptualHash.bitmap`, ImageIO) and then hashes a batch of 32 on the GPU. Decoding is the
-CPU-bound part, so the GPU waits and 7 of 8 cores sit idle. The source already carries a
-`ponytail:` note for `concurrentPerform`. Fix: decode a batch on a bounded pool of cores,
-keep the GPU call per batch. Memory: each decoded bitmap is 256 x 256 x 4 = 256 KiB, so a
-batch of 32 per core stays small.
+**Photo decoding.** Landed: `SimilarPhotos.scan` decodes a batch on 6 workers straight into
+the shared Metal buffer and hashes 64 images per submission, one threadgroup of 256 threads
+each. Decoding is still the CPU-bound half, which is why the worker count is the knob; 8
+workers measured 78.4 s at 1.33 GB against 6 workers at 84.0 s and 1.23 GB.
 
 **Tweaks load spawns one process per setting.** `TweakEngine.readAll` maps `read` over the
 catalog in a serial loop, and each `.defaults` entry runs `/usr/bin/defaults read`

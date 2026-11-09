@@ -34,6 +34,24 @@ struct GPUHasherTests {
         #expect(try small.digest(url) == GPUHasher.cpuDigest(data))
     }
 
+    @Test func digestReusesOneScratchSet() throws {
+        let dir = try TempDir()
+        let url = dir.url.appendingPathComponent("f")
+        try noise(200_000, seed: 5).write(to: url)
+        let gpu = GPUHasher(context: try GPUContext())
+        #expect(gpu.scratchIdentity == nil)
+        _ = try gpu.digest(url)
+        let first = try #require(gpu.scratchIdentity)
+        let bytes = try #require(gpu.scratchBytes)
+        _ = try gpu.digest(url)
+        #expect(gpu.scratchIdentity == first)
+        #expect(gpu.scratchBytes == bytes)
+        var small = gpu
+        small.chunkBytes = 2 * 65_536
+        _ = try small.digest(url)
+        #expect(gpu.scratchIdentity != first)
+    }
+
     @Test func swappingBlocksChangesDigest() {
         let first = noise(65_536, seed: 1)
         let second = noise(65_536, seed: 2)

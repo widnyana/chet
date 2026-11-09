@@ -15,6 +15,17 @@ struct GPUTimingTests {
         }
     }
 
+    @Test func pairPassIsNotCappedByOneBuffer() throws {
+        // 3,000 identical hashes are 4,498,500 pairs, past the old 1 << 20 pair buffer.
+        let gpu = try GPUContext()
+        let hash: UInt64 = 0xDEAD_BEEF_CAFE_1234
+        let pairs = try PerceptualHash.gpuPairs([UInt64](repeating: hash, count: 3_000), maxDistance: 10, context: gpu)
+        #expect(pairs.count == 4_498_500)
+        #expect(pairs.allSatisfy { $0.0 < $0.1 && $0.1 < 3_000 })
+        // Tiles append in completion order, so only the count and the distinct set are stable.
+        #expect(Set(pairs.prefix(1_024).map { UInt64($0.0) << 32 | UInt64($0.1) }).count == 1_024)
+    }
+
     @Test func timingIsRecordedAndResets() throws {
         let gpu = try GPUContext()
         let a = [Float](repeating: 1, count: 1024)

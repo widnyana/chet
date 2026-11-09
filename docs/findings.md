@@ -50,7 +50,7 @@ Metal accelerates four operations:
 
 1. **Content hashing** (`block_hash` kernel): 128-bit non-cryptographic hash in 64 KB blocks. Used by `DuplicateFinder` as an optional replacement for SHA-256. Falls back to SHA-256 when `GPUContext.shared` is nil.
 2. **Photo features** (`photo_features` kernel): perceptual hash (dCT over 32x32 grayscale blocks) and Laplacian blur score in one pass over a batch of 256x256 thumbnails.
-3. **Pair matching** (`hamming_pairs` kernel): all-pairs Hamming distance on hash arrays, dispatched in 2048x2048 tiles to keep each command buffer short.
+3. **Pair matching** (`hamming_pairs` kernel): all-pairs Hamming distance on hash arrays, one thread per candidate cell, dispatched in 2048x2048 tiles. Each tile drains the shared pair buffer before the next one starts, so the pair count is bounded by the library rather than by one fixed allocation, and each command buffer stays short.
 4. **Disk map rendering**: `DiskMapView` uses Metal for the squarified treemap.
 
 Shaders are plain `.metal` text files stored as bundle resources and compiled at runtime via `MTLDevice.makeLibrary(source:)`. This is a workaround because `swift build` does not compile `.metal` files. Each kernel has a CPU reference implementation; tests verify that GPU and CPU produce identical results for the same input.

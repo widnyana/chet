@@ -102,6 +102,9 @@ public struct SimilarPhotos: Sendable {
         var photos: [PhotoInfo] = []
         for start in stride(from: 0, to: entries.count, by: batchSize) {
             try Task.checkCancellation()
+            // Every eighth batch, plus once after the loop: decode slabs are large and the
+            // allocator keeps them until asked.
+            if (start / batchSize) % 8 == 7 { PerceptualHash.releaseFreePages() }
             let count = min(batchSize, entries.count - start)
             let features: [PerceptualHash.Features]
             if let gpu, let buffers {
@@ -136,6 +139,8 @@ public struct SimilarPhotos: Sendable {
                 photos.append(PhotoInfo(entry: item.entry, pixels: item.pixels, features: feature))
             }
         }
+
+        PerceptualHash.releaseFreePages()
 
         let hashes = photos.map(\.features.hash)
         let pairs =

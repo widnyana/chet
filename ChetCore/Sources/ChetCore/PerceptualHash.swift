@@ -1,4 +1,5 @@
 import CoreGraphics
+import Darwin
 import Foundation
 import ImageIO
 import Metal
@@ -201,6 +202,13 @@ public enum PerceptualHash {
         (a ^ b).nonzeroBitCount
     }
 
+    /// Hands the allocator back the pages the decoders freed. ImageIO allocates full-size
+    /// decode slabs per image; without this they stay resident until the process exits.
+    @discardableResult
+    public static func releaseFreePages() -> Int {
+        Int(malloc_zone_pressure_relief(nil, 0))
+    }
+
     public static func cpuPairs(_ hashes: [UInt64], maxDistance: Int) -> [(Int, Int)] {
         var pairs: [(Int, Int)] = []
         for i in hashes.indices {
@@ -212,25 +220,32 @@ public enum PerceptualHash {
     /// Largest side of one pair-search tile: 2048 x 2048 threads per command buffer.
     static let pairTile = 2048
 
+    /// Pairs within `maxDistance`, one thread per candidate cell, one command buffer per tile so a
+    /// submission stays short. Each tile fills the pair buffer from zero and is drained before the
+    /// next tile, so the result is bounded by the library instead of one fixed buffer. A tile can
+    /// report at most half of its cells, which is the buffer size.
     public static func gpuPairs(
-        _ hashes: [UInt64], maxDistance: Int, context: GPUContext, capacity: Int = 1 << 20
+        _ hashes: [UInt64], maxDistance: Int, context: GPUContext
     ) throws -> [(Int, Int)] {
         let count = hashes.count
         guard count > 1 else { return [] }
+        let tileCapacity = pairTile * pairTile / 2
         guard
             let hashBuffer = context.device.makeBuffer(
                 bytes: hashes, length: count * 8, options: .storageModeShared),
             let found = context.device.makeBuffer(length: 4, options: .storageModeShared),
-            let pairs = context.device.makeBuffer(length: capacity * 8, options: .storageModeShared)
+            let pairs = context.device.makeBuffer(length: tileCapacity * 8, options: .storageModeShared)
         else { throw GPUError.commandFailed("pair buffers") }
-        found.contents().storeBytes(of: UInt32(0), as: UInt32.self)
+        let values = pairs.contents().bindMemory(to: UInt32.self, capacity: tileCapacity * 2)
         var count32 = UInt32(count)
         var distance32 = UInt32(maxDistance)
-        var capacity32 = UInt32(capacity)
+        var capacity32 = UInt32(tileCapacity)
+        var result: [(Int, Int)] = []
         // One command buffer per tile keeps each GPU submission short (see GPUContext timing).
         for rowStart in stride(from: 0, to: count, by: pairTile) {
             for columnStart in stride(from: rowStart, to: count, by: pairTile) {
                 try Task.checkCancellation()
+                found.contents().storeBytes(of: UInt32(0), as: UInt32.self)
                 var origin = SIMD2<UInt32>(UInt32(columnStart), UInt32(rowStart))
                 let grid = MTLSize(
                     width: min(pairTile, count - columnStart), height: min(pairTile, count - rowStart), depth: 1)
@@ -243,11 +258,15 @@ public enum PerceptualHash {
                     encoder.setBytes(&capacity32, length: 4, index: 5)
                     encoder.setBytes(&origin, length: MemoryLayout<SIMD2<UInt32>>.stride, index: 6)
                 }
+                let total = Int(found.contents().load(as: UInt32.self))
+                guard total <= tileCapacity else {
+                    throw GPUError.commandFailed("too many similar pairs in one tile: \(total)")
+                }
+                for index in 0..<total {
+                    result.append((Int(values[index * 2]), Int(values[index * 2 + 1])))
+                }
             }
         }
-        let total = Int(found.contents().load(as: UInt32.self))
-        guard total <= capacity else { throw GPUError.commandFailed("too many similar pairs: \(total)") }
-        let values = pairs.contents().bindMemory(to: UInt32.self, capacity: capacity * 2)
-        return (0..<total).map { (Int(values[$0 * 2]), Int(values[$0 * 2 + 1])) }
+        return result
     }
 }

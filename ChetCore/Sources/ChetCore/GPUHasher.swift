@@ -17,31 +17,84 @@ public struct GPUHasher: Sendable {
         self.context = context
     }
 
+    /// Two scratch buffers reused by every digest. A fresh 64 MiB pair per file stays in
+    /// Metal's pool, so a long duplicate run kept every one of them.
+    private final class Scratch: @unchecked Sendable {
+        let input: MTLBuffer
+        let out: MTLBuffer
+        let chunkBytes: Int
+        let blocksPerChunk: Int
+
+        init(context: GPUContext, chunkBytes: Int) throws {
+            let blocksPerChunk = chunkBytes / GPUHasher.blockSize
+            guard chunkBytes >= GPUHasher.blockSize, chunkBytes % GPUHasher.blockSize == 0,
+                let input = context.device.makeBuffer(length: chunkBytes + 8, options: .storageModeShared),
+                let out = context.device.makeBuffer(length: blocksPerChunk * 16, options: .storageModeShared)
+            else { throw GPUError.commandFailed("hash buffers") }
+            self.input = input
+            self.out = out
+            self.chunkBytes = chunkBytes
+            self.blocksPerChunk = blocksPerChunk
+        }
+    }
+
+    private final class ScratchStore: @unchecked Sendable {
+        private let lock = NSLock()
+        private var scratch: Scratch?
+
+        var identity: ObjectIdentifier? {
+            lock.lock()
+            defer { lock.unlock() }
+            return scratch.map(ObjectIdentifier.init)
+        }
+
+        var bytes: Int? {
+            lock.lock()
+            defer { lock.unlock() }
+            guard let scratch else { return nil }
+            return scratch.input.length + scratch.out.length
+        }
+
+        func get(_ context: GPUContext, chunkBytes: Int) throws -> Scratch {
+            lock.lock()
+            defer { lock.unlock() }
+            if let scratch, scratch.chunkBytes == chunkBytes { return scratch }
+            let made = try Scratch(context: context, chunkBytes: chunkBytes)
+            scratch = made
+            return made
+        }
+    }
+
+    private let store = ScratchStore()
+    /// Test hook: identity of the cached buffers, nil before the first digest.
+    var scratchIdentity: ObjectIdentifier? { store.identity }
+    /// Test hook: bytes held by the cached buffers, nil before the first digest.
+    var scratchBytes: Int? { store.bytes }
+
     public func digest(_ url: URL) throws -> String {
         let handle = try FileHandle.uncached(url)
         defer { try? handle.close() }
-        let blocksPerChunk = chunkBytes / Self.blockSize
-        guard let buffer = context.device.makeBuffer(length: chunkBytes + 8, options: .storageModeShared),
-            let out = context.device.makeBuffer(length: blocksPerChunk * 16, options: .storageModeShared)
-        else { throw GPUError.commandFailed("hash buffers") }
+        let scratch = try store.get(context, chunkBytes: chunkBytes)
+        let blocksPerChunk = scratch.blocksPerChunk
         var blocks: [(UInt64, UInt64)] = []
         var total: UInt64 = 0
         var firstBlock: UInt32 = 0
         while true {
             try Task.checkCancellation()
-            let read = try Self.readFully(handle.fileDescriptor, into: buffer.contents(), count: chunkBytes)
+            let read = try Self.readFully(
+                handle.fileDescriptor, into: scratch.input.contents(), count: chunkBytes)
             if read == 0 { break }
-            memset(buffer.contents().advanced(by: read), 0, 8)
+            memset(scratch.input.contents().advanced(by: read), 0, 8)
             let blockCount = (read + Self.blockSize - 1) / Self.blockSize
             var count32 = UInt32(read)
             var first32 = firstBlock
             try context.run("block_hash", grid: MTLSize(width: blockCount, height: 1, depth: 1)) { encoder in
-                encoder.setBuffer(buffer, offset: 0, index: 0)
+                encoder.setBuffer(scratch.input, offset: 0, index: 0)
                 encoder.setBytes(&count32, length: 4, index: 1)
                 encoder.setBytes(&first32, length: 4, index: 2)
-                encoder.setBuffer(out, offset: 0, index: 3)
+                encoder.setBuffer(scratch.out, offset: 0, index: 3)
             }
-            let values = out.contents().bindMemory(to: UInt64.self, capacity: blockCount * 2)
+            let values = scratch.out.contents().bindMemory(to: UInt64.self, capacity: blocksPerChunk * 2)
             for i in 0..<blockCount { blocks.append((values[i * 2], values[i * 2 + 1])) }
             total += UInt64(read)
             firstBlock += UInt32(blockCount)
