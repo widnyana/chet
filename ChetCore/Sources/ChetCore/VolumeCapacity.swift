@@ -2,18 +2,20 @@ import Foundation
 
 /// Capacity of a volume, including the purgeable space macOS reclaims on demand. The gap
 /// between raw free and purgeable-inclusive free explains why "free space" can look wrong.
-struct VolumeCapacity: Sendable, Equatable {
-    let name: String
-    let total: Int64
-    let free: Int64
-    let purgeable: Int64
+public struct VolumeCapacity: Sendable, Equatable {
+    public let name: String
+    public let total: Int64
+    public let free: Int64
+    public let purgeable: Int64
 
-    static func make(name: String, total: Int64, rawFree: Int64, importantFree: Int64) -> VolumeCapacity {
+    public static func make(name: String, total: Int64, rawFree: Int64, importantFree: Int64)
+        -> VolumeCapacity
+    {
         VolumeCapacity(
             name: name, total: total, free: rawFree, purgeable: max(0, importantFree - rawFree))
     }
 
-    static func current(path: String = "/") -> VolumeCapacity {
+    public static func current(path: String = "/") -> VolumeCapacity {
         let values = try? URL(fileURLWithPath: path).resourceValues(forKeys: [
             .volumeTotalCapacityKey, .volumeAvailableCapacityKey,
             .volumeAvailableCapacityForImportantUsageKey, .volumeLocalizedNameKey,

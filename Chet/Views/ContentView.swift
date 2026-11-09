@@ -7,6 +7,7 @@ struct ContentView: View {
     @State private var appCleaner = AppCleanerModel()
     @State private var selection: String? = "overview"
     @State private var confirming = false
+    @State private var systemStatus = SystemStatusModel()
 
     var body: some View {
         Group {
@@ -15,6 +16,9 @@ struct ContentView: View {
             } else {
                 NavigationSplitView {
                     SidebarView(selection: $selection)
+                        .safeAreaInset(edge: .bottom, spacing: 0) {
+                            SidebarFooter()
+                        }
                 } detail: {
                     detail
                         .safeAreaInset(edge: .top, spacing: 0) {
@@ -30,6 +34,7 @@ struct ContentView: View {
             }
         }
         .environment(appCleaner)
+        .environment(systemStatus)
         .tint(Theme.accent)
         .sheet(isPresented: $confirming) {
             CleanFlowSheet()
