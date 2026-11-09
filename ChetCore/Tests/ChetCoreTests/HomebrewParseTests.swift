@@ -54,6 +54,30 @@ struct HomebrewParseTests {
         #expect(throws: BrewError.self) { try Homebrew.parse("not json") }
     }
 
+    @Test func sizedCountsEveryKegVersionAndTheCaskRoom() throws {
+        let dir = try TempDir()
+        try dir.file("Cellar/demo/1.0/bin/demo", bytes: 1_000_000)
+        try dir.file("Cellar/demo/2.0/bin/demo", bytes: 2_000_000)
+        try dir.file("Caskroom/thing/3.0/Thing.app/data", bytes: 3_000_000)
+        let formula = BrewPackage(
+            kind: .formula, name: "demo", title: "demo", desc: "", homepage: "",
+            version: "2.0", latest: "2.0", outdated: false, pinned: false, onRequest: true, deps: [])
+        let cask = BrewPackage(
+            kind: .cask, name: "thing", title: "Thing", desc: "", homepage: "",
+            version: "3.0", latest: "3.0", outdated: false, pinned: false, onRequest: true, deps: [])
+
+        let sized = Homebrew.sized([formula, cask], root: dir.url.path)
+        let old = FS.usage(dir.url.appendingPathComponent("Cellar/demo/1.0").path).size
+        let new = FS.usage(dir.url.appendingPathComponent("Cellar/demo/2.0").path).size
+        let caskRoom = FS.usage(dir.url.appendingPathComponent("Caskroom/thing").path).size
+
+        #expect(sized[0].size == old + new)
+        #expect(sized[0].oldVersionsSize == old)
+        #expect(sized[0].paths == [dir.url.appendingPathComponent("Cellar/demo").path])
+        #expect(sized[1].size == caskRoom)
+        #expect(sized[1].paths == [dir.url.appendingPathComponent("Caskroom/thing").path])
+    }
+
     @Test func dryRunUninstallAndCleanupNeverRunBrew() {
         // Safe without brew installed: the dry-run paths never spawn a process.
         let pkg = BrewPackage(

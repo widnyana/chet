@@ -122,10 +122,11 @@ public enum Homebrew {
 
     /// Measures each package's on-disk size in parallel. Writes go to distinct indices of a
     /// buffer pointer, which is safe, unlike mutating a Swift Array from several threads.
-    private static func sized(_ packages: [BrewPackage]) -> [BrewPackage] {
-        guard !packages.isEmpty, let prefix else { return packages }
-        let cellar = prefix + "/Cellar"
-        let caskroom = prefix + "/Caskroom"
+    /// `root` overrides the brew prefix so a test can point at a fixture.
+    static func sized(_ packages: [BrewPackage], root: String? = nil) -> [BrewPackage] {
+        guard !packages.isEmpty, let root = root ?? prefix else { return packages }
+        let cellar = root + "/Cellar"
+        let caskroom = root + "/Caskroom"
         var out = packages
         out.withUnsafeMutableBufferPointer { buffer in
             guard let baseAddress = buffer.baseAddress else { return }
