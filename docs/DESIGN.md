@@ -7,7 +7,8 @@ Detailed references: [design/README.md](design/README.md),
 [design/components.md](design/components.md),
 [design/screens.md](design/screens.md),
 [design/copy.md](design/copy.md),
-[design/references.md](design/references.md).
+[design/references.md](design/references.md),
+[design/ui-guidelines.md](design/ui-guidelines.md).
 
 ## The design read
 

@@ -41,6 +41,7 @@ MOTION 1.
 | [screens.md](screens.md) | Each screen, what it must do, and how it is composed |
 | [copy.md](copy.md) | Voice, labels, empty states, and error text |
 | [references.md](references.md) | Sources and the reasoning behind the direction |
+| [ui-guidelines.md](ui-guidelines.md) | The rules for adding or changing UI, the layer model on macOS 26 and later, and the API facts they rest on |
 
 The shipped summary is [../DESIGN.md](../DESIGN.md). It is the file the layout
 checker reads.
