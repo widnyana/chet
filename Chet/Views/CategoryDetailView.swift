@@ -75,6 +75,7 @@ struct CategoryDetailView: View {
             }
         }
         .background(Theme.paper)
+        .backgroundExtensionEffect()
         .focusedValue(
             \.selectionActions,
             SelectionActions(
@@ -82,7 +83,7 @@ struct CategoryDetailView: View {
                 none: { model.setSelected(urls, false) },
                 invert: { model.invertSelection(urls) })
         )
-        .safeAreaInset(edge: .bottom) { commandBar }
+        .safeAreaBar(edge: .bottom) { commandBar }
     }
 
     private var riskSentence: String {

@@ -10,41 +10,45 @@ struct ContentView: View {
     @State private var selection: String? = "overview"
     @State private var confirming = false
     @State private var systemStatus = SystemStatusModel()
+    @State private var pageWidth: CGFloat = 0
 
     var body: some View {
-        GeometryReader { proxy in
-            Group {
-                if model.access == .denied && !model.accessSkipped {
-                    OnboardingView()
-                } else {
-                    NavigationSplitView {
-                        VStack(spacing: 0) {
-                            SidebarView(selection: $selection)
+        Group {
+            if model.access == .denied && !model.accessSkipped {
+                OnboardingView()
+            } else {
+                NavigationSplitView {
+                    SidebarView(selection: $selection)
+                        .safeAreaInset(edge: .bottom, spacing: 0) {
                             SidebarFooter()
                         }
-                    } detail: {
-                        detail
-                            .safeAreaInset(edge: .top, spacing: 0) {
-                                // Tweaks, Apps, and Homebrew carry their own surface; the
-                                // cleaning strip would repeat a verb that does not apply.
-                                if !["tweaks", "applications", "homebrew"].contains(selection ?? "") {
-                                    TopStatusStrip()
-                                }
+                } detail: {
+                    detail
+                        .safeAreaInset(edge: .top, spacing: 0) {
+                            // Tweaks, Apps, and Homebrew carry their own surface; the
+                            // cleaning strip would repeat a verb that does not apply.
+                            if !["tweaks", "applications", "homebrew"].contains(selection ?? "") {
+                                TopStatusStrip()
                             }
-                            .background(Theme.paper)
-                            .toolbar {
-                                if !["overview", "applications", "tweaks", "homebrew"]
-                                    .contains(selection ?? "")
-                                {
-                                    scanButton
-                                }
+                        }
+                        .toolbar {
+                            if !["overview", "applications", "tweaks", "homebrew"]
+                                .contains(selection ?? "")
+                            {
+                                scanButton
                             }
-                    }
+                        }
                 }
             }
-            .environment(
-                \.pageMargin,
-                proxy.size.width >= 1100 ? Metrics.widePageMargin : Metrics.pageMargin)
+        }
+        .environment(
+            \.pageMargin,
+            pageWidth >= 1100 ? Metrics.widePageMargin : Metrics.pageMargin
+        )
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+        } action: { width in
+            pageWidth = width
         }
         .environment(appCleaner)
         .environment(homebrew)

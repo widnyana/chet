@@ -40,7 +40,8 @@ struct SnapshotsView: View {
             }
         }
         .background(Theme.paper)
-        .safeAreaInset(edge: .bottom) {
+        .backgroundExtensionEffect()
+        .safeAreaBar(edge: .bottom) {
             CommandBar(
                 metric: "\(model.selectedSnapshots.count)",
                 detail: model.selectedSnapshots.count == 1

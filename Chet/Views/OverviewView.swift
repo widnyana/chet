@@ -21,7 +21,8 @@ struct OverviewView: View {
             .frame(maxWidth: .infinity, alignment: .center)
         }
         .background(Theme.paper)
-        .safeAreaInset(edge: .bottom) { commandBar }
+        .backgroundExtensionEffect()
+        .safeAreaBar(edge: .bottom) { commandBar }
     }
 
     private var pageHeader: some View {

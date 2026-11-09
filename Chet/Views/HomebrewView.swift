@@ -32,9 +32,10 @@ struct HomebrewView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Theme.paper)
+        .backgroundExtensionEffect()
         .onAppear { model.load() }
         .searchable(text: $query, placement: .toolbar, prompt: "Search packages")
-        .safeAreaInset(edge: .bottom) { commandBar }
+        .safeAreaBar(edge: .bottom) { commandBar }
         .sheet(isPresented: $model.showInstaller) {
             HomebrewInstallerSheet()
         }

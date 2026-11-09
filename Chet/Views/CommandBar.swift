@@ -58,7 +58,6 @@ struct CommandBar: View {
             .padding(.vertical, Spacing.s3)
             .frame(minHeight: Metrics.commandBarMinHeight)
         }
-        .background(Theme.paper)
     }
 
     @ViewBuilder private var primaryButton: some View {

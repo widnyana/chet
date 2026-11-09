@@ -142,6 +142,7 @@ struct DiskMapView: View {
             }
         }
         .background(Theme.paper)
+        .backgroundExtensionEffect()
         // The final trees replace the live render (same canvas, full data).
         .task(id: model.folderTrees) {
             guard !model.folderTrees.isEmpty else { return }

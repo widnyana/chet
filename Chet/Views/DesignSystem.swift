@@ -224,7 +224,7 @@ struct StatusStrip: View {
             .padding(.horizontal, Metrics.pageMargin)
             .padding(.vertical, Spacing.s3)
             .frame(minHeight: 48)
-            .background(Theme.paperRaised)
+            .background(.bar)
             if showsHairline { Hairline() }
         }
     }
@@ -311,7 +311,7 @@ struct PrimaryActionButton: View {
                 Text(title)
             }
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.glassProminent)
         .controlSize(.large)
         .tint(Theme.accent)
         .frame(minWidth: Metrics.controlMinWidth)
@@ -341,7 +341,7 @@ struct DestructiveActionButton: View {
                 Text(title)
             }
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.glassProminent)
         .controlSize(.regular)
         .tint(Theme.red)
         .frame(minWidth: Metrics.controlMinWidth)
@@ -371,7 +371,7 @@ struct SecondaryActionButton: View {
                 Text(title)
             }
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.glass)
         .controlSize(.regular)
         .disabled(!isEnabled)
         .help(help ?? title)
@@ -525,8 +525,8 @@ struct ColumnTable<Item: Identifiable, Header: View, Row: View>: View {
     }
 }
 
-/// The geometry every action sheet shares: 520 pt wide, 24 pt padding, paper on the body, and an
-/// optional fixed height. A sheet supplies its own stack and its own footer row.
+/// The geometry every action sheet shares: 520 pt wide, 24 pt padding, and an optional fixed
+/// height. The system supplies the sheet material; a sheet supplies its own stack and footer.
 struct SheetFrame<Content: View>: View {
     var height: CGFloat?
     @ViewBuilder let content: Content
@@ -535,7 +535,6 @@ struct SheetFrame<Content: View>: View {
         content
             .padding(Spacing.s6)
             .frame(width: 520, height: height)
-            .background(Theme.paper)
     }
 }
 

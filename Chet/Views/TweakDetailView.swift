@@ -49,7 +49,6 @@ struct TweakDetailView: View {
         }
         .padding(Spacing.s6)
         .frame(width: 540, alignment: .leading)
-        .background(Theme.paper)
         .accessibilityIdentifier("tweak.detail.\(tweak.id)")
         .confirmationDialog(
             "Revert the last change?",

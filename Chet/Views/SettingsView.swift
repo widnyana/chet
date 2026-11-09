@@ -49,7 +49,6 @@ struct SettingsView: View {
                     .tag(SettingsPane.tweaks)
             }
         }
-        .background(Theme.paper)
         .frame(width: 560, height: 560)
         .confirmationDialog(
             "Reset every tweak?", isPresented: $confirmingReset, titleVisibility: .visible

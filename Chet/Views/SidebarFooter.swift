@@ -19,6 +19,7 @@ struct SidebarFooter: View {
         }
         .padding(.horizontal, Spacing.s3)
         .padding(.vertical, Spacing.s2)
+        .background(.bar)
         .onAppear { status.refresh() }
         .confirmationDialog(
             "Empty the Trash?", isPresented: $confirmingEmpty, titleVisibility: .visible

@@ -45,7 +45,8 @@ struct AppCleanerDetailView: View {
             }
         }
         .background(Theme.paper)
-        .safeAreaInset(edge: .bottom) { commandBar }
+        .backgroundExtensionEffect()
+        .safeAreaBar(edge: .bottom) { commandBar }
         .sheet(
             isPresented: Binding(
                 get: { model.showConfirm && model.selectedApp != nil },

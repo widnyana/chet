@@ -29,6 +29,7 @@ struct TweaksView: View {
             .frame(maxWidth: .infinity, alignment: .center)
         }
         .background(Theme.paper)
+        .backgroundExtensionEffect()
         .searchable(text: $model.query, placement: .toolbar, prompt: "Search tweaks")
         .task {
             if model.readings.isEmpty { await model.load() }

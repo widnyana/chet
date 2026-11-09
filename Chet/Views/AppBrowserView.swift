@@ -131,8 +131,9 @@ struct AppBrowserView: View {
             }
         }
         .background(Theme.paper)
+        .backgroundExtensionEffect()
         .searchable(text: $model.query, placement: .toolbar, prompt: "Search apps")
-        .safeAreaInset(edge: .bottom) {
+        .safeAreaBar(edge: .bottom) {
             bulkBar
         }
         .toolbar {
