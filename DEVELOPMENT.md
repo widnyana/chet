@@ -30,6 +30,7 @@ Every development step is a mise task:
 | `mise run test` | Run the ChetCore tests. Filter with `mise run test -- --filter Cleaner` |
 | `mise run check` | Tests, debug build, and a check that the binary is arm64 only |
 | `mise run release` | Release build, arm64 check, and `dist/chet.zip` |
+| `mise run dmg` | The release build in `dist/chet.dmg`, with an `Applications` symlink |
 | `mise run bench` | Compare GPU and SHA-256 hashing speed (writes 1 GB of temp files) |
 | `mise run fmt` / `mise run lint` | Format Swift code, or only check the format |
 | `mise run layout` | Check the persistent chrome against the registry in `docs/DESIGN.md` |
@@ -106,8 +107,11 @@ same result.
 ## Release
 
 `mise run release` builds the app, checks that the binary is arm64 only, and writes
-`dist/chet.zip`. The app is ad-hoc signed and not notarized. The quarantine step for another
-Mac is in the [user guide](docs/USER-GUIDE.md#install-on-another-mac).
+`dist/chet.zip`. `mise run dmg` runs the same build and writes `dist/chet.dmg`, a compressed
+read-only image holding `chet.app` and an `Applications` symlink; the mount carries no custom
+volume icon. The app is ad-hoc signed and not notarized, and the image is unsigned for the same
+reason. The quarantine step for another Mac is in the
+[user guide](docs/USER-GUIDE.md#install-on-another-mac).
 
 ## Boundaries
 

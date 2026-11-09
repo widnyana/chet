@@ -43,6 +43,19 @@ description = "Tests, debug build, and arm64-only binary check"
 depends = ["test", "build"]
 run = "test \"$(lipo -archs .build/xc/Build/Products/Debug/chet.app/Contents/MacOS/chet)\" = arm64 && echo arm64 ok"
 
+[tasks.dmg]
+description = "Release build packaged as dist/chet.dmg"
+depends = ["release"]
+run = [
+  "rm -rf .build/dmg && mkdir -p .build/dmg",
+  "cp -R .build/xc/Build/Products/Release/chet.app .build/dmg/",
+  "ln -s /Applications .build/dmg/Applications",
+  "mkdir -p dist && rm -f dist/chet.dmg",
+  "hdiutil create -volname Chet -srcfolder .build/dmg -ov -format UDZO dist/chet.dmg",
+  "hdiutil verify dist/chet.dmg",
+  "echo dist/chet.dmg",
+]
+
 [tasks.bench]
 description = "Benchmark GPU vs SHA-256 duplicate hashing (writes 1 GB of temp files)"
 run = "CHET_BENCH=1 swift test --package-path ChetCore --filter hashingBenchmark"
