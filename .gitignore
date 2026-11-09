@@ -24,12 +24,14 @@
 !/project.yml
 !/mise.toml
 !/README.md
+!/DEVELOPMENT.md
 !/AGENTS.md
 !/.swift-format
 !/CLAUDE.md
 !Chet/**
 !ChetCore/**
 !docs/DESIGN.md
+!docs/USER-GUIDE.md
 !docs/findings.md
 !docs/design/
 !docs/design/**

@@ -112,4 +112,4 @@ Both walkers skip dataless files and deduplicate hard links by inode.
 
 **Similar photos/videos decoding notes.** `SimilarPhotos` decodes thumbnails sequentially (`// ponytail:` at `SimilarPhotos.swift:55`); `SimilarVideos` does an O(n²) CPU pair check (`SimilarVideos.swift:62`). Both flagged as fine-until-measured.
 
-**No root-level scanning.** `/Library/Caches`, system logs, root-owned package caches, and Docker/OrbStack images are out of scope by design. Adding any of these would require a privileged helper process. The README is explicit about this boundary.
+**No root-level scanning.** `/Library/Caches`, system logs, root-owned package caches, and Docker/OrbStack images are out of scope by design. Adding any of these would require a privileged helper process. `DEVELOPMENT.md` and the user guide are explicit about this boundary.

@@ -1,7 +1,8 @@
 # Chet project notes
 
 Notes for working on the app. The design rules are in `docs/DESIGN.md`, the architecture is
-in `README.md`. This file covers how to run, drive, and test the app while you change it.
+in `DEVELOPMENT.md`, and the user guide is `docs/USER-GUIDE.md`. This file covers how to run,
+drive, and test the app while you change it.
 
 ## Run it
 
