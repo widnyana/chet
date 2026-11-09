@@ -57,8 +57,8 @@ final class HomebrewModel {
     var totalBytes: Int64 { packages.reduce(0) { $0 + $1.size } }
     var canAct: Bool { !isWorking && !isLoading }
 
-    func toggleMark(_ package: BrewPackage) {
-        if marked.contains(package.id) { marked.remove(package.id) } else { marked.insert(package.id) }
+    func setMark(_ package: BrewPackage, on: Bool) {
+        if on { marked.insert(package.id) } else { marked.remove(package.id) }
     }
 
     func clearMarks() { marked.removeAll() }

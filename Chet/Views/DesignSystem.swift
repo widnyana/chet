@@ -433,6 +433,34 @@ struct LoadingStateView: View {
     }
 }
 
+/// One scrolling table: a pinned column header over the rows. The header lives inside the
+/// scroll view, so the first row sits directly under it instead of a dead band, and the header
+/// stays visible while the list scrolls. The header and each row own their horizontal margin,
+/// which keeps a column label over its cells.
+struct ColumnTable<Item: Identifiable, Header: View, Row: View>: View {
+    let items: [Item]
+    @ViewBuilder let header: Header
+    @ViewBuilder let row: (Item) -> Row
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
+                Section {
+                    ForEach(items) { item in
+                        row(item)
+                        if item.id != items.last?.id {
+                            Hairline().padding(.horizontal, Metrics.widePageMargin)
+                        }
+                    }
+                } header: {
+                    header.background(Theme.paper)
+                }
+            }
+        }
+        .background(Theme.paper)
+    }
+}
+
 struct ErrorStateView: View {
     let title: String
     let message: String

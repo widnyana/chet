@@ -209,22 +209,11 @@ struct AppBrowserView: View {
     }
 
     private var list: some View {
-        ScrollView {
-            LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
-                Section {
-                    ForEach(sortedApps) { app in
-                        AppRow(app: app)
-                        if app.id != sortedApps.last?.id {
-                            Hairline().padding(.horizontal, Metrics.widePageMargin)
-                        }
-                    }
-                } header: {
-                    AppListHeader(sort: sort, ascending: ascending, onSort: toggleSort)
-                        .background(Theme.paper)
-                }
-            }
+        ColumnTable(items: sortedApps) {
+            AppListHeader(sort: sort, ascending: ascending, onSort: toggleSort)
+        } row: { app in
+            AppRow(app: app)
         }
-        .background(Theme.paper)
     }
 
     private var bulkBar: some View {

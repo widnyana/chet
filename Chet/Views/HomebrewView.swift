@@ -21,6 +21,7 @@ struct HomebrewView: View {
 
             content
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Theme.paper)
         .onAppear { model.load() }
         .alert(
@@ -111,19 +112,11 @@ struct HomebrewView: View {
     }
 
     private var list: some View {
-        VStack(spacing: 0) {
+        ColumnTable(items: model.sortedPackages) {
             header
-            Hairline()
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(model.sortedPackages) { package in
-                        HomebrewRow(package: package)
-                        Hairline()
-                    }
-                }
-            }
+        } row: { package in
+            HomebrewRow(package: package)
         }
-        .padding(.horizontal, Metrics.widePageMargin)
     }
 
     private var header: some View {
@@ -137,6 +130,7 @@ struct HomebrewView: View {
             sortButton("Status", .status)
                 .frame(width: HomebrewColumns.status, alignment: .leading)
         }
+        .padding(.horizontal, Metrics.widePageMargin)
         .padding(.vertical, Spacing.s2)
     }
 
@@ -180,7 +174,7 @@ private struct HomebrewRow: View {
                 "",
                 isOn: Binding(
                     get: { model.marked.contains(package.id) },
-                    set: { _ in model.toggleMark(package) })
+                    set: { model.setMark(package, on: $0) })
             )
             .labelsHidden()
             .toggleStyle(.checkbox)
@@ -206,6 +200,7 @@ private struct HomebrewRow: View {
                 .frame(width: HomebrewColumns.size, alignment: .trailing)
             statusLabel.frame(width: HomebrewColumns.status, alignment: .leading)
         }
+        .padding(.horizontal, Metrics.widePageMargin)
         .padding(.vertical, Spacing.s2)
     }
 
@@ -220,6 +215,8 @@ private struct HomebrewRow: View {
                 help: "Installed as a dependency, now used by nothing.")
         } else if package.pinned {
             StatusLabel(text: "Pinned", systemImage: "pin", tone: .neutral)
+        } else {
+            Color.clear.frame(height: 1)
         }
     }
 }
