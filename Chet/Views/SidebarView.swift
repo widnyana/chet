@@ -98,5 +98,6 @@ struct SidebarView: View {
                 .frame(width: 20)
         }
         .tag(id)
+        .accessibilityIdentifier("sidebar.\(id)")
     }
 }

@@ -30,6 +30,7 @@ struct OverviewView: View {
             subtitle: subtitle,
             metric: metric,
             metricLabel: "can be freed")
+        .accessibilityIdentifier("home.header")
     }
 
     private var metric: String? {
@@ -83,6 +84,7 @@ struct OverviewView: View {
             message:
                 "Chet looks for caches, old files, duplicates, and other files apps can rebuild. Nothing is removed without your approval.",
             systemImage: "internaldrive")
+        .accessibilityIdentifier("home.empty")
     }
 
     @ViewBuilder private var ledgers: some View {

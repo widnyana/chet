@@ -47,6 +47,7 @@ struct SettingsView: View {
                 sizesPane.tabItem { Label("Limits", systemImage: "ruler") }
                 foldersPane.tabItem { Label("Folders", systemImage: "folder") }
             }
+            .accessibilityIdentifier("settings.tabs")
         }
         .background(Theme.paper)
         .tint(Theme.accent)

@@ -79,6 +79,7 @@ struct AppBrowserView: View {
                 subtitle: subtitle,
                 metric: nil
             )
+            .accessibilityIdentifier("apps.header")
             .padding(.horizontal, Metrics.widePageMargin)
             .padding(.top, Spacing.s6)
             .padding(.bottom, Spacing.s3)

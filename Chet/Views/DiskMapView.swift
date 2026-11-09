@@ -193,6 +193,7 @@ struct DiskMapView: View {
             metric: current?.size.formatted(.byteCount(style: .file)),
             metricLabel: current == nil ? nil : "in this folder"
         )
+        .accessibilityIdentifier("storage.header")
         .padding(.horizontal, Metrics.widePageMargin)
         .padding(.top, Spacing.s6)
         .padding(.bottom, Spacing.s3)

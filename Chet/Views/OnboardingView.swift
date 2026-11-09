@@ -14,6 +14,7 @@ struct OnboardingView: View {
                     .font(.system(size: 28, weight: .regular))
                     .foregroundStyle(Theme.inkSecondary)
                 Text("Chet needs permission to find junk.")
+                    .accessibilityIdentifier("gate.title")
                     .font(Typography.title)
                     .foregroundStyle(Theme.ink)
                 Text(
@@ -36,10 +37,12 @@ struct OnboardingView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(Theme.accent)
                 .controlSize(.large)
+                .accessibilityIdentifier("gate.openSettings")
                 .padding(.top, Spacing.s2)
                 VStack(alignment: .leading, spacing: Spacing.s1) {
                     Button("Continue with limited results") { model.accessSkipped = true }
                         .buttonStyle(.link)
+                        .accessibilityIdentifier("gate.continue")
                     Text("Without access, Chet finds less. It never removes anything you did not choose.")
                         .font(Typography.caption)
                         .foregroundStyle(Theme.inkSecondary)

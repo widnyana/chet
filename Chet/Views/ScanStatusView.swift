@@ -31,6 +31,7 @@ struct ScanStatusView: View {
             .padding(.vertical, 6)
             .help("Stop the scan")
             .accessibilityLabel("Stop the scan")
+            .accessibilityIdentifier("toolbar.scanStop")
         } else {
             Button(model.lastScan == nil ? "Scan" : "Scan again", systemImage: "magnifyingglass") {
                 model.scan()
@@ -39,6 +40,7 @@ struct ScanStatusView: View {
             .tint(Theme.accent)
             .help("Find files you can remove (Command-R)")
             .accessibilityLabel("Scan for files you can remove")
+            .accessibilityIdentifier("toolbar.scan")
         }
     }
 

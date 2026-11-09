@@ -1,0 +1,105 @@
+// Selector-driven UI driver. Reads the accessibility tree of the running app so a test
+// can press a control by identifier instead of guessing pixel coordinates.
+// Build: swiftc -O scripts/axdrv.swift -o /tmp/axdrv
+import AppKit
+import ApplicationServices
+
+func attr(_ el: AXUIElement, _ name: String) -> CFTypeRef? {
+    var v: CFTypeRef?
+    guard AXUIElementCopyAttributeValue(el, name as CFString, &v) == .success else { return nil }
+    return v
+}
+
+func kids(_ el: AXUIElement) -> [AXUIElement] {
+    (attr(el, kAXChildrenAttribute as String) as? [AXUIElement]) ?? []
+}
+
+func str(_ el: AXUIElement, _ name: String) -> String {
+    (attr(el, name) as? String) ?? ""
+}
+
+func point(_ el: AXUIElement, _ name: String) -> CGPoint? {
+    guard let v = attr(el, name), CFGetTypeID(v) == AXValueGetTypeID() else { return nil }
+    var p = CGPoint.zero
+    guard AXValueGetValue(v as! AXValue, .cgPoint, &p) else { return nil }
+    return p
+}
+
+func size(_ el: AXUIElement) -> CGSize? {
+    guard let v = attr(el, kAXSizeAttribute as String), CFGetTypeID(v) == AXValueGetTypeID() else { return nil }
+    var s = CGSize.zero
+    guard AXValueGetValue(v as! AXValue, .cgSize, &s) else { return nil }
+    return s
+}
+
+func all(_ root: AXUIElement) -> [AXUIElement] {
+    var out: [AXUIElement] = []
+    var stack: [(AXUIElement, Int)] = [(root, 0)]
+    while let (el, depth) = stack.popLast() {
+        out.append(el)
+        if depth < 40 { for k in kids(el) { stack.append((k, depth + 1)) } }
+    }
+    return out
+}
+
+func click(_ el: AXUIElement) -> Bool {
+    guard let origin = point(el, kAXPositionAttribute as String), let s = size(el) else { return false }
+    let center = CGPoint(x: origin.x + s.width / 2, y: origin.y + s.height / 2)
+    guard let down = CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown, mouseCursorPosition: center, mouseButton: .left),
+        let up = CGEvent(mouseEventSource: nil, mouseType: .leftMouseUp, mouseCursorPosition: center, mouseButton: .left)
+    else { return false }
+    down.post(tap: .cghidEventTap)
+    usleep(30_000)
+    up.post(tap: .cghidEventTap)
+    return true
+}
+
+let args = CommandLine.arguments
+guard args.count > 1 else { print("usage: axdrv dump|texts|press <id>|click <text>|clickid <id>"); exit(2) }
+guard AXIsProcessTrusted() else { print("AX NOT TRUSTED"); exit(3) }
+guard let pid = NSRunningApplication.runningApplications(withBundleIdentifier: "id.web.widnyana.chet").first?.processIdentifier else {
+    print("chet not running")
+    exit(4)
+}
+let els = all(AXUIElementCreateApplication(pid))
+
+switch args[1] {
+case "dump":
+    for el in els {
+        let id = str(el, "AXIdentifier")
+        let role = str(el, kAXRoleAttribute as String)
+        let title = str(el, kAXTitleAttribute as String)
+        let value = str(el, kAXValueAttribute as String)
+        if !id.isEmpty || !title.isEmpty || !value.isEmpty {
+            print("\(role) id=\(id) title=\(title) value=\(value)")
+        }
+    }
+case "texts":
+    for el in els where str(el, kAXRoleAttribute as String) == "AXStaticText" {
+        let v = str(el, kAXValueAttribute as String)
+        if !v.isEmpty { print(v) }
+    }
+case "press":
+    let target = args[2]
+    if let hit = els.first(where: { str($0, "AXIdentifier") == target }) {
+        print(AXUIElementPerformAction(hit, kAXPressAction as CFString) == .success ? "pressed \(target)" : "press failed")
+    } else {
+        print("no element with id \(target)")
+    }
+case "clickid":
+    let target = args[2]
+    if let hit = els.first(where: { str($0, "AXIdentifier") == target }) {
+        print(click(hit) ? "clicked \(target)" : "click failed")
+    } else {
+        print("no element with id \(target)")
+    }
+case "click":
+    let target = args[2]
+    if let hit = els.first(where: { str($0, kAXValueAttribute as String) == target }) {
+        print(click(hit) ? "clicked \(target)" : "click failed")
+    } else {
+        print("no element with value \(target)")
+    }
+default:
+    print("unknown command")
+}

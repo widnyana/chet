@@ -24,6 +24,7 @@
 !/project.yml
 !/mise.toml
 !/README.md
+!/DEVELOPING.md
 !/.swift-format
 !Chet/**
 !ChetCore/**
