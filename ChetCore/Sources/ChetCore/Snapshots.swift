@@ -7,6 +7,10 @@ public struct LocalSnapshot: Sendable, Hashable {
     public let date: String
 }
 
+extension LocalSnapshot: Identifiable {
+    public var id: String { name }
+}
+
 public enum SnapshotError: Error, Equatable {
     case failed(Int32)
 }

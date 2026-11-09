@@ -43,6 +43,8 @@ enum Theme {
     static let capacityFree = dynamic(
         light: NSColor(srgbRed: 0.914, green: 0.902, blue: 0.871, alpha: 1),
         dark: NSColor(srgbRed: 0.133, green: 0.141, blue: 0.157, alpha: 1))
+    static let mapLabelDark = Color(red: 0.07, green: 0.08, blue: 0.09)
+    static let mapLabelLight = Color.white
 
     private static func dynamic(light: NSColor, dark: NSColor) -> Color {
         Color(
@@ -58,6 +60,7 @@ enum Typography {
     static let section = Font.system(size: 16, weight: .semibold)
     static let body = Font.system(size: 15, weight: .regular)
     static let row = Font.system(size: 14, weight: .regular)
+    static let sidebar = Font.system(size: 13, weight: .regular)
     static let caption = Font.system(size: 12, weight: .regular)
     static let metric = Font.system(size: 18, weight: .medium)
 }
@@ -81,6 +84,8 @@ enum Metrics {
     static let commandBarMinHeight: CGFloat = 56
     /// Controls use one radius and one height so every primary action matches.
     static let controlRadius: CGFloat = 6
+    static let panelRadius: CGFloat = 8
+    static let innerRadius: CGFloat = 6
     static let controlMinWidth: CGFloat = 96
 }
 
@@ -116,13 +121,66 @@ struct StatusLabel: View {
     var body: some View {
         HStack(spacing: Spacing.s1) {
             Image(systemName: systemImage)
-                .font(Typography.caption)
+                .font(.system(size: 16, weight: .regular))
             Text(text)
                 .font(Typography.caption)
         }
         .foregroundStyle(tone.color)
         .help(help ?? text)
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// The one dry-run gate treatment. The call site supplies the verb that matches its action.
+struct PreviewNotice: View {
+    let text: String
+
+    var body: some View {
+        StatusLabel(
+            text: text,
+            systemImage: "exclamationmark.triangle",
+            tone: .amber)
+    }
+}
+
+/// A sortable column label. The arrow is reserved for the active column, and the whole label
+/// shares one focus ring and hit area across every table.
+struct SortColumnButton: View {
+    let title: String
+    let isActive: Bool
+    let ascending: Bool
+    var identifier: String?
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 2) {
+                Text(title)
+                Image(systemName: ascending ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+                    .opacity(isActive ? 1 : 0)
+            }
+            .foregroundStyle(isActive ? Theme.ink : Theme.inkSecondary)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .focusable()
+        .focusRing()
+        .help("Sort by \(title)")
+        .accessibilityLabel(title)
+        .modifier(OptionalAccessibilityIdentifier(identifier: identifier))
+    }
+}
+
+struct OptionalAccessibilityIdentifier: ViewModifier {
+    let identifier: String?
+
+    func body(content: Content) -> some View {
+        if let identifier {
+            content.accessibilityIdentifier(identifier)
+        } else {
+            content
+        }
     }
 }
 
@@ -165,6 +223,7 @@ struct StatusStrip: View {
             }
             .padding(.horizontal, Metrics.pageMargin)
             .padding(.vertical, Spacing.s3)
+            .frame(minHeight: 48)
             .background(Theme.paperRaised)
             if showsHairline { Hairline() }
         }
@@ -186,7 +245,7 @@ struct PageHeader: View {
                         .resizable()
                         .frame(width: 44, height: 44)
                 }
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: Spacing.s1) {
                     Text(title)
                         .font(Typography.title)
                         .foregroundStyle(Theme.ink)
@@ -253,8 +312,7 @@ struct PrimaryActionButton: View {
             }
         }
         .buttonStyle(.borderedProminent)
-        .buttonBorderShape(.roundedRectangle(radius: Metrics.controlRadius))
-        .controlSize(.regular)
+        .controlSize(.large)
         .tint(Theme.accent)
         .frame(minWidth: Metrics.controlMinWidth)
         .disabled(!isEnabled)
@@ -284,7 +342,6 @@ struct DestructiveActionButton: View {
             }
         }
         .buttonStyle(.borderedProminent)
-        .buttonBorderShape(.roundedRectangle(radius: Metrics.controlRadius))
         .controlSize(.regular)
         .tint(Theme.red)
         .frame(minWidth: Metrics.controlMinWidth)
@@ -315,7 +372,6 @@ struct SecondaryActionButton: View {
             }
         }
         .buttonStyle(.bordered)
-        .buttonBorderShape(.roundedRectangle(radius: Metrics.controlRadius))
         .controlSize(.regular)
         .disabled(!isEnabled)
         .help(help ?? title)
@@ -341,6 +397,8 @@ struct QuietActionButton: View {
                 .lineLimit(1)
         }
         .buttonStyle(.plain)
+        .focusable()
+        .focusRing()
         .disabled(!isEnabled)
         .help(help ?? title)
         .accessibilityLabel(accessibilityLabel ?? title)
@@ -362,6 +420,10 @@ struct IconActionButton: View {
                 .foregroundStyle(isEnabled ? Theme.inkSecondary : Theme.inkTertiary)
         }
         .buttonStyle(.plain)
+        .frame(width: 40, height: 40)
+        .contentShape(Rectangle())
+        .focusable()
+        .focusRing()
         .disabled(!isEnabled)
         .help(help ?? label)
         .accessibilityLabel(label)
@@ -398,22 +460,24 @@ struct SectionHeader: View {
 struct EmptyStateView: View {
     let title: String
     let message: String
-    var systemImage: String = "folder"
     var actionTitle: String?
     var action: (() -> Void)?
 
     var body: some View {
-        ContentUnavailableView {
-            Label(title, systemImage: systemImage)
-        } description: {
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            Text(title)
+                .font(Typography.section)
+                .foregroundStyle(Theme.ink)
             Text(message)
                 .font(Typography.body)
-        } actions: {
+                .foregroundStyle(Theme.inkSecondary)
+                .fixedSize(horizontal: false, vertical: true)
             if let actionTitle, let action {
                 PrimaryActionButton(title: actionTitle, action: action)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: 420, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 }
 
@@ -449,11 +513,11 @@ struct ColumnTable<Item: Identifiable, Header: View, Row: View>: View {
                     ForEach(items) { item in
                         row(item)
                         if item.id != items.last?.id {
-                            Hairline().padding(.horizontal, Metrics.widePageMargin)
+                            Hairline().pageHorizontalPadding()
                         }
                     }
                 } header: {
-                    header.background(Theme.paper)
+                    header.background(Theme.paperRaised)
                 }
             }
         }
@@ -503,27 +567,32 @@ struct CapacityBarView: View {
     let total: Int64
     let free: Int64
     let reclaimable: Int64
+    var showsHeader = true
+    var showsLegend = true
+    var height: CGFloat = 10
 
     var body: some View {
         let used = max(0, total - free)
         let junk = min(max(0, reclaimable), used)
         VStack(alignment: .leading, spacing: Spacing.s2) {
-            HStack(alignment: .firstTextBaseline, spacing: Spacing.s3) {
-                Text(volumeName)
-                    .font(Typography.section)
-                    .foregroundStyle(Theme.ink)
-                Spacer()
-                if total > 0 {
-                    Text(
-                        "\(free.formatted(.byteCount(style: .file))) available of \(total.formatted(.byteCount(style: .file)))"
-                    )
-                    .font(Typography.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.inkSecondary)
-                } else {
-                    Text("Capacity unavailable")
+            if showsHeader {
+                HStack(alignment: .firstTextBaseline, spacing: Spacing.s3) {
+                    Text(volumeName)
+                        .font(Typography.section)
+                        .foregroundStyle(Theme.ink)
+                    Spacer()
+                    if total > 0 {
+                        Text(
+                            "\(free.formatted(.byteCount(style: .file))) available of \(total.formatted(.byteCount(style: .file)))"
+                        )
                         .font(Typography.caption)
+                        .monospacedDigit()
                         .foregroundStyle(Theme.inkSecondary)
+                    } else {
+                        Text("Capacity unavailable")
+                            .font(Typography.caption)
+                            .foregroundStyle(Theme.inkSecondary)
+                    }
                 }
             }
             if total > 0 {
@@ -539,19 +608,21 @@ struct CapacityBarView: View {
                             .fill(Theme.capacityFree)
                     }
                 }
-                .frame(height: 10)
+                .frame(height: height)
                 .overlay {
                     Rectangle().strokeBorder(Theme.hairline, lineWidth: 1)
                 }
-                HStack(spacing: Spacing.s4) {
-                    legend("Used", Theme.capacityUsed, used)
-                    if reclaimable > 0 {
-                        legend("Can be reclaimed", Theme.accent, reclaimable)
+                if showsLegend {
+                    HStack(spacing: Spacing.s4) {
+                        legend("Used", Theme.capacityUsed, used)
+                        if reclaimable > 0 {
+                            legend("Can be reclaimed", Theme.accent, reclaimable)
+                        }
+                        legend("Free", Theme.capacityFree, free)
                     }
-                    legend("Free", Theme.capacityFree, free)
+                    .font(Typography.caption)
+                    .foregroundStyle(Theme.inkSecondary)
                 }
-                .font(Typography.caption)
-                .foregroundStyle(Theme.inkSecondary)
             }
         }
         .accessibilityElement(children: .combine)
@@ -562,7 +633,7 @@ struct CapacityBarView: View {
 
     private func legend(_ title: String, _ color: Color, _ value: Int64) -> some View {
         HStack(spacing: Spacing.s1) {
-            RoundedRectangle(cornerRadius: 1)
+            Rectangle()
                 .fill(color)
                 .frame(width: 10, height: 10)
             Text("\(title) \(value.formatted(.byteCount(style: .file)))")
@@ -576,11 +647,55 @@ struct CapacityBarView: View {
     }
 }
 
+// MARK: - Focus
+
+struct FocusRing: ViewModifier {
+    @Environment(\.isFocused) private var isFocused
+
+    func body(content: Content) -> some View {
+        content.overlay {
+            if isFocused {
+                RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous)
+                    .strokeBorder(Theme.accent, lineWidth: 2)
+            }
+        }
+    }
+}
+
+// MARK: - Page margin
+
+private struct PageMarginKey: EnvironmentKey {
+    static let defaultValue = Metrics.pageMargin
+}
+
+extension EnvironmentValues {
+    var pageMargin: CGFloat {
+        get { self[PageMarginKey.self] }
+        set { self[PageMarginKey.self] = newValue }
+    }
+}
+
+struct PageHorizontalPadding: ViewModifier {
+    @Environment(\.pageMargin) private var margin
+
+    func body(content: Content) -> some View {
+        content.padding(.horizontal, margin)
+    }
+}
+
 // MARK: - Helpers
 
 extension View {
     func pageSurface() -> some View {
         background(Theme.paper)
+    }
+
+    func pageHorizontalPadding() -> some View {
+        modifier(PageHorizontalPadding())
+    }
+
+    func focusRing() -> some View {
+        modifier(FocusRing())
     }
 
     func sheetSurface() -> some View {

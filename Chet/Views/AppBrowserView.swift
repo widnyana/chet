@@ -80,26 +80,50 @@ struct AppBrowserView: View {
                 metric: nil
             )
             .accessibilityIdentifier("apps.header")
-            .padding(.horizontal, Metrics.widePageMargin)
+            .pageHorizontalPadding()
             .padding(.top, Spacing.s6)
             .padding(.bottom, Spacing.s3)
+            if DryRun.enabled {
+                PreviewNotice(text: "Preview only. Nothing will be moved.")
+                    .pageHorizontalPadding()
+                    .padding(.bottom, Spacing.s2)
+            }
             if model.isLoadingApps {
                 LoadingStateView(message: "Reading applications")
-                    .padding(.horizontal, Metrics.widePageMargin)
+                    .pageHorizontalPadding()
+                Spacer()
+            } else if let error = model.loadError, model.apps.isEmpty {
+                ErrorStateView(
+                    title: "The applications folder could not be read.",
+                    message: "Check Full Disk Access, then reload.",
+                    actionTitle: "Reload",
+                    action: { model.load() }
+                )
+                .help(error)
+                .pageHorizontalPadding()
                 Spacer()
             } else if model.apps.isEmpty {
                 noApps
-                    .padding(.horizontal, Metrics.widePageMargin)
+                    .pageHorizontalPadding()
             } else if model.filteredApps.isEmpty {
                 EmptyStateView(
                     title: "No application matches \"\(model.query)\"",
                     message: "Clear the search to see all apps.",
-                    systemImage: "magnifyingglass",
                     actionTitle: "Clear search",
                     action: { model.query = "" }
                 )
-                .padding(.horizontal, Metrics.widePageMargin)
+                .pageHorizontalPadding()
             } else {
+                if let error = model.loadError {
+                    StatusLabel(
+                        text: "Some application folders could not be read.",
+                        systemImage: "exclamationmark.triangle",
+                        tone: .amber,
+                        help: error
+                    )
+                    .pageHorizontalPadding()
+                    .padding(.bottom, Spacing.s2)
+                }
                 switch model.style {
                 case .grid: grid
                 case .list: list
@@ -109,9 +133,7 @@ struct AppBrowserView: View {
         .background(Theme.paper)
         .searchable(text: $model.query, placement: .toolbar, prompt: "Search apps")
         .safeAreaInset(edge: .bottom) {
-            if model.isBulkRemoving || !model.markedApps.isEmpty {
-                bulkBar
-            }
+            bulkBar
         }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
@@ -146,14 +168,12 @@ struct AppBrowserView: View {
             EmptyStateView(
                 title: "No applications found",
                 message: "Try reading the Applications folder again.",
-                systemImage: "app.dashed",
                 actionTitle: "Reload",
                 action: { model.load() })
         } else {
             EmptyStateView(
                 title: "No applications found",
                 message: "If this is unexpected, check Full Disk Access.",
-                systemImage: "app.dashed",
                 actionTitle: "Open Settings",
                 action: { NSWorkspace.shared.open(FullDiskAccess.settingsURL) })
         }
@@ -167,18 +187,12 @@ struct AppBrowserView: View {
         switch sort {
         case .name:
             ordered = apps.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-        case .lastUsed:
-            ordered = apps.sorted { lastUsedKey($0) < lastUsedKey($1) }
         case .size:
             ordered = apps.sorted { (model.appSizes[$0.url] ?? -1) < (model.appSizes[$1.url] ?? -1) }
         case .status:
             ordered = apps.sorted { statusRank($0) < statusRank($1) }
         }
         return ascending ? ordered : ordered.reversed()
-    }
-
-    private func lastUsedKey(_ app: InstalledApp) -> TimeInterval {
-        (model.appLastUsed[app.url] ?? nil)?.timeIntervalSince1970 ?? -1
     }
 
     private func statusRank(_ app: InstalledApp) -> Int {
@@ -203,7 +217,7 @@ struct AppBrowserView: View {
                     AppCell(app: app)
                 }
             }
-            .padding(.horizontal, Metrics.widePageMargin)
+            .pageHorizontalPadding()
             .padding(.bottom, Spacing.s6)
         }
     }
@@ -228,54 +242,35 @@ struct AppBrowserView: View {
         }
         return CommandBar(
             metric: model.markedBytes.formatted(.byteCount(style: .file)),
-            detail: model.markedApps.count == 1
-                ? "1 app selected" : "\(model.markedApps.count) apps selected",
+            detail: model.markedApps.isEmpty
+                ? "No apps selected"
+                : (model.markedApps.count == 1
+                    ? "1 app selected" : "\(model.markedApps.count) apps selected"),
             actionTitle: "Remove",
             isEnabled: model.canBulkRemove,
-            secondaryTitle: "Clear",
-            secondaryAction: { model.clearMarks() },
+            secondaryTitle: model.markedApps.isEmpty ? nil : "Clear",
+            secondaryAction: model.markedApps.isEmpty ? nil : { model.clearMarks() },
             help: "Review and move the selected apps to the Trash",
             accessibilityLabel: "Remove, \(model.markedApps.count) apps",
+            disabledReason: model.markedApps.isEmpty ? "Select an app to remove." : nil,
             action: { model.beginBulkRemoval() })
     }
 }
 
 /// The sortable columns of the Applications list. Every column is sortable (repo rule).
 private enum AppSort {
-    case name, lastUsed, size, status
+    case name, size, status
 }
 
 /// Stable column metrics shared by the header and the rows.
 private enum AppColumns {
     static let mark: CGFloat = 20
     static let icon: CGFloat = 22
-    static let lastUsed: CGFloat = 110
+    static let location: CGFloat = 140
+    static let version: CGFloat = 80
     static let size: CGFloat = 82
     static let status: CGFloat = 118
-    static let open: CGFloat = 20
     static let spacing: CGFloat = Spacing.s3
-}
-
-/// The "Last used" cell, shared by the list row and the grid footer. Shows a relative date
-/// when Spotlight has one, "Unknown" when it resolved with no record, and a dim placeholder
-/// while the lazy lookup is still running.
-private struct LastUsedText: View {
-    @Environment(AppCleanerModel.self) private var model
-    let url: URL
-
-    var body: some View {
-        if let entry = model.appLastUsed[url] {
-            if let date = entry {
-                Text(date, format: .relative(presentation: .named))
-                    .foregroundStyle(Theme.inkSecondary)
-                    .help(date.formatted(date: .long, time: .shortened))
-            } else {
-                Text("Unknown").foregroundStyle(Theme.inkSecondary)
-            }
-        } else {
-            Text("Reading").foregroundStyle(Theme.inkSecondary)
-        }
-    }
 }
 
 private struct AppListHeader: View {
@@ -287,38 +282,33 @@ private struct AppListHeader: View {
         VStack(spacing: 0) {
             HStack(spacing: AppColumns.spacing) {
                 Color.clear.frame(width: AppColumns.mark)
-                sortButton("App", .name)
+                Color.clear.frame(width: AppColumns.icon)
+                sortButton("Name", .name)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                sortButton("Last used", .lastUsed)
-                    .frame(width: AppColumns.lastUsed, alignment: .leading)
+                Text("Location")
+                    .frame(width: AppColumns.location, alignment: .leading)
+                Text("Version")
+                    .frame(width: AppColumns.version, alignment: .leading)
                 sortButton("Size", .size)
                     .frame(width: AppColumns.size, alignment: .trailing)
                 sortButton("Status", .status)
                     .frame(width: AppColumns.status, alignment: .leading)
-                Color.clear.frame(width: AppColumns.open)
             }
             .font(Typography.caption)
-            .padding(.horizontal, Metrics.widePageMargin)
+            .pageHorizontalPadding()
             .padding(.vertical, Spacing.s2)
             Hairline()
         }
     }
 
     private func sortButton(_ title: String, _ column: AppSort) -> some View {
-        Button {
+        SortColumnButton(
+            title: title,
+            isActive: sort == column,
+            ascending: ascending
+        ) {
             onSort(column)
-        } label: {
-            HStack(spacing: 2) {
-                Text(title)
-                Image(systemName: ascending ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 8, weight: .semibold))
-                    .opacity(sort == column ? 1 : 0)
-            }
-            .foregroundStyle(sort == column ? Theme.ink : Theme.inkSecondary)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .help("Sort by \(title)")
     }
 }
 
@@ -346,17 +336,24 @@ private struct AppRow: View {
                     .font(Typography.row)
                     .foregroundStyle(Theme.ink)
                     .lineLimit(1)
-                Text(app.vendorLabel ?? "Unknown developer")
+                Text(app.bundleID ?? "No bundle ID")
                     .font(Typography.caption)
                     .foregroundStyle(Theme.inkSecondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            LastUsedText(url: app.url)
-                .font(Typography.row)
+            Text(model.locationLabel(app))
+                .font(Typography.caption)
+                .foregroundStyle(Theme.inkSecondary)
                 .lineLimit(1)
-                .frame(width: AppColumns.lastUsed, alignment: .leading)
+                .frame(width: AppColumns.location, alignment: .leading)
+            Text(app.version ?? "Unknown")
+                .font(Typography.caption)
+                .monospacedDigit()
+                .foregroundStyle(Theme.inkSecondary)
+                .lineLimit(1)
+                .frame(width: AppColumns.version, alignment: .leading)
             Text(model.appSizes[app.url].map { $0.formatted(.byteCount(style: .file)) } ?? "Unknown")
                 .font(Typography.row)
                 .monospacedDigit()
@@ -365,20 +362,9 @@ private struct AppRow: View {
                 .frame(width: AppColumns.size, alignment: .trailing)
             status
                 .frame(width: AppColumns.status, alignment: .leading)
-            Button {
-                model.select(app)
-            } label: {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Theme.inkTertiary)
-            }
-            .buttonStyle(.plain)
-            .frame(width: AppColumns.open)
-            .help("Show files left by this app")
-            .accessibilityLabel("Show files left by \(app.name)")
         }
-        .padding(.vertical, Spacing.s1)
-        .padding(.horizontal, Metrics.widePageMargin)
+        .frame(minHeight: Metrics.rowHeight)
+        .pageHorizontalPadding()
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { model.select(app) }
         .contextMenu { appContextMenu(for: app, model: model) }
@@ -445,6 +431,10 @@ private struct AppCell: View {
                         .font(Typography.caption)
                         .monospacedDigit()
                         .foregroundStyle(Theme.inkSecondary)
+                    Text(model.locationLabel(app))
+                        .font(Typography.caption)
+                        .foregroundStyle(Theme.inkSecondary)
+                        .lineLimit(1)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, Spacing.s3)
@@ -452,9 +442,9 @@ private struct AppCell: View {
             .buttonStyle(.plain)
         }
         .padding(Spacing.s3)
-        .background(Theme.paperRaised, in: RoundedRectangle(cornerRadius: 8))
+        .background(Theme.paperRaised, in: .rect(corners: .fixed(Metrics.panelRadius)))
         .overlay {
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: Metrics.panelRadius, style: .continuous)
                 .strokeBorder(
                     marked ? Theme.accent : (hovering ? Theme.inkTertiary : Theme.hairline),
                     lineWidth: marked ? 2 : 1)

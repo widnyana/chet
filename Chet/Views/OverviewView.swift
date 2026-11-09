@@ -15,7 +15,7 @@ struct OverviewView: View {
                 capacity
                 content
             }
-            .padding(.horizontal, Metrics.widePageMargin)
+            .pageHorizontalPadding()
             .padding(.vertical, Spacing.s8)
             .frame(maxWidth: Metrics.contentMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .center)
@@ -70,19 +70,6 @@ struct OverviewView: View {
                     systemImage: "exclamationmark.triangle",
                     tone: .amber)
             }
-            if !model.isScanning {
-                HStack(spacing: Spacing.s3) {
-                    PrimaryActionButton(
-                        title: model.lastScan == nil ? "Scan" : "Scan again",
-                        systemImage: "magnifyingglass",
-                        help: "Scan for caches, logs, and large files (Command-R)",
-                        accessibilityLabel: "Scan for caches, logs, and large files",
-                        action: { model.scan() }
-                    )
-                    .accessibilityIdentifier("home.scan")
-                    Spacer()
-                }
-            }
             if model.isScanning {
                 scanProgress
             } else if model.lastScan == nil {
@@ -96,8 +83,7 @@ struct OverviewView: View {
     private var neverScanned: some View {
         EmptyStateView(
             title: "No scan yet",
-            message: "Run a scan to see what can be reclaimed.",
-            systemImage: "internaldrive"
+            message: "Run a scan to see what can be reclaimed."
         )
         .accessibilityIdentifier("home.empty")
     }
@@ -109,8 +95,7 @@ struct OverviewView: View {
             if safe.isEmpty && review.isEmpty {
                 EmptyStateView(
                     title: "Nothing to reclaim",
-                    message: "This Mac is tidy.",
-                    systemImage: "checkmark.circle")
+                    message: "This Mac is tidy.")
             }
             if !safe.isEmpty { ledger("Safe to remove", safe) }
             if !review.isEmpty { ledger("Check first", review) }
@@ -172,6 +157,8 @@ struct OverviewView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .focusable()
+        .focusRing()
         .help(CategoryCopy.explanation(category.id))
     }
 
@@ -184,14 +171,27 @@ struct OverviewView: View {
 
     private func categoryValue(_ category: CategoryState) -> String {
         if category.id == "snapshots" {
-            return model.snapshots.count == 1 ? "1" : "\(model.snapshots.count)"
+            let count = model.snapshots.count
+            return count == 1 ? "1 snapshot" : "\(count) snapshots"
         }
         return category.bytes.formatted(.byteCount(style: .file))
     }
 
     private var scanProgress: some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
-            SectionHeader(title: "Scanning caches and logs")
+            VStack(spacing: Spacing.s2) {
+                HStack(alignment: .firstTextBaseline, spacing: Spacing.s3) {
+                    Text("Scanning caches and logs")
+                        .font(Typography.section)
+                        .foregroundStyle(Theme.ink)
+                    Spacer()
+                    Text("\(Int((progressFraction * 100).rounded()))%")
+                        .font(Typography.metric)
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.ink)
+                }
+                Hairline()
+            }
             ProgressView(value: progressFraction)
                 .tint(Theme.accent)
             Text(activityLabel)
@@ -206,6 +206,7 @@ struct OverviewView: View {
                         Image(systemName: step.done ? "checkmark.circle" : "circle")
                             .font(.system(size: 12, weight: .regular))
                             .foregroundStyle(step.done ? Theme.inkSecondary : Theme.inkTertiary)
+                            .accessibilityHidden(true)
                         Text(ScanStepCopy.title(step.id))
                             .font(Typography.row)
                             .foregroundStyle(step.done ? Theme.inkSecondary : Theme.ink)
@@ -214,19 +215,6 @@ struct OverviewView: View {
                     .padding(.vertical, Spacing.s1)
                 }
             }
-            HStack(spacing: Spacing.s2) {
-                SecondaryActionButton(
-                    title: "Pause", isEnabled: !model.isPaused,
-                    action: { model.togglePause() }
-                )
-                .accessibilityIdentifier("home.pause")
-                SecondaryActionButton(
-                    title: "Resume", isEnabled: model.isPaused,
-                    action: { model.togglePause() }
-                )
-                .accessibilityIdentifier("home.resume")
-            }
-            .padding(.top, Spacing.s1)
         }
     }
 
@@ -242,7 +230,42 @@ struct OverviewView: View {
     }
 
     @ViewBuilder private var commandBar: some View {
-        if !model.selectedItems.isEmpty && !model.isScanning {
+        if model.isScanning {
+            CommandBar(
+                metric: "\(Int((progressFraction * 100).rounded()))%",
+                detail: activityLabel,
+                actionTitle: "Stop scan",
+                actionSystemImage: "stop.circle",
+                secondaryTitle: model.isPaused ? "Resume" : "Pause",
+                secondaryAction: { model.togglePause() },
+                help: "Stop the scan",
+                accessibilityLabel: "Stop the scan",
+                disabledReason: nil,
+                primaryIdentifier: "home.stop",
+                secondaryIdentifier: model.isPaused ? "home.resume" : "home.pause",
+                action: { model.cancel() })
+        } else if model.lastScan == nil {
+            CommandBar(
+                metric: "Not measured",
+                detail: "No scan yet",
+                actionTitle: "Scan this Mac",
+                actionSystemImage: "magnifyingglass",
+                help: "Scan for caches, logs, and large files (Command-R)",
+                accessibilityLabel: "Scan for caches, logs, and large files",
+                primaryIdentifier: "home.scan",
+                action: { model.scan() })
+        } else if model.selectedItems.isEmpty {
+            CommandBar(
+                metric: model.totalBytes.formatted(.byteCount(style: .file)),
+                detail: model.categories.count == 1
+                    ? "1 category" : "\(model.categories.count) categories",
+                actionTitle: "Scan again",
+                actionSystemImage: "magnifyingglass",
+                help: "Scan for caches, logs, and large files (Command-R)",
+                accessibilityLabel: "Scan for caches, logs, and large files",
+                primaryIdentifier: "home.scan",
+                action: { model.scan() })
+        } else {
             let count = model.selectedItems.count
             CommandBar(
                 metric: model.selectedBytes.formatted(.byteCount(style: .file)),
@@ -252,6 +275,7 @@ struct OverviewView: View {
                 isEnabled: !model.isCleaning,
                 help: "Review and clean the selected items",
                 accessibilityLabel: "Clean selected, \(count) items",
+                disabledReason: "Cleaning is running.",
                 action: {
                     model.beginClean()
                     onClean()

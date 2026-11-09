@@ -49,7 +49,7 @@ struct AppUninstallConfirmSheet: View {
                     .padding(.vertical, Spacing.s2)
                 }
                 .frame(maxHeight: 220)
-                .background(Theme.paperRaised, in: RoundedRectangle(cornerRadius: 6))
+                .background(Theme.paperRaised, in: .rect(corners: .fixed(6)))
                 VStack(alignment: .leading, spacing: Spacing.s2) {
                     labeled("The app and the files you chose move to the Trash.", icon: "trash")
                     labeled("You can restore them from the Trash.", icon: "arrow.uturn.backward")
@@ -79,19 +79,19 @@ struct AppUninstallConfirmSheet: View {
                 }
                 HStack {
                     Spacer()
-                    SecondaryActionButton(title: "Cancel", shortcut: .escape, action: { dismiss() })
+                    SecondaryActionButton(title: "Cancel", shortcut: .return, action: { dismiss() })
                     DestructiveActionButton(
                         title: "Move to Trash",
                         isEnabled: model.canRemove,
                         help: moveLabel,
                         accessibilityLabel: moveLabel,
-                        shortcut: .return,
                         action: {
                             model.remove()
                             dismiss()
                         })
                 }
             }
+            .onExitCommand { dismiss() }
         }
     }
 
@@ -269,7 +269,7 @@ struct BulkUninstallConfirmSheet: View {
                     .padding(.vertical, Spacing.s2)
                 }
                 .frame(maxHeight: 220)
-                .background(Theme.paperRaised, in: RoundedRectangle(cornerRadius: 6))
+                .background(Theme.paperRaised, in: .rect(corners: .fixed(6)))
                 VStack(alignment: .leading, spacing: Spacing.s2) {
                     labeled("The apps and the files you chose move to the Trash.", icon: "trash")
                     labeled("You can restore them from the Trash.", icon: "arrow.uturn.backward")
@@ -289,19 +289,19 @@ struct BulkUninstallConfirmSheet: View {
                 }
                 HStack {
                     Spacer()
-                    SecondaryActionButton(title: "Cancel", shortcut: .escape, action: { dismiss() })
+                    SecondaryActionButton(title: "Cancel", shortcut: .return, action: { dismiss() })
                     DestructiveActionButton(
                         title: "Move to Trash",
                         isEnabled: model.canBulkRemove,
                         help: "Move \(model.markedApps.count) apps to the Trash",
                         accessibilityLabel: "Move \(model.markedApps.count) apps to the Trash",
-                        shortcut: .return,
                         action: {
                             model.removeMarked()
                             dismiss()
                         })
                 }
             }
+            .onExitCommand { dismiss() }
         }
     }
 

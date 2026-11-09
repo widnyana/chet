@@ -30,14 +30,15 @@ struct SidebarView: View {
                 }
             }
             Section("Configure") {
-                row("tweaks", "Tweaks", symbol: "slider.horizontal.3", emphasis: true)
+                row("tweaks", "Tweaks", symbol: "slider.horizontal.3")
             }
             Section("Tools") {
-                row("applications", "Apps", symbol: "app.dashed", emphasis: true)
-                row("disk-map", "Storage", symbol: "internaldrive", emphasis: true)
-                row("homebrew", "Homebrew", symbol: "shippingbox", emphasis: true)
+                row("applications", "Apps", symbol: "app.dashed")
+                row("disk-map", "Storage", symbol: "internaldrive")
+                row("homebrew", "Homebrew", symbol: "shippingbox")
             }
         }
+        .listStyle(.sidebar)
         .navigationSplitViewColumnWidth(min: 220, ideal: 250)
     }
 
@@ -56,7 +57,6 @@ struct SidebarView: View {
 
     private func categoryRow(_ category: CategoryState) -> some View {
         let step = ScanStatusView.step(forCategory: category.id)
-        let running = model.isScanning && model.currentStep == step
         let pending =
             model.isScanning && !(model.steps.first(where: { $0.id == step })?.done ?? false)
             && category.bytes == 0
@@ -65,41 +65,44 @@ struct SidebarView: View {
             trailing: category.id == "snapshots"
                 ? "\(model.snapshots.count)" : category.bytes.formatted(.byteCount(style: .file)),
             locked: category.needsFullDiskAccess,
-            running: running, dimmed: pending)
+            dimmed: pending)
     }
 
     private func row(
         _ id: String, _ title: String, trailing: String? = nil, locked: Bool = false,
-        running: Bool = false, dimmed: Bool = false, symbol: String? = nil, emphasis: Bool = false
+        dimmed: Bool = false, symbol: String? = nil
     ) -> some View {
         let glyph = symbol ?? CategoryStyle.of(id).symbol
+        let isSelected = selection == id
         return Label {
             HStack(spacing: Spacing.s2) {
                 Text(title)
+                    .font(Typography.sidebar)
                     .lineLimit(1)
-                    .foregroundStyle(dimmed ? AnyShapeStyle(Theme.inkTertiary) : AnyShapeStyle(Theme.ink))
-                if running {
-                    ProgressView().controlSize(.mini)
-                }
+                    .foregroundStyle(
+                        isSelected
+                            ? AnyShapeStyle(Color.white)
+                            : AnyShapeStyle(dimmed ? Theme.inkSecondary : Theme.ink))
                 if locked {
                     Image(systemName: "lock.fill")
                         .font(Typography.caption)
-                        .foregroundStyle(Theme.inkSecondary)
+                        .foregroundStyle(isSelected ? Color.white : Theme.inkSecondary)
                         .help("Some folders need Full Disk Access")
+                        .accessibilityHidden(true)
                 }
                 Spacer(minLength: Spacing.s2)
                 if let trailing {
                     Text(trailing)
                         .font(Typography.caption)
-                        .foregroundStyle(Theme.inkSecondary)
+                        .foregroundStyle(isSelected ? Color.white : Theme.inkSecondary)
                         .monospacedDigit()
                 }
             }
         } icon: {
             Image(systemName: glyph)
-                .font(.system(size: 14, weight: .regular))
-                .foregroundStyle(emphasis ? Theme.ink : Theme.inkSecondary)
-                .frame(width: 20)
+                .font(Typography.sidebar)
+                .foregroundStyle(isSelected ? Color.white : Theme.inkSecondary)
+                .frame(width: 18)
         }
         .tag(id)
         .accessibilityIdentifier("sidebar.\(id)")

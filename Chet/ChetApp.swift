@@ -44,10 +44,13 @@ struct SelectCommands: Commands {
         CommandMenu("Select") {
             Button("All") { selectionActions?.all() }
                 .keyboardShortcut("a", modifiers: .command)
+                .disabled(selectionActions == nil)
             Button("None") { selectionActions?.none() }
                 .keyboardShortcut("a", modifiers: [.command, .shift])
+                .disabled(selectionActions == nil)
             Button("Invert") { selectionActions?.invert() }
                 .keyboardShortcut("i", modifiers: [.command, .option])
+                .disabled(selectionActions == nil)
         }
     }
 }
@@ -75,7 +78,7 @@ struct ChetApp: App {
             ContentView()
                 .environment(model)
                 .environment(tweaks)
-                .frame(minWidth: 960, minHeight: 600)
+                .frame(minWidth: 960, minHeight: 632)
         }
         .commands {
             AboutCommand()
@@ -84,6 +87,7 @@ struct ChetApp: App {
                     if model.isScanning { model.cancel() } else { model.scan() }
                 }
                 .keyboardShortcut("r")
+                .disabled(model.access == .denied && !model.accessSkipped)
             }
             SelectCommands()
         }

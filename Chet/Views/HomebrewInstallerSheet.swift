@@ -9,7 +9,7 @@ struct HomebrewInstallerSheet: View {
 
     var body: some View {
         @Bindable var model = model
-        SheetFrame(height: 460) {
+        SheetFrame {
             VStack(alignment: .leading, spacing: Spacing.s4) {
                 VStack(alignment: .leading, spacing: Spacing.s1) {
                     Text("Install a package")
@@ -78,7 +78,7 @@ struct HomebrewInstallerSheet: View {
     @ViewBuilder private var results: some View {
         if model.isSearching {
             LoadingStateView(message: "Searching Homebrew")
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .frame(maxWidth: .infinity, minHeight: 160, maxHeight: 220, alignment: .top)
         } else if let message = model.searchMessage {
             ErrorStateView(
                 title: "Could not search Homebrew",
@@ -87,17 +87,15 @@ struct HomebrewInstallerSheet: View {
                 action: { model.search() }
             )
             .help(message)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .frame(maxWidth: .infinity, minHeight: 160, maxHeight: 220, alignment: .top)
         } else if !model.hasSearched {
             EmptyStateView(
                 title: "Search for a package",
-                message: "Type a name and press Return. Formulae and casks appear here.",
-                systemImage: "magnifyingglass")
+                message: "Type a name and press Return. Formulae and casks appear here.")
         } else if model.searchResults.isEmpty {
             EmptyStateView(
                 title: "No matches",
-                message: "No formula or cask matches \"\(model.lastQuery)\".",
-                systemImage: "magnifyingglass")
+                message: "No formula or cask matches \"\(model.lastQuery)\".")
         } else {
             ScrollView {
                 LazyVStack(spacing: 0) {
@@ -107,7 +105,7 @@ struct HomebrewInstallerSheet: View {
                     }
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity, minHeight: 160, maxHeight: 220)
             .background(Theme.paperRaised, in: .rect(corners: .fixed(8)))
         }
     }

@@ -70,7 +70,7 @@ struct ConfirmSheet: View {
                     .padding(.vertical, Spacing.s2)
                 }
                 .frame(maxHeight: 220)
-                .background(Theme.paperRaised, in: RoundedRectangle(cornerRadius: 6))
+                .background(Theme.paperRaised, in: .rect(corners: .fixed(6)))
                 VStack(alignment: .leading, spacing: Spacing.s2) {
                     if permanent > 0 {
                         HStack(spacing: Spacing.s2) {
@@ -114,16 +114,16 @@ struct ConfirmSheet: View {
                 }
                 HStack {
                     Spacer()
-                    SecondaryActionButton(title: "Cancel", shortcut: .escape, action: { dismiss() })
+                    SecondaryActionButton(title: "Cancel", shortcut: .return, action: { dismiss() })
                     DestructiveActionButton(
                         title: action,
                         isEnabled: true,
                         help: "\(action) \(itemText)",
                         accessibilityLabel: "\(action) \(itemText)",
-                        shortcut: .return,
                         action: { model.clean() })
                 }
             }
+            .onExitCommand { dismiss() }
         }
     }
 

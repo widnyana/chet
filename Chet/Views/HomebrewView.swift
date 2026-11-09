@@ -4,6 +4,9 @@ import SwiftUI
 
 struct HomebrewView: View {
     @Environment(HomebrewModel.self) private var model
+    @State private var query = ""
+    @State private var confirmingUpgrade = false
+    @State private var confirmingCleanup = false
 
     var body: some View {
         @Bindable var model = model
@@ -16,17 +19,27 @@ struct HomebrewView: View {
                 metricLabel: "on disk"
             )
             .accessibilityIdentifier("homebrew.header")
-            .padding(.horizontal, Metrics.widePageMargin)
+            .pageHorizontalPadding()
             .padding(.top, Spacing.s6)
             .padding(.bottom, Spacing.s3)
+            if DryRun.enabled {
+                PreviewNotice(text: "Preview only. Nothing will be changed.")
+                    .pageHorizontalPadding()
+                    .padding(.bottom, Spacing.s2)
+            }
 
             content
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Theme.paper)
         .onAppear { model.load() }
+        .searchable(text: $query, placement: .toolbar, prompt: "Search packages")
+        .safeAreaInset(edge: .bottom) { commandBar }
         .sheet(isPresented: $model.showInstaller) {
             HomebrewInstallerSheet()
+        }
+        .sheet(isPresented: $model.showUninstallConfirm) {
+            HomebrewUninstallSheet()
         }
         .alert(
             "Homebrew",
@@ -39,21 +52,55 @@ struct HomebrewView: View {
             Text(model.actionResult ?? "")
         }
         .confirmationDialog(
-            "Uninstall \(model.markedPackages.count) \(model.markedPackages.count == 1 ? "package" : "packages")?",
-            isPresented: $model.showUninstallConfirm, titleVisibility: .visible
+            "Upgrade \(model.markedOutdated.count) \(model.markedOutdated.count == 1 ? "package" : "packages")?",
+            isPresented: $confirmingUpgrade, titleVisibility: .visible
         ) {
-            Button("Uninstall", role: .destructive) { model.uninstall(zap: false) }
-            if model.markedPackages.contains(where: { $0.kind == .cask }) {
-                Button("Uninstall and delete data", role: .destructive) { model.uninstall(zap: true) }
-            }
+            Button("Upgrade") { model.upgrade() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text(
-                DryRun.enabled
-                    ? "Preview only. Nothing will be removed."
-                    : (model.markedPackages.contains(where: { $0.kind == .cask })
-                        ? "This removes the packages. Removing data also deletes their settings and saved files."
-                        : "This removes the packages. Homebrew can install them again."))
+            Text("Homebrew replaces the selected packages with the latest versions.")
+        }
+        .confirmationDialog(
+            "Remove old versions?", isPresented: $confirmingCleanup, titleVisibility: .visible
+        ) {
+            Button("Remove", role: .destructive) { model.cleanup() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This deletes old package versions and the download cache. Current versions stay.")
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    model.openInstaller()
+                } label: {
+                    Label("Install packages", systemImage: "plus")
+                }
+                .help("Search for a formula or cask to install")
+                .accessibilityIdentifier("homebrew.install")
+
+                Menu {
+                    Button("Update catalog", systemImage: "arrow.triangle.2.circlepath") {
+                        model.update()
+                    }
+                    .disabled(!model.canAct)
+                    Button(upgradeTitle, systemImage: "arrow.up.circle") {
+                        confirmingUpgrade = true
+                    }
+                    .disabled(!model.canUpgrade)
+                    Button("Remove old versions", systemImage: "trash") {
+                        confirmingCleanup = true
+                    }
+                    .disabled(!model.canAct)
+                    Divider()
+                    Button("Reload", systemImage: "arrow.clockwise") {
+                        model.load()
+                    }
+                    .disabled(model.isLoading)
+                } label: {
+                    Label("More", systemImage: "ellipsis.circle")
+                }
+                .help("Update, upgrade, clean up, or reload")
+            }
         }
     }
 
@@ -68,7 +115,6 @@ struct HomebrewView: View {
             EmptyStateView(
                 title: "Homebrew is not installed",
                 message: "Install it from brew.sh, then reload.",
-                systemImage: "shippingbox",
                 actionTitle: "Open brew.sh",
                 action: { NSWorkspace.shared.open(URL(string: "https://brew.sh")!) })
         } else if model.isLoading && model.packages.isEmpty {
@@ -77,7 +123,6 @@ struct HomebrewView: View {
             EmptyStateView(
                 title: "The Homebrew list could not be read.",
                 message: "Run brew list in Terminal, then reload.",
-                systemImage: "shippingbox",
                 actionTitle: "Reload",
                 action: { model.load() }
             )
@@ -86,27 +131,39 @@ struct HomebrewView: View {
             EmptyStateView(
                 title: "No Homebrew packages",
                 message: "Install one with brew, then reload.",
-                systemImage: "shippingbox",
                 actionTitle: "Reload",
                 action: { model.load() })
         } else {
-            actionsRow
             list
-            if !model.marked.isEmpty {
-                CommandBar(
-                    metric: model.markedBytes.formatted(.byteCount(style: .file)),
-                    detail: "\(model.marked.count) selected",
-                    actionTitle: "Uninstall",
-                    actionSystemImage: "shippingbox",
-                    isDestructive: true,
-                    isWorking: model.isWorking,
-                    secondaryTitle: "Deselect",
-                    secondaryAction: { model.clearMarks() },
-                    help: "Review and uninstall the selected packages",
-                    accessibilityLabel: "Uninstall selected",
-                    action: { model.showUninstallConfirm = true })
-            }
         }
+    }
+
+    private var visiblePackages: [BrewPackage] {
+        let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return model.sortedPackages }
+        return model.sortedPackages.filter {
+            $0.name.localizedCaseInsensitiveContains(text)
+                || $0.title.localizedCaseInsensitiveContains(text)
+                || $0.desc.localizedCaseInsensitiveContains(text)
+        }
+    }
+
+    private var commandBar: some View {
+        CommandBar(
+            metric: model.markedBytes.formatted(.byteCount(style: .file)),
+            detail: model.marked.isEmpty
+                ? "No packages selected"
+                : "\(model.marked.count) \(model.marked.count == 1 ? "package selected" : "packages selected")",
+            actionTitle: "Uninstall",
+            actionSystemImage: "shippingbox",
+            isEnabled: !model.marked.isEmpty && model.canAct,
+            isWorking: model.isWorking,
+            secondaryTitle: model.marked.isEmpty ? nil : "Deselect",
+            secondaryAction: model.marked.isEmpty ? nil : { model.clearMarks() },
+            help: "Review and uninstall the selected packages",
+            accessibilityLabel: "Uninstall \(model.marked.count) selected packages",
+            disabledReason: model.marked.isEmpty ? "Select a package to uninstall." : nil,
+            action: { model.showUninstallConfirm = true })
     }
 
     private var upgradeTitle: String {
@@ -114,39 +171,8 @@ struct HomebrewView: View {
         return "Upgrade \(count) \(count == 1 ? "package" : "packages")"
     }
 
-    private var actionsRow: some View {
-        HStack {
-            Spacer()
-            SecondaryActionButton(
-                title: "Update catalog",
-                isEnabled: model.canAct,
-                help: "Refresh Homebrew's catalog with brew update.",
-                action: { model.update() })
-            SecondaryActionButton(
-                title: upgradeTitle,
-                isEnabled: model.canUpgrade,
-                help: model.canUpgrade
-                    ? "Upgrade the selected packages that have an update."
-                    : "Mark a package with an update first.",
-                action: { model.upgrade() })
-            SecondaryActionButton(
-                title: "Install packages…",
-                isEnabled: model.canAct,
-                help: "Search for a formula or cask to install.",
-                action: { model.openInstaller() })
-            QuietActionButton(
-                title: "Remove old versions",
-                isEnabled: model.canAct,
-                help: "Remove old versions and the download cache.",
-                action: { model.cleanup() })
-            if model.isWorking || model.isUpdating { ProgressView().controlSize(.mini) }
-        }
-        .padding(.horizontal, Metrics.widePageMargin)
-        .padding(.bottom, Spacing.s2)
-    }
-
     private var list: some View {
-        ColumnTable(items: model.sortedPackages) {
+        ColumnTable(items: visiblePackages) {
             header
         } row: { package in
             HomebrewRow(package: package)
@@ -154,37 +180,32 @@ struct HomebrewView: View {
     }
 
     private var header: some View {
-        HStack(spacing: HomebrewColumns.spacing) {
-            Color.clear.frame(width: HomebrewColumns.mark)
-            sortButton("Name", .name).frame(maxWidth: .infinity, alignment: .leading)
-            sortButton("Kind", .kind).frame(width: HomebrewColumns.kind, alignment: .leading)
-            sortButton("Version", .version)
-                .frame(width: HomebrewColumns.version, alignment: .leading)
-            sortButton("Size", .size).frame(width: HomebrewColumns.size, alignment: .trailing)
-            sortButton("Status", .status)
-                .frame(width: HomebrewColumns.status, alignment: .leading)
+        VStack(spacing: 0) {
+            HStack(spacing: HomebrewColumns.spacing) {
+                Color.clear.frame(width: HomebrewColumns.mark)
+                sortButton("Name", .name).frame(maxWidth: .infinity, alignment: .leading)
+                sortButton("Kind", .kind).frame(width: HomebrewColumns.kind, alignment: .leading)
+                sortButton("Version", .version)
+                    .frame(width: HomebrewColumns.version, alignment: .leading)
+                sortButton("Size", .size).frame(width: HomebrewColumns.size, alignment: .trailing)
+                sortButton("Status", .status)
+                    .frame(width: HomebrewColumns.status, alignment: .leading)
+            }
+            .pageHorizontalPadding()
+            .padding(.vertical, Spacing.s2)
+            Hairline()
         }
-        .padding(.horizontal, Metrics.widePageMargin)
-        .padding(.vertical, Spacing.s2)
     }
 
     private func sortButton(_ title: String, _ column: BrewSort) -> some View {
-        Button {
+        SortColumnButton(
+            title: title,
+            isActive: model.sort == column,
+            ascending: model.ascending,
+            identifier: "homebrew.sort.\(column.rawValue)"
+        ) {
             model.setSort(column)
-        } label: {
-            HStack(spacing: 2) {
-                Text(title).font(Typography.caption).fontWeight(.semibold)
-                Image(systemName: model.ascending ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 8, weight: .semibold))
-                    .opacity(model.sort == column ? 1 : 0)
-            }
-            .foregroundStyle(model.sort == column ? Theme.ink : Theme.inkSecondary)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .help("Sort by \(title)")
-        .accessibilityLabel(title)
-        .accessibilityIdentifier("homebrew.sort.\(column.rawValue)")
     }
 }
 
@@ -234,8 +255,10 @@ private struct HomebrewRow: View {
                 .frame(width: HomebrewColumns.size, alignment: .trailing)
             statusLabel.frame(width: HomebrewColumns.status, alignment: .leading)
         }
-        .padding(.horizontal, Metrics.widePageMargin)
-        .padding(.vertical, Spacing.s2)
+        .frame(minHeight: Metrics.rowHeight)
+        .pageHorizontalPadding()
+        .padding(.vertical, Spacing.s1)
+        .background(model.marked.contains(package.id) ? Theme.accentSoft : Theme.paper)
     }
 
     @ViewBuilder private var statusLabel: some View {

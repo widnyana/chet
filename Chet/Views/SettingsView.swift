@@ -26,22 +26,31 @@ struct SettingsView: View {
                     systemImage: "eye.slash",
                     tone: .amber)
             }
-            SettingsPaneSwitcher(selection: $pane)
-            Hairline()
-            Group {
-                switch pane {
-                case .whatToFind: scanPane
-                case .limits: sizesPane
-                case .folders: foldersPane
-                case .tweaks: tweaksPane
-                }
+            TabView(selection: $pane) {
+                scanPane
+                    .tabItem {
+                        Label(SettingsPane.whatToFind.title, systemImage: SettingsPane.whatToFind.systemImage)
+                    }
+                    .tag(SettingsPane.whatToFind)
+                sizesPane
+                    .tabItem {
+                        Label(SettingsPane.limits.title, systemImage: SettingsPane.limits.systemImage)
+                    }
+                    .tag(SettingsPane.limits)
+                foldersPane
+                    .tabItem {
+                        Label(SettingsPane.folders.title, systemImage: SettingsPane.folders.systemImage)
+                    }
+                    .tag(SettingsPane.folders)
+                tweaksPane
+                    .tabItem {
+                        Label(SettingsPane.tweaks.title, systemImage: SettingsPane.tweaks.systemImage)
+                    }
+                    .tag(SettingsPane.tweaks)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Theme.paper)
-        .tint(Theme.accent)
         .frame(width: 560, height: 560)
-        .background(SettingsWindowChrome())
         .confirmationDialog(
             "Reset every tweak?", isPresented: $confirmingReset, titleVisibility: .visible
         ) {

@@ -343,15 +343,35 @@ public struct AppUninstaller: Sendable {
 
     // MARK: - Discovery
 
+    /// The inventory plus the app folders that could not be read.
+    public struct AppInventory: Sendable {
+        public let apps: [InstalledApp]
+        public let unreadableFolders: [URL]
+
+        public init(apps: [InstalledApp], unreadableFolders: [URL]) {
+            self.apps = apps
+            self.unreadableFolders = unreadableFolders
+        }
+    }
+
     /// App bundles in the configured folders, including one level of subfolders such as
     /// `/Applications/Utilities`. Symlinks are skipped; duplicate bundle IDs keep the first
     /// folder in priority order (`/Applications` before `~/Applications`).
     public func installedApps() -> [InstalledApp] {
+        inventory().apps
+    }
+
+    public func inventory() -> AppInventory {
         var seenIDs = Set<String>()
         var seenPaths = Set<URL>()
         var apps: [InstalledApp] = []
+        var unreadableFolders: [URL] = []
         for folder in appFolders {
-            for url in Self.appBundles(in: folder) {
+            let scan = Self.appBundles(in: folder)
+            if !scan.readable {
+                unreadableFolders.append(folder)
+            }
+            for url in scan.urls {
                 guard seenPaths.insert(URL(fileURLWithPath: Self.canonicalPath(url))).inserted else { continue }
                 guard let app = Self.readApp(url) else { continue }
                 let key = app.bundleID ?? app.url.path
@@ -359,26 +379,38 @@ public struct AppUninstaller: Sendable {
                 apps.append(app)
             }
         }
-        return apps.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        return AppInventory(
+            apps: apps.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending },
+            unreadableFolders: unreadableFolders)
     }
 
-    static func appBundles(in folder: URL, depth: Int = 0) -> [URL] {
-        guard depth <= 1 else { return [] }
-        let children =
-            (try? FileManager.default.contentsOfDirectory(
+    static func appBundles(in folder: URL, depth: Int = 0) -> (urls: [URL], readable: Bool) {
+        guard depth <= 1 else { return ([], true) }
+        let children: [URL]
+        do {
+            children = try FileManager.default.contentsOfDirectory(
                 at: folder, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
-                options: [.skipsHiddenFiles])) ?? []
+                options: [.skipsHiddenFiles])
+        } catch {
+            return ([], false)
+        }
         var bundles: [URL] = []
+        var readable = true
         for child in children {
             let values = try? child.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
             guard values?.isSymbolicLink != true else { continue }
             if child.pathExtension == "app" {
                 bundles.append(child.standardizedFileURL)
             } else if values?.isDirectory == true {
-                bundles += appBundles(in: child, depth: depth + 1)
+                let nested = appBundles(in: child, depth: depth + 1)
+                bundles += nested.urls
+                readable = readable && nested.readable
             }
         }
-        return bundles.sorted { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+        return (
+            bundles.sorted { $0.path.localizedStandardCompare($1.path) == .orderedAscending },
+            readable
+        )
     }
 
     static func readApp(_ url: URL) -> InstalledApp? {

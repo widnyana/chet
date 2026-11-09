@@ -14,9 +14,13 @@ struct ListHeaderBar: View {
                     model.setSelected(items.map(\.url), selected.count != items.count)
                 } label: {
                     Image(systemName: Self.triState(selected: selected.count, total: items.count))
-                        .foregroundStyle(Theme.inkSecondary)
+                        .foregroundStyle(selected.count > 0 ? Theme.accent : Theme.inkSecondary)
                 }
                 .buttonStyle(.plain)
+                .frame(width: 40, height: 40)
+                .contentShape(Rectangle())
+                .focusable()
+                .focusRing()
                 .help(selected.count == items.count ? "Deselect all" : "Select all")
                 .accessibilityLabel(selected.count == items.count ? "Deselect all" : "Select all")
                 .accessibilityIdentifier("list.selectAll")
@@ -55,6 +59,7 @@ struct ListHeaderBar: View {
                 .menuStyle(.borderlessButton)
                 .fixedSize()
             }
+            .frame(minHeight: Metrics.rowHeight)
             .padding(.horizontal, Spacing.s6)
             .padding(.vertical, Spacing.s2)
             Hairline()

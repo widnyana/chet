@@ -13,6 +13,7 @@ struct OnboardingView: View {
                 Image(systemName: "lock.shield")
                     .font(.system(size: 28, weight: .regular))
                     .foregroundStyle(Theme.inkSecondary)
+                    .accessibilityHidden(true)
                 Text("Chet needs Full Disk Access")
                     .accessibilityIdentifier("gate.title")
                     .font(Typography.title)

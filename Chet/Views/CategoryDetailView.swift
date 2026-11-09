@@ -7,16 +7,32 @@ struct CategoryDetailView: View {
     @Environment(ScanModel.self) private var model
     let category: CategoryState
     let onClean: () -> Void
+    let onBack: () -> Void
     @State private var preview: URL?
-    @State private var sortOrder: [KeyPathComparator<ScanItem>] = [
-        KeyPathComparator(\.reclaimableBytes, order: .reverse)
-    ]
+    @State private var sort: CategorySort = .size
+    @State private var ascending = false
 
     private var urls: [URL] { category.items.map(\.url) }
     private var categorySelected: [ScanItem] { category.items.filter { model.selected.contains($0.url) } }
     private var isInformational: Bool { category.items.first?.risk == .informational }
     private var section: CategorySection {
         CategoryCopy.section(category.id, risk: category.items.first?.risk)
+    }
+
+    private var sortedItems: [ScanItem] {
+        let ordered: [ScanItem]
+        switch sort {
+        case .name:
+            ordered = category.items.sorted {
+                $0.url.lastPathComponent.localizedStandardCompare($1.url.lastPathComponent)
+                    == .orderedAscending
+            }
+        case .size:
+            ordered = category.items.sorted { $0.reclaimableBytes < $1.reclaimableBytes }
+        case .modified:
+            ordered = category.items.sorted { $0.stamp.modified < $1.stamp.modified }
+        }
+        return ascending ? ordered : ordered.reversed()
     }
 
     var body: some View {
@@ -27,18 +43,29 @@ struct CategoryDetailView: View {
                 metric: category.bytes.formatted(.byteCount(style: .file)),
                 metricLabel: "can be freed"
             )
-            .padding(.horizontal, Metrics.widePageMargin)
+            .pageHorizontalPadding()
             .padding(.top, Spacing.s6)
             .padding(.bottom, Spacing.s3)
             if category.items.isEmpty {
                 EmptyStateView(
                     title: "No entries in this category",
                     message: "Scan again to look for new items.",
-                    systemImage: "folder"
+                    actionTitle: "Back to Home",
+                    action: onBack
                 )
-                .padding(.horizontal, Metrics.widePageMargin)
+                .pageHorizontalPadding()
                 Spacer()
             } else {
+                if category.needsFullDiskAccess {
+                    StatusLabel(
+                        text: "Some folders need Full Disk Access",
+                        systemImage: "lock.fill",
+                        tone: .amber,
+                        help: "Chet could not read some folders in this category."
+                    )
+                    .pageHorizontalPadding()
+                    .padding(.bottom, Spacing.s2)
+                }
                 ListHeaderBar(items: category.items)
                 if let groups = model.groups[category.id] {
                     GroupedItemsView(groups: groups)
@@ -88,77 +115,124 @@ struct CategoryDetailView: View {
     }
 
     private var table: some View {
-        Table(category.items.sorted(using: sortOrder), sortOrder: $sortOrder) {
-            TableColumn("Remove") { item in
-                if item.risk != .informational {
-                    Toggle("Remove", isOn: model.isSelected(item.url))
-                        .toggleStyle(.checkbox)
-                        .labelsHidden()
-                        .disabled(!model.canSelect(item))
-                        .help(
-                            model.canSelect(item)
-                                ? "Remove" : "Turn on Administrator cleanup in Settings to remove this"
-                        )
-                        .accessibilityLabel("Remove \(item.url.lastPathComponent)")
-                }
-            }
-            .width(60)
-            TableColumn("Name", value: \.url.lastPathComponent) { item in
-                ItemNameCell(item: item)
-            }
-            TableColumn("Modified", value: \.stamp.modified) { item in
-                Text(item.stamp.modified, format: .relative(presentation: .named))
-                    .font(Typography.row)
-                    .foregroundStyle(Theme.inkSecondary)
-                    .help(item.stamp.modified.formatted(date: .long, time: .shortened))
-            }
-            .width(min: 110, ideal: 140, max: 180)
-            TableColumn("Size", value: \.reclaimableBytes) { item in
-                Text(item.reclaimableBytes.formatted(.byteCount(style: .file)))
-                    .font(Typography.row)
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.ink)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-            }
-            .width(90)
-            TableColumn("Risk") { item in
-                Group {
-                    if item.risk == .informational {
-                        StatusLabel(
-                            text: "Protected",
-                            systemImage: "shield.lefthalf.filled",
-                            tone: .red)
-                    } else if item.risk == .review {
-                        StatusLabel(
-                            text: "Review",
-                            systemImage: "exclamationmark.circle",
-                            tone: .amber)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .trailing)
-            }
-            TableColumn("") { item in
-                Menu {
-                    Button("Show in Finder") {
-                        NSWorkspace.shared.activateFileViewerSelecting([item.url])
-                    }
-                    Button("Quick Look") { preview = item.url }
-                    Button("Copy Path") {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(item.url.path, forType: .string)
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .help("More actions")
-                .accessibilityLabel("More actions for \(item.url.lastPathComponent)")
-            }
-            .width(28)
+        ColumnTable(items: sortedItems) {
+            header
+        } row: { item in
+            row(item)
         }
-        .tableStyle(.inset(alternatesRowBackgrounds: false))
         .quickLookPreview($preview)
-        .background(Theme.paper)
     }
+
+    private var header: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: Spacing.s3) {
+                Color.clear.frame(width: CategoryColumns.mark)
+                sortButton("Name", .name)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                sortButton("Size", .size)
+                    .frame(width: CategoryColumns.size, alignment: .trailing)
+                sortButton("Modified", .modified)
+                    .frame(width: CategoryColumns.modified, alignment: .trailing)
+                Text("Risk")
+                    .frame(width: CategoryColumns.risk, alignment: .trailing)
+            }
+            .font(Typography.caption)
+            .pageHorizontalPadding()
+            .padding(.vertical, Spacing.s2)
+            Hairline()
+        }
+    }
+
+    private func sortButton(_ title: String, _ column: CategorySort) -> some View {
+        SortColumnButton(
+            title: title,
+            isActive: sort == column,
+            ascending: ascending
+        ) {
+            if sort == column {
+                ascending.toggle()
+            } else {
+                sort = column
+                ascending = column == .name
+            }
+        }
+    }
+
+    private func row(_ item: ScanItem) -> some View {
+        let canSelect = model.canSelect(item) && item.risk != .informational
+        let selected = canSelect && model.selected.contains(item.url)
+        return HStack(spacing: Spacing.s3) {
+            if item.risk == .informational {
+                Color.clear.frame(width: CategoryColumns.mark)
+            } else {
+                Toggle("Remove", isOn: model.isSelected(item.url))
+                    .toggleStyle(.checkbox)
+                    .labelsHidden()
+                    .disabled(!model.canSelect(item))
+                    .help(
+                        model.canSelect(item)
+                            ? "Remove" : "Turn on Administrator cleanup in Settings to remove this"
+                    )
+                    .accessibilityLabel("Remove \(item.url.lastPathComponent)")
+                    .frame(width: CategoryColumns.mark)
+            }
+            ItemNameCell(item: item)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(item.reclaimableBytes.formatted(.byteCount(style: .file)))
+                .font(Typography.row)
+                .monospacedDigit()
+                .foregroundStyle(Theme.ink)
+                .lineLimit(1)
+                .frame(width: CategoryColumns.size, alignment: .trailing)
+            Text(item.stamp.modified, format: .relative(presentation: .named))
+                .font(Typography.row)
+                .foregroundStyle(Theme.inkSecondary)
+                .lineLimit(1)
+                .help(item.stamp.modified.formatted(date: .long, time: .shortened))
+                .frame(width: CategoryColumns.modified, alignment: .trailing)
+            riskLabel(item)
+                .frame(width: CategoryColumns.risk, alignment: .trailing)
+        }
+        .frame(minHeight: Metrics.rowHeight)
+        .pageHorizontalPadding()
+        .background(selected ? Theme.accentSoft : Color.clear)
+        .contentShape(Rectangle())
+        .contextMenu {
+            Button("Show in Finder") {
+                NSWorkspace.shared.activateFileViewerSelecting([item.url])
+            }
+            Button("Quick Look") { preview = item.url }
+            Button("Copy Path") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(item.url.path, forType: .string)
+            }
+        }
+    }
+
+    @ViewBuilder private func riskLabel(_ item: ScanItem) -> some View {
+        if item.risk == .informational {
+            StatusLabel(
+                text: "Protected",
+                systemImage: "shield.lefthalf.filled",
+                tone: .red)
+        } else if item.risk == .review {
+            StatusLabel(
+                text: "Review",
+                systemImage: "exclamationmark.circle",
+                tone: .amber)
+        } else {
+            Color.clear.frame(height: 1)
+        }
+    }
+}
+
+private enum CategorySort {
+    case name, size, modified
+}
+
+private enum CategoryColumns {
+    static let mark: CGFloat = 20
+    static let size: CGFloat = 90
+    static let modified: CGFloat = 140
+    static let risk: CGFloat = 110
 }

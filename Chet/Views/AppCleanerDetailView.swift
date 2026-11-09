@@ -18,7 +18,7 @@ struct AppCleanerDetailView: View {
                 metricLabel: "app size",
                 icon: IconCache.icon(for: app.url)
             )
-            .padding(.horizontal, Metrics.widePageMargin)
+            .pageHorizontalPadding()
             .padding(.top, Spacing.s6)
             .padding(.bottom, Spacing.s2)
             details
@@ -32,15 +32,14 @@ struct AppCleanerDetailView: View {
             appBundleRow(selected: $model.appSelected)
             if model.isLoadingDetail {
                 LoadingStateView(message: "Looking for related files")
-                    .padding(.horizontal, Metrics.widePageMargin)
+                    .pageHorizontalPadding()
                 Spacer()
             } else if model.components.isEmpty {
                 EmptyStateView(
                     title: "No related files",
-                    message: "The app bundle can still be removed.",
-                    systemImage: "folder.badge.questionmark"
+                    message: "The app bundle can still be removed."
                 )
-                .padding(.horizontal, Metrics.widePageMargin)
+                .pageHorizontalPadding()
             } else {
                 relatedFiles
             }
@@ -73,7 +72,7 @@ struct AppCleanerDetailView: View {
             }
             .padding(.top, Spacing.s1)
         }
-        .padding(.horizontal, Metrics.widePageMargin)
+        .pageHorizontalPadding()
         .padding(.bottom, Spacing.s2)
     }
 
@@ -83,7 +82,7 @@ struct AppCleanerDetailView: View {
                 StatusLabel(text: text, systemImage: icon, tone: tone)
                 Spacer()
             }
-            .padding(.horizontal, Metrics.widePageMargin)
+            .pageHorizontalPadding()
             .padding(.vertical, Spacing.s2)
             Hairline()
         }
@@ -117,7 +116,7 @@ struct AppCleanerDetailView: View {
                     .monospacedDigit()
                     .foregroundStyle(Theme.inkSecondary)
             }
-            .padding(.horizontal, Metrics.widePageMargin)
+            .pageHorizontalPadding()
             .padding(.vertical, Spacing.s2)
             Hairline()
         }
@@ -144,7 +143,7 @@ struct AppCleanerDetailView: View {
                 .menuStyle(.borderlessButton)
                 .fixedSize()
             }
-            .padding(.horizontal, Metrics.widePageMargin)
+            .pageHorizontalPadding()
             .padding(.vertical, Spacing.s2)
             Hairline()
             List {

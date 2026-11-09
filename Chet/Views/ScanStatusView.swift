@@ -12,42 +12,25 @@ struct ScanStatusView: View {
             Button {
                 model.cancel()
             } label: {
-                ZStack {
-                    Circle()
-                        .stroke(Theme.hairline, lineWidth: 2.5)
-                    Circle()
-                        .trim(from: 0, to: progressFraction)
-                        .stroke(Theme.accent, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                    Image(systemName: "stop.fill")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(Theme.ink)
-                }
-                .frame(width: 24, height: 24)
-                .contentShape(Circle())
+                Label("Stop scan", systemImage: "stop.circle")
             }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
+            .labelStyle(.iconOnly)
             .help("Stop the scan")
             .accessibilityLabel("Stop the scan")
             .accessibilityIdentifier("toolbar.scanStop")
         } else {
-            PrimaryActionButton(
-                title: model.lastScan == nil ? "Scan" : "Scan again",
-                systemImage: "magnifyingglass",
-                help: "Scan for caches, logs, and large files (Command-R)",
-                accessibilityLabel: "Scan for caches, logs, and large files",
-                action: { model.scan() }
-            )
+            Button {
+                model.scan()
+            } label: {
+                Label(
+                    model.lastScan == nil ? "Scan" : "Scan again",
+                    systemImage: "magnifyingglass")
+            }
+            .labelStyle(.iconOnly)
+            .help("Scan for caches, logs, and large files (Command-R)")
+            .accessibilityLabel("Scan for caches, logs, and large files")
             .accessibilityIdentifier("toolbar.scan")
         }
-    }
-
-    /// Coarse scan-stage fraction: completed steps over the scan steps.
-    private var progressFraction: Double {
-        let total = max(model.steps.count, 1)
-        return Double(model.steps.filter(\.done).count) / Double(total)
     }
 
     /// Which scan step produces a category; nil for pages that are not categories.

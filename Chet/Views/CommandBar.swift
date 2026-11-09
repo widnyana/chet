@@ -15,6 +15,10 @@ struct CommandBar: View {
     var help: String?
     /// Names the action and its count for VoiceOver; nil falls back to the visible title.
     var accessibilityLabel: String?
+    /// Why the primary is disabled. Shown only while it is disabled.
+    var disabledReason: String?
+    var primaryIdentifier: String?
+    var secondaryIdentifier: String?
     let action: () -> Void
 
     var body: some View {
@@ -33,18 +37,24 @@ struct CommandBar: View {
                         .lineLimit(1)
                 }
                 Spacer(minLength: Spacing.s3)
+                if !isEnabled || isWorking, let disabledReason {
+                    Text(disabledReason)
+                        .font(Typography.caption)
+                        .foregroundStyle(Theme.inkSecondary)
+                        .lineLimit(1)
+                }
                 if isWorking {
                     ProgressView()
                         .controlSize(.small)
                 }
                 if let secondaryTitle, let secondaryAction {
                     SecondaryActionButton(title: secondaryTitle, action: secondaryAction)
+                        .modifier(OptionalAccessibilityIdentifier(identifier: secondaryIdentifier))
                 }
-                if !isWorking {
-                    primaryButton
-                }
+                primaryButton
+                    .modifier(OptionalAccessibilityIdentifier(identifier: primaryIdentifier))
             }
-            .padding(.horizontal, Spacing.s6)
+            .pageHorizontalPadding()
             .padding(.vertical, Spacing.s3)
             .frame(minHeight: Metrics.commandBarMinHeight)
         }
@@ -56,7 +66,7 @@ struct CommandBar: View {
             DestructiveActionButton(
                 title: actionTitle,
                 systemImage: actionSystemImage ?? "trash",
-                isEnabled: isEnabled,
+                isEnabled: isEnabled && !isWorking,
                 help: help,
                 accessibilityLabel: accessibilityLabel,
                 shortcut: .delete,
@@ -66,7 +76,7 @@ struct CommandBar: View {
             PrimaryActionButton(
                 title: actionTitle,
                 systemImage: actionSystemImage,
-                isEnabled: isEnabled,
+                isEnabled: isEnabled && !isWorking,
                 help: help,
                 accessibilityLabel: accessibilityLabel,
                 action: action)

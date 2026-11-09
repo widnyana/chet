@@ -23,7 +23,7 @@ struct TweaksView: View {
                 notice
                 content
             }
-            .padding(.horizontal, Metrics.widePageMargin)
+            .pageHorizontalPadding()
             .padding(.vertical, Spacing.s8)
             .frame(maxWidth: Metrics.contentMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .center)
@@ -137,7 +137,6 @@ struct TweaksView: View {
         EmptyStateView(
             title: model.filter == .changed && model.query.isEmpty ? "No changed tweaks" : "No tweaks match",
             message: emptyMessage,
-            systemImage: "slider.horizontal.3",
             actionTitle: "Show all tweaks",
             action: {
                 model.query = ""
@@ -214,6 +213,12 @@ private struct TweakRow: View {
         if model.busy.contains(reading.id) {
             ProgressView()
                 .controlSize(.small)
+        } else if !reading.isSupported {
+            Text(TweakCopy.state(reading.state))
+                .font(Typography.caption)
+                .foregroundStyle(Theme.inkSecondary)
+                .lineLimit(1)
+                .accessibilityIdentifier("tweak.control.\(reading.id)")
         } else {
             switch reading.tweak.control {
             case .toggle:

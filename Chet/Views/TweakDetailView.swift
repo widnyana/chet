@@ -12,6 +12,7 @@ struct TweakDetailView: View {
     @State private var revertRecord: TweakRecord?
 
     private var reading: TweakReading? { model.reading(for: tweak.id) }
+    private var isSupported: Bool { reading?.isSupported == true }
 
     private var isInspection: Bool {
         if case .probe = tweak.target { return true }
@@ -36,9 +37,15 @@ struct TweakDetailView: View {
                     text: "Preview only. No tweak is changed.", systemImage: "eye.slash",
                     tone: .amber)
             }
+            if !isSupported, let reading {
+                StatusLabel(
+                    text: TweakCopy.state(reading.state),
+                    systemImage: "questionmark.circle",
+                    tone: .neutral)
+            }
             facts
             actions
-                .disabled(model.isGated)
+                .disabled(model.isGated || !isSupported)
         }
         .padding(Spacing.s6)
         .frame(width: 540, alignment: .leading)
@@ -166,7 +173,7 @@ struct TweakDetailView: View {
     }
 
     @ViewBuilder private var primaryAction: some View {
-        if case .toggle = tweak.control {
+        if isSupported, case .toggle = tweak.control {
             if reading?.state == .on {
                 PrimaryActionButton(title: "Turn Off") { model.toggle(tweak) }
             } else {

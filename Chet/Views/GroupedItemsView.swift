@@ -198,7 +198,7 @@ struct MediaCard: View {
             Thumbnail(url: url, side: 150)
                 .frame(maxWidth: .infinity)
                 .frame(height: 150)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .clipShape(.rect(corners: .fixed(8)))
             HStack(spacing: Spacing.s2) {
                 if let isOn {
                     Toggle("Remove", isOn: isOn)

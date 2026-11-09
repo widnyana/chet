@@ -12,34 +12,39 @@ struct ContentView: View {
     @State private var systemStatus = SystemStatusModel()
 
     var body: some View {
-        Group {
-            if model.access == .denied && !model.accessSkipped {
-                OnboardingView()
-            } else {
-                NavigationSplitView {
-                    SidebarView(selection: $selection)
-                        .safeAreaInset(edge: .bottom, spacing: 0) {
+        GeometryReader { proxy in
+            Group {
+                if model.access == .denied && !model.accessSkipped {
+                    OnboardingView()
+                } else {
+                    NavigationSplitView {
+                        VStack(spacing: 0) {
+                            SidebarView(selection: $selection)
                             SidebarFooter()
                         }
-                } detail: {
-                    detail
-                        .safeAreaInset(edge: .top, spacing: 0) {
-                            // Tweaks carries its own preview gate; the cleaning strip would
-                            // repeat it with the wrong verb.
-                            if selection != "tweaks" {
-                                TopStatusStrip()
+                    } detail: {
+                        detail
+                            .safeAreaInset(edge: .top, spacing: 0) {
+                                // Tweaks, Apps, and Homebrew carry their own surface; the
+                                // cleaning strip would repeat a verb that does not apply.
+                                if !["tweaks", "applications", "homebrew"].contains(selection ?? "") {
+                                    TopStatusStrip()
+                                }
                             }
-                        }
-                        .background(Theme.paper)
-                        .toolbar {
-                            if selection != "applications" && selection != "tweaks"
-                                && selection != "homebrew"
-                            {
-                                scanButton
+                            .background(Theme.paper)
+                            .toolbar {
+                                if !["overview", "applications", "tweaks", "homebrew"]
+                                    .contains(selection ?? "")
+                                {
+                                    scanButton
+                                }
                             }
-                        }
+                    }
                 }
             }
+            .environment(
+                \.pageMargin,
+                proxy.size.width >= 1100 ? Metrics.widePageMargin : Metrics.pageMargin)
         }
         .environment(appCleaner)
         .environment(homebrew)
@@ -75,7 +80,7 @@ struct ContentView: View {
         } else if selection == "homebrew" {
             HomebrewView()
         } else if let id = selection, let category = model.categories.first(where: { $0.id == id }) {
-            CategoryDetailView(category: category, onClean: { confirming = true })
+            CategoryDetailView(category: category, onClean: { confirming = true }, onBack: { selection = "overview" })
         } else {
             OverviewView(
                 selection: $selection,

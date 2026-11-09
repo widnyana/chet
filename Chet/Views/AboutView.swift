@@ -30,7 +30,7 @@ struct AboutView: View {
                     LoadingStateView(message: "Reading this build")
                 }
             }
-            .padding(.horizontal, Metrics.widePageMargin)
+            .pageHorizontalPadding()
             .padding(.vertical, Spacing.s6)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -136,6 +136,7 @@ private struct AboutInfoRow: View {
                     if let systemImage {
                         Image(systemName: systemImage)
                             .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(tone.color)
                     }
                     Text(value)
                         .font(Typography.row)
@@ -143,8 +144,8 @@ private struct AboutInfoRow: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .textSelection(.enabled)
+                        .foregroundStyle(tone == .neutral ? Theme.ink : tone.color)
                 }
-                .foregroundStyle(tone.color)
                 if let detail {
                     Text(detail)
                         .font(Typography.caption)

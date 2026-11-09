@@ -33,79 +33,6 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - Pane switcher
-
-/// The pane switcher: one segment per pane, every segment the same width, icon over word.
-/// A system `TabView` sizes its items to their own text, so the three headings came out at
-/// three widths. This component gives each pane an equal share and keeps the selected state
-/// in one place.
-struct SettingsPaneSwitcher: View {
-    @Binding var selection: SettingsPane
-
-    var body: some View {
-        HStack(spacing: Spacing.s1) {
-            ForEach(SettingsPane.allCases) { pane in
-                SettingsPaneSegment(
-                    pane: pane,
-                    isSelected: pane == selection,
-                    action: { selection = pane })
-            }
-        }
-        .padding(.horizontal, Metrics.pageMargin)
-        .padding(.vertical, Spacing.s2)
-        .background(Theme.paper)
-    }
-}
-
-private struct SettingsPaneSegment: View {
-    let pane: SettingsPane
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: Spacing.s1) {
-                Image(systemName: pane.systemImage)
-                    .font(Typography.row)
-                Text(pane.title)
-                    .font(Typography.caption)
-            }
-            .foregroundStyle(isSelected ? Theme.accent : Theme.inkSecondary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, Spacing.s2)
-            .contentShape(Rectangle())
-            .background(
-                RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous)
-                    .fill(isSelected ? Theme.accentSoft : Color.clear))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(pane.title)
-        .accessibilityIdentifier("settings.pane.\(pane.rawValue)")
-        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-    }
-}
-
-// MARK: - Window chrome
-
-/// SwiftUI's `Settings` scene puts the pane buttons in the window toolbar and repeats the
-/// active pane name in the title bar. The toolbar already names the pane, so the title text
-/// is hidden; the window keeps its title for accessibility and the Window menu.
-struct SettingsWindowChrome: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        DispatchQueue.main.async {
-            view.window?.titleVisibility = .hidden
-        }
-        return view
-    }
-
-    func updateNSView(_ view: NSView, context: Context) {
-        DispatchQueue.main.async {
-            view.window?.titleVisibility = .hidden
-        }
-    }
-}
-
 // MARK: - Pane container
 
 /// The scroll container every pane shares: the one-line note about when changes apply, then
@@ -124,7 +51,8 @@ struct SettingsPaneView<Content: View>: View {
                 content
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(Spacing.s4)
+            .padding(.horizontal, Metrics.pageMargin)
+            .padding(.vertical, Spacing.s4)
         }
     }
 }
@@ -153,9 +81,9 @@ struct SettingsPanel<Content: View>: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.bottom, Spacing.s2)
-        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Theme.paperRaised))
+        .background(Theme.paperRaised, in: .rect(corners: .fixed(Metrics.panelRadius)))
         .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: Metrics.panelRadius, style: .continuous)
                 .strokeBorder(Theme.hairline))
     }
 }
@@ -197,6 +125,7 @@ struct SettingsRow<Control: View>: View {
                 .gridColumnAlignment(.trailing)
                 .padding(.vertical, SettingsGrid.rowPadding)
         }
+        .frame(minHeight: SettingsGrid.row, alignment: .leading)
     }
 }
 
@@ -212,6 +141,7 @@ struct SettingsActionRow<Content: View>: View {
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .padding(.vertical, SettingsGrid.rowPadding)
         }
+        .frame(minHeight: SettingsGrid.row, alignment: .leading)
     }
 }
 

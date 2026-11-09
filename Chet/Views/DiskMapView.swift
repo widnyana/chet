@@ -32,6 +32,7 @@ struct DiskMapView: View {
                 isDark: isDark,
                 sizeBasis: model.treeSizeBasis,
                 onSelect: { index in
+                    guard index < stack.count else { return }
                     stack.removeSubrange((index + 1)...)
                 })
             if !model.readErrors.isEmpty {
@@ -73,8 +74,8 @@ struct DiskMapView: View {
                             }
                             .foregroundStyle(
                                 label.darkText
-                                    ? Color(red: 0.07, green: 0.08, blue: 0.09)
-                                    : Color.white
+                                    ? Theme.mapLabelDark
+                                    : Theme.mapLabelLight
                             )
                             .frame(maxWidth: label.rect.width - 12, alignment: .leading)
                             .offset(x: label.rect.minX + 8, y: label.rect.minY + 8)
@@ -86,7 +87,7 @@ struct DiskMapView: View {
                     "Storage map for \(current.url.lastPathComponent), \(current.size.formatted(.byteCount(style: .file)))"
                 )
                 .accessibilityHint("Click a folder block to open it.")
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .clipShape(.rect(corners: .fixed(Metrics.panelRadius)))
                 .padding(.horizontal, Spacing.s6)
                 .padding(.bottom, Spacing.s3)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -104,9 +105,9 @@ struct DiskMapView: View {
                         }
                         .padding(.horizontal, Spacing.s3)
                         .padding(.vertical, Spacing.s1)
-                        .background(Theme.paperRaised, in: RoundedRectangle(cornerRadius: 6))
+                        .background(Theme.paperRaised, in: .rect(corners: .fixed(Metrics.innerRadius)))
                         .overlay {
-                            RoundedRectangle(cornerRadius: 6)
+                            RoundedRectangle(cornerRadius: Metrics.innerRadius, style: .continuous)
                                 .strokeBorder(Theme.hairline, lineWidth: 1)
                         }
                         .padding(Spacing.s6)
@@ -117,7 +118,6 @@ struct DiskMapView: View {
                 EmptyStateView(
                     title: "The disk map appears after a scan.",
                     message: "Scan this Mac to see where the space goes.",
-                    systemImage: "internaldrive",
                     actionTitle: "Scan this Mac",
                     action: { model.scan() }
                 )
@@ -197,7 +197,7 @@ struct DiskMapView: View {
             metricLabel: current == nil ? nil : "in this folder"
         )
         .accessibilityIdentifier("storage.header")
-        .padding(.horizontal, Metrics.widePageMargin)
+        .pageHorizontalPadding()
         .padding(.top, Spacing.s6)
         .padding(.bottom, Spacing.s3)
     }
@@ -357,13 +357,22 @@ struct DiskMapChrome: View {
                                 .font(Typography.caption)
                                 .foregroundStyle(Theme.inkTertiary)
                         }
-                        Button(index == 0 ? "Home" : node.url.lastPathComponent) {
-                            onSelect(index)
+                        if index == pathNodes.count - 1 {
+                            Text(index == 0 ? "Home" : node.url.lastPathComponent)
+                                .font(Typography.caption)
+                                .foregroundStyle(Theme.ink)
+                                .lineLimit(1)
+                        } else {
+                            Button(index == 0 ? "Home" : node.url.lastPathComponent) {
+                                onSelect(index)
+                            }
+                            .buttonStyle(.plain)
+                            .font(Typography.caption)
+                            .foregroundStyle(Theme.inkSecondary)
+                            .lineLimit(1)
+                            .focusable()
+                            .focusRing()
                         }
-                        .buttonStyle(.plain)
-                        .font(Typography.caption)
-                        .foregroundStyle(index == pathNodes.count - 1 ? Theme.ink : Theme.inkSecondary)
-                        .lineLimit(1)
                     }
                 }
                 Spacer()
@@ -379,7 +388,7 @@ struct DiskMapChrome: View {
     private var legend: some View {
         HStack(spacing: Spacing.s2) {
             ForEach(0..<4, id: \.self) { step in
-                RoundedRectangle(cornerRadius: 0)
+                Rectangle()
                     .fill(swatch(step))
                     .frame(width: 10, height: 10)
             }

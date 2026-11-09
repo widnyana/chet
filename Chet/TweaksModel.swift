@@ -139,6 +139,7 @@ final class TweaksModel {
 
     func set(_ tweak: Tweak, to value: TweakValue?) {
         guard !isGated else { return refuse() }
+        guard reading(for: tweak.id)?.isSupported == true else { return }
         guard !busy.contains(tweak.id) else { return }
         busy.insert(tweak.id)
         let store = historyStore

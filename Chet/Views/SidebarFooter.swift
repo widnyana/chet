@@ -14,18 +14,11 @@ struct SidebarFooter: View {
                 capacityBlock(capacity)
             }
             VStack(alignment: .leading, spacing: Spacing.s1) {
-                if DryRun.enabled {
-                    StatusLabel(
-                        text: "Preview only. Nothing will be removed.",
-                        systemImage: "exclamationmark.triangle",
-                        tone: .amber)
-                }
                 trashRow
             }
         }
         .padding(.horizontal, Spacing.s3)
         .padding(.vertical, Spacing.s2)
-        .background(Theme.paper)
         .onAppear { status.refresh() }
         .confirmationDialog(
             "Empty the Trash?", isPresented: $confirmingEmpty, titleVisibility: .visible
@@ -40,42 +33,22 @@ struct SidebarFooter: View {
     }
 
     private func capacityBlock(_ capacity: VolumeCapacity) -> some View {
-        let used = max(0, capacity.total - capacity.free)
-        return VStack(alignment: .leading, spacing: Spacing.s1) {
-            HStack(spacing: Spacing.s2) {
-                Text(capacity.name)
-                    .font(Typography.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Theme.ink)
-                    .lineLimit(1)
-                Spacer(minLength: Spacing.s2)
-                Text("\(capacity.free.formatted(.byteCount(style: .file))) free")
-                    .font(Typography.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.inkSecondary)
-            }
-            GeometryReader { geometry in
-                HStack(spacing: 0) {
-                    Rectangle()
-                        .fill(Theme.capacityUsed)
-                        .frame(width: share(used, capacity.total) * geometry.size.width)
-                    Rectangle()
-                        .fill(Theme.capacityFree)
-                }
-            }
-            .frame(height: 6)
-            .clipShape(RoundedRectangle(cornerRadius: 3))
+        VStack(alignment: .leading, spacing: Spacing.s1) {
+            CapacityBarView(
+                volumeName: capacity.name,
+                total: capacity.total,
+                free: capacity.free,
+                reclaimable: 0,
+                showsHeader: false,
+                showsLegend: false,
+                height: 10)
             if capacity.purgeable > 0 {
                 Text("\(capacity.purgeable.formatted(.byteCount(style: .file))) purgeable")
                     .font(Typography.caption)
-                    .foregroundStyle(Theme.inkTertiary)
+                    .foregroundStyle(Theme.inkSecondary)
                     .help("Space macOS frees automatically when it needs room.")
             }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            "\(capacity.name), \(capacity.free.formatted(.byteCount(style: .file))) free of \(capacity.total.formatted(.byteCount(style: .file)))"
-        )
     }
 
     private var trashRow: some View {
@@ -84,12 +57,15 @@ struct SidebarFooter: View {
                 .font(Typography.caption)
                 .foregroundStyle(Theme.inkSecondary)
                 .frame(width: 16)
+                .accessibilityHidden(true)
             Text("Trash")
                 .font(Typography.caption)
                 .foregroundStyle(Theme.ink)
             Spacer(minLength: Spacing.s2)
             if status.isEmptyingTrash {
-                ProgressView().controlSize(.mini)
+                Text("Emptying...")
+                    .font(Typography.caption)
+                    .foregroundStyle(Theme.inkSecondary)
             } else {
                 Text(status.trashBytes.formatted(.byteCount(style: .file)))
                     .font(Typography.caption)
@@ -102,10 +78,5 @@ struct SidebarFooter: View {
                     action: { confirmingEmpty = true })
             }
         }
-    }
-
-    private func share(_ part: Int64, _ total: Int64) -> CGFloat {
-        guard total > 0 else { return 0 }
-        return CGFloat(min(1, max(0, Double(part) / Double(total))))
     }
 }

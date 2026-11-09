@@ -58,6 +58,7 @@ final class AppCleanerModel {
     var apps: [InstalledApp] = []
     var query = ""
     var isLoadingApps = false
+    var loadError: String?
 
     var selectedAppID: URL?
     var components: [AppComponent] = []
@@ -77,9 +78,6 @@ final class AppCleanerModel {
     var markedApps: Set<URL> = []
     var appSizes: [URL: Int64] = [:]
     var isMeasuringSizes = false
-    /// Spotlight last-used dates, filled lazily like `appSizes`. A present key with a nil
-    /// value means Spotlight had no record (shown as "Unknown"); an absent key is still loading.
-    var appLastUsed: [URL: Date?] = [:]
     var isBulkRemoving = false
     var bulkProgress: (done: Int, total: Int, current: String?)?
     var style = AppBrowserStyle.default {
@@ -89,7 +87,6 @@ final class AppCleanerModel {
     private let home = FileManager.default.homeDirectoryForCurrentUser
     private var detailTask: Task<Void, Never>?
     private var sizeTask: Task<Void, Never>?
-    private var lastUsedTask: Task<Void, Never>?
     private var bulkTask: Task<Void, Never>?
     /// Bumped on every selection change; stale component scans are dropped.
     private var generation = 0
@@ -140,12 +137,17 @@ final class AppCleanerModel {
         hasFullDiskAccess = FullDiskAccess.status() == .granted
         let worker = makeUninstaller()
         Task {
-            let found = await Task.detached(priority: .userInitiated) { worker.installedApps() }.value
-            apps = found
+            let inventory = await Task.detached(priority: .userInitiated) {
+                worker.inventory()
+            }.value
+            apps = inventory.apps
+            loadError =
+                inventory.unreadableFolders.isEmpty
+                ? nil
+                : "The applications folder could not be read. Check Full Disk Access, then reload."
             isLoadingApps = false
             startMeasuringSizes()
-            startMeasuringLastUsed()
-            if let selectedAppID, !found.contains(where: { $0.url == selectedAppID }) {
+            if let selectedAppID, !inventory.apps.contains(where: { $0.url == selectedAppID }) {
                 clearSelection()
             }
         }
@@ -198,24 +200,6 @@ final class AppCleanerModel {
                 appSizes[app.url] = bytes
             }
             isMeasuringSizes = false
-        }
-    }
-
-    /// Last-used dates arrive live like sizes, one app at a time. A cell shows a dim
-    /// placeholder until its app resolves; apps with no Spotlight record stay nil ("Unknown").
-    private func startMeasuringLastUsed() {
-        lastUsedTask?.cancel()
-        let queue = apps.filter { appLastUsed[$0.url] == nil }
-        guard !queue.isEmpty else { return }
-        lastUsedTask = Task {
-            for app in queue {
-                guard !Task.isCancelled else { return }
-                let date = await Task.detached(priority: .utility) {
-                    AppUninstaller.lastUsedDate(app.url)
-                }.value
-                guard !Task.isCancelled else { return }
-                appLastUsed[app.url] = .some(date)
-            }
         }
     }
 

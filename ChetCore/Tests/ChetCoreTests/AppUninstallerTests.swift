@@ -46,6 +46,20 @@ struct AppUninstallerTests {
         #expect(found.first { $0.name == "Foobar" }?.url.lastPathComponent == "Foobar.app")
     }
 
+    @Test func inventoryReportsUnreadableFolder() throws {
+        let home = try TempDir()
+        let apps = try TempDir()
+        try makeApp(in: apps.url, name: "Foobar", bundleID: "com.test.foobar")
+        let missing = apps.url.appendingPathComponent("Missing", isDirectory: true)
+
+        let inventory = AppUninstaller(
+            home: home.url, appFolders: [apps.url, missing], searchRoots: []
+        ).inventory()
+
+        #expect(inventory.apps.map(\.name) == ["Foobar"])
+        #expect(inventory.unreadableFolders == [missing])
+    }
+
     @Test func readsHelpersAndVendor() throws {
         let home = try TempDir()
         let apps = try TempDir()

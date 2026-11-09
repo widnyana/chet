@@ -122,9 +122,9 @@ struct CleanProgressSheet: View {
             currentRow(progress, dryRun: dryRun)
         }
         .padding(Spacing.s4)
-        .background(Theme.paperRaised, in: RoundedRectangle(cornerRadius: 6))
+        .background(Theme.paperRaised, in: .rect(corners: .fixed(Metrics.innerRadius)))
         .overlay {
-            RoundedRectangle(cornerRadius: 6)
+            RoundedRectangle(cornerRadius: Metrics.innerRadius, style: .continuous)
                 .strokeBorder(Theme.hairline, lineWidth: 1)
         }
     }
