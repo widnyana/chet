@@ -103,8 +103,8 @@ public struct AppComponent: Identifiable, Hashable, Sendable {
     /// Only exact matches are selected for the user. A name guess is never destructive by default.
     public var defaultSelected: Bool { ownership == .exclusive && !requiresAdmin }
 
-    /// Exact and probable matches may be chosen after review. Shared, privileged and
-    /// protected data can never be moved by this feature.
+    /// Exact and probable matches may be chosen after review. Shared and protected data can
+    /// never be moved by this feature; a privileged row needs the registered helper.
     public var isSelectable: Bool {
         (ownership == .exclusive || ownership == .probable) && !requiresAdmin
     }
@@ -132,15 +132,22 @@ public enum UninstallSkipReason: String, Sendable, Codable, Equatable {
 
 public enum UninstallOutcome: Sendable, Equatable {
     case trashed(Int64)
+    case removed(Int64)
     case skipped(UninstallSkipReason)
     case failed(String)
 
     public var logValue: String {
         switch self {
         case .trashed: "trashed"
+        case .removed: "removed"
         case .skipped(let reason): "skipped:\(reason.rawValue)"
         case .failed(let message): "failed:\(message)"
         }
+    }
+
+    var isPermanentRemoval: Bool {
+        if case .removed = self { return true }
+        return false
     }
 }
 
@@ -167,6 +174,18 @@ public struct UninstallReport: Sendable {
 
     public var trashedCount: Int {
         results.filter { if case .trashed = $0.outcome { return true } else { return false } }.count
+    }
+
+    /// Bytes the privileged helper removed for good; never counted as trashed.
+    public var removedBytes: Int64 {
+        results.reduce(0) { total, row in
+            if case .removed(let bytes) = row.outcome { return total + bytes }
+            return total
+        }
+    }
+
+    public var removedCount: Int {
+        results.filter { if case .removed = $0.outcome { return true } else { return false } }.count
     }
 }
 
@@ -206,6 +225,9 @@ public struct AppUninstaller: Sendable {
     public let recorder: FlightRecorder?
     public var isRunning: @Sendable ([String]) -> Bool
     public var trash: @Sendable (URL) throws -> Void
+    /// Root-owned remnants. Set only when the helper is registered and the dry-run gate is off;
+    /// without it an admin remnant is a skip, and the app bundle is never routed here.
+    public let privileged: (@Sendable (URL, String) -> UninstallOutcome?)?
 
     /// Names that must never drive a name match: they are shared folders, not app names.
     static let genericNames: Set<String> = [
@@ -227,7 +249,8 @@ public struct AppUninstaller: Sendable {
         },
         trash: @escaping @Sendable (URL) throws -> Void = { url in
             try FileManager.default.trashItem(at: url, resultingItemURL: nil)
-        }
+        },
+        privileged: (@Sendable (URL, String) -> UninstallOutcome?)? = nil
     ) {
         self.home = home
         self.appFolders = appFolders ?? Self.defaultAppFolders(home: home)
@@ -237,6 +260,7 @@ public struct AppUninstaller: Sendable {
         self.recorder = recorder
         self.isRunning = isRunning
         self.trash = trash
+        self.privileged = privileged
     }
 
     public static func defaultAppFolders(home: URL) -> [URL] {
@@ -625,7 +649,8 @@ public struct AppUninstaller: Sendable {
 
     // MARK: - Removal
 
-    /// Moves the confirmed rows to the Trash, components first and the app bundle last.
+    /// Moves the confirmed rows to the Trash, components first and the app bundle last. A
+    /// root-owned remnant goes through the privileged helper instead and is gone for good.
     /// The app is refused entirely while it or a helper runs. Every row is revalidated.
     public func uninstall(_ plan: UninstallPlan, dryRun: Bool) async -> UninstallReport {
         var report = UninstallReport(dryRun: dryRun)
@@ -650,6 +675,26 @@ public struct AppUninstaller: Sendable {
             if let reason {
                 report.results.append(
                     result(for: component, outcome: .skipped(reason), dryRun: dryRun))
+                continue
+            }
+            if component.requiresAdmin {
+                if dryRun {
+                    report.results.append(
+                        result(for: component, outcome: .removed(component.bytes), dryRun: true))
+                } else if let privileged {
+                    let outcome =
+                        privileged(component.url, plan.app.bundleID ?? "") ?? .skipped(.requiresAdmin)
+                    // The report always carries the size measured for the row; the helper only
+                    // says whether the removal happened.
+                    report.results.append(
+                        result(
+                            for: component,
+                            outcome: outcome.isPermanentRemoval ? .removed(component.bytes) : outcome,
+                            dryRun: false))
+                } else {
+                    report.results.append(
+                        result(for: component, outcome: .skipped(.requiresAdmin), dryRun: false))
+                }
                 continue
             }
             if dryRun {
@@ -697,9 +742,10 @@ public struct AppUninstaller: Sendable {
 
         logReport(report)
         if let recorder {
+            let removed = report.removedCount > 0 ? ", \(report.removedCount) removed" : ""
             recorder.record(
                 step: "uninstall",
-                "\(report.trashedCount) trashed, \(report.trashedBytes) bytes\(dryRun ? ", dry run" : "")")
+                "\(report.trashedCount) trashed, \(report.trashedBytes) bytes\(removed)\(dryRun ? ", dry run" : "")")
         }
         return report
     }
@@ -710,8 +756,10 @@ public struct AppUninstaller: Sendable {
         guard let current = FileStamp.read(component.url) else { return .missing }
         guard !current.isSymlink, current == component.stamp else { return .changed }
         guard !policy.isProtectedPath(component.url) else { return .protected }
-        guard !component.requiresAdmin else { return .requiresAdmin }
-        guard component.isSelectable else { return component.ownership == .shared ? .shared : .protected }
+        // A root-owned remnant may go through the helper. Shared data and macOS-protected
+        // paths stay refused: the helper is not a licence to take another app's files.
+        if component.ownership == .shared { return .shared }
+        guard component.isSelectable || component.ownership == .privileged else { return .protected }
         if Self.isInside(component.url, home) {
             guard policy.isDeletable(component.url) == .allowed else { return .policy }
         }

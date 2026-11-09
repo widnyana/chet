@@ -197,7 +197,7 @@ private struct OwnershipRow: View {
             )
             .toggleStyle(.checkbox)
             .labelsHidden()
-            .disabled(!component.isSelectable)
+            .disabled(!model.canSelect(component))
             .accessibilityLabel("Remove \(component.url.lastPathComponent)")
             Image(nsImage: IconCache.icon(for: component.url))
                 .resizable()

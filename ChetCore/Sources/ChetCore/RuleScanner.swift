@@ -72,7 +72,8 @@ public struct RuleScanner: Sendable {
                     ScanItem(
                         url: child, categoryID: rule.category, risk: holdsState ? .review : rule.risk,
                         mode: holdsState ? .trash : rule.mode,
-                        reclaimableBytes: bytes, stamp: stamp, ownerBundleID: rule.owningBundleID))
+                        reclaimableBytes: bytes, stamp: stamp, ownerBundleID: rule.owningBundleID,
+                        requiresAdmin: rule.requiresAdmin))
             }
             if rule.keepNewest, let newest = found.max(by: { $0.stamp.modified < $1.stamp.modified }) {
                 found.removeAll { $0.url == newest.url }

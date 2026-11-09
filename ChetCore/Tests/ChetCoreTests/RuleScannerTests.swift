@@ -60,6 +60,19 @@ struct RuleScannerTests {
         #expect(result.items.isEmpty)
     }
 
+    @Test func adminRuleMarksItemsAsAdmin() async throws {
+        let dir = try TempDir()
+        let root = dir.url.appendingPathComponent("Library/Caches")
+        try dir.file("Library/Caches/system/blob/x", bytes: 5_000_000)
+        let rule = Rule(
+            id: "system-caches-test", title: "System caches", roots: [root.path],
+            risk: .review, mode: .permanent, requiresAdmin: true)
+        let result = try await RuleScanner(home: dir.url, rules: [rule]).scan(rule)
+        #expect(result.items.map(\.url.lastPathComponent) == ["system"])
+        #expect(result.items.allSatisfy { $0.requiresAdmin })
+        #expect(result.items.allSatisfy { $0.risk == .review && $0.mode == .permanent })
+    }
+
     @Test func missingRootIsEmptyNotError() async throws {
         let dir = try TempDir()
         let result = try await RuleScanner(home: dir.url).scan(try rule("package-caches"))

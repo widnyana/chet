@@ -93,6 +93,11 @@ struct CategoryDetailView: View {
                     Toggle("Remove", isOn: model.isSelected(item.url))
                         .toggleStyle(.checkbox)
                         .labelsHidden()
+                        .disabled(!model.canSelect(item))
+                        .help(
+                            model.canSelect(item)
+                                ? "Remove" : "Turn on Administrator cleanup in Settings to remove this"
+                        )
                         .accessibilityLabel("Remove \(item.url.lastPathComponent)")
                 }
             }

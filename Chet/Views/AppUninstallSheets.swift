@@ -51,6 +51,13 @@ struct AppUninstallConfirmSheet: View {
                 labeled("The app and the files you chose move to the Trash.", icon: "trash")
                 labeled("You can restore them from the Trash.", icon: "arrow.uturn.backward")
                 labeled("Chet checks each item again before it moves.", icon: "checkmark.shield")
+                if !DryRun.enabled,
+                    model.selectedComponentList.contains(where: { $0.requiresAdmin })
+                {
+                    labeled(
+                        "Items that need an administrator are removed permanently, not moved to the Trash.",
+                        icon: "lock.open")
+                }
                 if let app, !model.appSelected, app.isWritable, !model.isRunning {
                     labeled("The app stays installed.", icon: "app.dashed")
                 }
@@ -131,26 +138,33 @@ struct UninstallSummaryView: View {
     private var problems: [UninstallResult] {
         report.results.filter { result in
             switch result.outcome {
-            case .trashed: false
+            case .trashed, .removed: false
             case .skipped, .failed: true
             }
         }
     }
 
+    /// Everything that left the disk, by Trash or permanently.
+    private var cleanedBytes: Int64 { report.trashedBytes + report.removedBytes }
+    private var cleanedCount: Int { report.trashedCount + report.removedCount }
+
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
             VStack(alignment: .leading, spacing: Spacing.s1) {
-                Text(report.dryRun ? "Preview complete" : "Moved to the Trash")
-                    .font(Typography.title)
-                    .foregroundStyle(Theme.ink)
-                Text(report.trashedBytes.formatted(.byteCount(style: .file)))
+                Text(
+                    report.dryRun
+                        ? "Preview complete" : (report.removedCount > 0 ? "Removed" : "Moved to the Trash")
+                )
+                .font(Typography.title)
+                .foregroundStyle(Theme.ink)
+                Text(cleanedBytes.formatted(.byteCount(style: .file)))
                     .font(Typography.display)
                     .monospacedDigit()
                     .foregroundStyle(Theme.ink)
                 Text(
                     report.dryRun
-                        ? "would be moved to the Trash. \(report.trashedCount) of \(report.results.count) items would be moved. Nothing was moved."
-                        : "moved to the Trash. \(report.trashedCount) of \(report.results.count) items moved."
+                        ? "\(cleanedCount) of \(report.results.count) items would be cleaned. Nothing was moved or removed."
+                        : "\(cleanedCount) of \(report.results.count) items cleaned. Items marked removed are gone permanently."
                 )
                 .font(Typography.body)
                 .foregroundStyle(Theme.inkSecondary)
@@ -164,7 +178,7 @@ struct UninstallSummaryView: View {
                                     Text(result.name)
                                         .font(Typography.row)
                                         .foregroundStyle(Theme.ink)
-                                    Text(Self.reason(result.outcome))
+                                    Text(Self.reason(result.outcome, dryRun: result.dryRun))
                                         .font(Typography.caption)
                                         .foregroundStyle(Theme.inkSecondary)
                                 }
@@ -192,9 +206,10 @@ struct UninstallSummaryView: View {
         .background(Theme.paper)
     }
 
-    static func reason(_ outcome: UninstallOutcome) -> String {
+    static func reason(_ outcome: UninstallOutcome, dryRun: Bool = false) -> String {
         switch outcome {
-        case .trashed: "Moved to the Trash"
+        case .trashed: dryRun ? "Would be moved to the Trash" : "Moved to the Trash"
+        case .removed: dryRun ? "Would be removed permanently" : "Removed permanently"
         case .skipped(let reason): AppCopy.skip(reason)
         case .failed(let message): message
         }
@@ -307,7 +322,7 @@ struct BulkUninstallSummaryView: View {
             item.report.results
                 .filter { result in
                     switch result.outcome {
-                    case .trashed: false
+                    case .trashed, .removed: false
                     case .skipped, .failed: true
                     }
                 }
@@ -318,10 +333,13 @@ struct BulkUninstallSummaryView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
             VStack(alignment: .leading, spacing: Spacing.s1) {
-                Text(report.dryRun ? "Preview complete" : "Moved to the Trash")
-                    .font(Typography.title)
-                    .foregroundStyle(Theme.ink)
-                Text(report.trashedBytes.formatted(.byteCount(style: .file)))
+                Text(
+                    report.dryRun
+                        ? "Preview complete" : (report.removedCount > 0 ? "Removed" : "Moved to the Trash")
+                )
+                .font(Typography.title)
+                .foregroundStyle(Theme.ink)
+                Text((report.trashedBytes + report.removedBytes).formatted(.byteCount(style: .file)))
                     .font(Typography.display)
                     .monospacedDigit()
                     .foregroundStyle(Theme.ink)
@@ -341,7 +359,8 @@ struct BulkUninstallSummaryView: View {
                                         .foregroundStyle(Theme.ink)
                                     Text(
                                         problem.result.name + " · "
-                                            + UninstallSummaryView.reason(problem.result.outcome)
+                                            + UninstallSummaryView.reason(
+                                                problem.result.outcome, dryRun: problem.result.dryRun)
                                     )
                                     .font(Typography.caption)
                                     .foregroundStyle(Theme.inkSecondary)
@@ -372,10 +391,11 @@ struct BulkUninstallSummaryView: View {
 
     private var summaryLine: String {
         let apps = report.items.count == 1 ? "1 app" : "\(report.items.count) apps"
+        let cleaned = report.trashedCount + report.removedCount
         if report.dryRun {
             return
-                "would be moved to the Trash. \(report.trashedCount) of \(report.resultCount) items across \(apps) would be moved. Nothing was moved."
+                "\(cleaned) of \(report.resultCount) items across \(apps) would be cleaned. Nothing was moved or removed."
         }
-        return "moved to the Trash. \(report.trashedCount) of \(report.resultCount) items across \(apps) moved."
+        return "\(cleaned) of \(report.resultCount) items across \(apps) cleaned."
     }
 }

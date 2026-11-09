@@ -56,10 +56,12 @@ public struct ScanItem: Identifiable, Hashable, Sendable {
     public let stamp: FileStamp
     /// App that owns the data, for example a browser. Cleaning is skipped while it runs.
     public let ownerBundleID: String?
+    /// Root-owned data. The cleaner routes it to the privileged helper instead of removing it.
+    public let requiresAdmin: Bool
 
     public init(
         url: URL, categoryID: String, risk: Risk, mode: DeleteMode, reclaimableBytes: Int64, stamp: FileStamp,
-        ownerBundleID: String? = nil
+        ownerBundleID: String? = nil, requiresAdmin: Bool = false
     ) {
         self.url = url
         self.categoryID = categoryID
@@ -68,5 +70,6 @@ public struct ScanItem: Identifiable, Hashable, Sendable {
         self.reclaimableBytes = reclaimableBytes
         self.stamp = stamp
         self.ownerBundleID = ownerBundleID
+        self.requiresAdmin = requiresAdmin
     }
 }

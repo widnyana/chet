@@ -15,6 +15,7 @@
 # .codegraph/ and let their inner .gitignore files leak through.
 !Chet/
 !ChetCore/
+!ChetHelper/
 !docs/
 !scripts/
 
@@ -30,6 +31,7 @@
 !/CLAUDE.md
 !Chet/**
 !ChetCore/**
+!ChetHelper/**
 !docs/DESIGN.md
 !docs/images/
 !docs/images/**

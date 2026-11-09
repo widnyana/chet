@@ -265,6 +265,7 @@ struct SettingsSliderRow: View {
     @Binding var value: Double
     let range: ClosedRange<Double>
     let step: Double
+    var isEnabled = true
 
     var body: some View {
         SettingsRow(label: label) {
@@ -272,6 +273,7 @@ struct SettingsSliderRow: View {
                 Slider(value: $value, in: range, step: step)
                     .frame(width: SettingsGrid.slider)
                     .controlSize(.small)
+                    .disabled(!isEnabled)
                     .accessibilityLabel(label)
                     .accessibilityValue(readout)
                 Text(readout)

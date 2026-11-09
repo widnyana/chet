@@ -128,6 +128,19 @@ final class ScanModel {
         }
     }
     nonisolated static let oldAgeKey = "largeFileOldAgeDays"
+    /// Minutes one administrator approval lasts. Clamped to the helper's own 1...60 range.
+    var helperLifetimeMinutes = UserDefaults.standard.object(forKey: ScanModel.helperLifetimeKey) as? Int ?? 10 {
+        didSet {
+            let clamped = min(60, max(1, helperLifetimeMinutes))
+            guard clamped == helperLifetimeMinutes else {
+                helperLifetimeMinutes = clamped
+                return
+            }
+            guard oldValue != helperLifetimeMinutes else { return }
+            UserDefaults.standard.set(helperLifetimeMinutes, forKey: ScanModel.helperLifetimeKey)
+        }
+    }
+    nonisolated static let helperLifetimeKey = "helperLifetimeMinutes"
     var categories: [CategoryState] = []
     /// Category id -> groups, for duplicates and similar media.
     var groups: [String: [ItemGroup]] = [:]
@@ -196,6 +209,7 @@ final class ScanModel {
         "similar-videos": "Similar videos", "tagged-caches": "Tagged cache folders",
         "snapshots": "Time Machine local snapshots", "dev-garbage": "Project build dirs",
         "nix": "Nix", "user-rules": "Your folders",
+        "system-caches": "System caches", "system-logs": "System logs",
     ]
 
     /// Selected items, each URL once (a file can show up in more than one category).
@@ -345,6 +359,8 @@ final class ScanModel {
         cleanSnapshotCount = chosenSnapshots.count
         let started = Date()
         isCleaning = true
+        // Read on the main actor: the daemon status is a main-thread fact, and the gate wins.
+        let approval = HelperService.isAvailable ? helperLifetimeMinutes : nil
         Task {
             let (stream, continuation) = AsyncStream<CleanProgress>.makeStream(
                 bufferingPolicy: .bufferingNewest(1))
@@ -353,7 +369,7 @@ final class ScanModel {
                     self.cleanProgress = progress
                 }
             }
-            let result = await Self.runClean(items) { continuation.yield($0) }
+            let result = await Self.runClean(items, helperLifetimeMinutes: approval) { continuation.yield($0) }
             continuation.finish()
             await consumer.value
             var errors: [String] = []
@@ -540,6 +556,7 @@ final class ScanModel {
 
     @concurrent nonisolated static func runClean(
         _ items: [ScanItem],
+        helperLifetimeMinutes: Int?,
         progress: @escaping @Sendable (CleanProgress) -> Void
     ) async -> CleanReport {
         var cleaner = Cleaner(
@@ -548,6 +565,19 @@ final class ScanModel {
                 excludedPaths: UserDefaults.standard.stringArray(forKey: excludedKey) ?? []),
             recorder: FlightRecorder.shared, dryRun: DryRun.enabled)
         cleaner.owner = { $0.ownerBundleID }
+        if let minutes = helperLifetimeMinutes {
+            let lifetime = TimeInterval(min(60, max(1, minutes)) * 60)
+            cleaner.privileged = { item in
+                let reply = PrivilegedClient(lifetime: lifetime)
+                    .remove(item.url.path, bundleID: "id.web.widnyana.chet")
+                switch reply {
+                case "ok": return .removed(item.reclaimableBytes)
+                case let text where text.hasPrefix("failed:"):
+                    return .failed(String(text.dropFirst("failed:".count)))
+                default: return .skipped(.policy)
+                }
+            }
+        }
         return cleaner.clean(items, progress: progress)
     }
 

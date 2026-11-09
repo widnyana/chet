@@ -23,11 +23,12 @@ struct AppUninstallerTests {
 
     private func uninstaller(
         home: URL, apps: [URL], roots: [AppSearchRoot], running: Bool = false,
-        trash: @escaping @Sendable (URL) throws -> Void = { _ in }
+        trash: @escaping @Sendable (URL) throws -> Void = { _ in },
+        privileged: (@Sendable (URL, String) -> UninstallOutcome?)? = nil
     ) -> AppUninstaller {
         AppUninstaller(
             home: home, appFolders: apps, searchRoots: roots, log: nil, recorder: nil,
-            isRunning: { _ in running }, trash: trash)
+            isRunning: { _ in running }, trash: trash, privileged: privileged)
     }
 
     @Test func discoversAppsIncludingOneNestedFolderAndDeduplicates() throws {
@@ -247,6 +248,84 @@ struct AppUninstallerTests {
         #expect(component.requiresAdmin)
         #expect(!component.isSelectable)
         #expect(!component.defaultSelected)
+    }
+
+    @Test func adminRemnantIsHandedToTheHelper() async throws {
+        let (home, apps, app, roots, component) = try await adminFixture()
+
+        let ids = BundleIDs()
+        let plan = UninstallPlan(
+            app: app, components: [component], includeApp: false, appBytes: 0,
+            otherBundleIDs: [], otherNames: [])
+        let report = await uninstaller(
+            home: home.url, apps: [apps.url], roots: roots,
+            privileged: { _, bundleID in
+                ids.append(bundleID)
+                return .removed(component.bytes)
+            }
+        )
+        .uninstall(plan, dryRun: false)
+
+        #expect(report.results.first?.outcome == .removed(component.bytes))
+        #expect(report.removedBytes == component.bytes)
+        #expect(report.removedCount == 1)
+        #expect(report.trashedBytes == 0)
+        #expect(ids.value == ["com.test.foobar"])
+    }
+
+    @Test func adminRemnantWithoutHelperIsSkipped() async throws {
+        let (home, apps, app, roots, component) = try await adminFixture()
+
+        let plan = UninstallPlan(
+            app: app, components: [component], includeApp: false, appBytes: 0,
+            otherBundleIDs: [], otherNames: [])
+        let report = await uninstaller(home: home.url, apps: [apps.url], roots: roots)
+            .uninstall(plan, dryRun: false)
+        #expect(report.results.first?.outcome == .skipped(.requiresAdmin))
+        #expect(report.removedBytes == 0)
+    }
+
+    @Test func adminRemnantUnderDryRunNeverCallsTheHelper() async throws {
+        let (home, apps, app, roots, component) = try await adminFixture()
+
+        let calls = Counter()
+        let plan = UninstallPlan(
+            app: app, components: [component], includeApp: false, appBytes: 0,
+            otherBundleIDs: [], otherNames: [])
+        let report = await uninstaller(
+            home: home.url, apps: [apps.url], roots: roots,
+            privileged: { _, _ in
+                calls.increment()
+                return .removed(component.bytes)
+            }
+        )
+        .uninstall(plan, dryRun: true)
+
+        #expect(calls.value == 0)
+        #expect(report.results.first?.outcome == .removed(component.bytes))
+        #expect(report.results.first?.dryRun == true)
+    }
+
+    /// A launch daemon under a root-owned search root: a real admin remnant, in a temp home.
+    private func adminFixture() async throws -> (
+        home: TempDir, apps: TempDir, app: InstalledApp, roots: [AppSearchRoot], component: AppComponent
+    ) {
+        let home = try TempDir()
+        let apps = try TempDir()
+        try makeApp(in: apps.url, name: "Foobar", bundleID: "com.test.foobar")
+        try home.file("Library/LaunchDaemons/com.test.foobar.plist", bytes: 10)
+        let app = try #require(
+            AppUninstaller(home: home.url, appFolders: [apps.url], searchRoots: []).installedApps().first)
+        let roots = [
+            AppSearchRoot(
+                url: home.url.appendingPathComponent("Library/LaunchDaemons"), kind: .launchDaemons,
+                maxDepth: 0, requiresAdmin: true)
+        ]
+        let component = try #require(
+            await uninstaller(home: home.url, apps: [apps.url], roots: roots)
+                .components(for: app, installedApps: [app]).first)
+        #expect(component.requiresAdmin)
+        return (home, apps, app, roots, component)
     }
 
     @Test func launchAgentMatchesLabelAndAssociatedIdentifiers() async throws {
@@ -522,6 +601,23 @@ private final class Paths: @unchecked Sendable {
     func append(_ url: URL) {
         lock.lock()
         paths.append(url)
+        lock.unlock()
+    }
+}
+
+private final class BundleIDs: @unchecked Sendable {
+    private let lock = NSLock()
+    private var ids: [String] = []
+
+    var value: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return ids
+    }
+
+    func append(_ id: String) {
+        lock.lock()
+        ids.append(id)
         lock.unlock()
     }
 }

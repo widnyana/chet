@@ -24,6 +24,37 @@ struct FileWalkerTests {
         #expect(names == ["main.swift"])
     }
 
+    @Test func skipsPackageContentsAndSymlinks() throws {
+        let dir = try TempDir()
+        try dir.file("plain.txt", bytes: 10)
+        try dir.file("nested/deep/file.txt", bytes: 10)
+        try dir.file("Thing.app/Contents/MacOS/thing", bytes: 10)
+        try FileManager.default.createSymbolicLink(
+            at: dir.url.appendingPathComponent("link"),
+            withDestinationURL: dir.url.appendingPathComponent("plain.txt"))
+        var names: [String] = []
+        try FileWalker(policy: dir.policy).walk(dir.url) { names.append($0.url.lastPathComponent) }
+        #expect(names.sorted() == ["file.txt", "plain.txt"])
+    }
+
+    @Test func fileRootIsItsOwnEntry() throws {
+        let dir = try TempDir()
+        let file = try dir.file("one.txt", bytes: 10)
+        var names: [String] = []
+        try FileWalker(policy: dir.policy).walk(file) { names.append($0.url.lastPathComponent) }
+        #expect(names == ["one.txt"])
+    }
+
+    @Test func stampsMatchTheDirectoryRecord() throws {
+        let dir = try TempDir()
+        let file = try dir.file("sized.bin", bytes: 4096)
+        var found: [WalkEntry] = []
+        try FileWalker(policy: dir.policy).walk(dir.url) { found.append($0) }
+        let entry = try #require(found.first { $0.url.lastPathComponent == "sized.bin" })
+        #expect(entry.stamp == FileStamp.read(file))
+        #expect(entry.reclaimableBytes > 0)
+    }
+
     @Test func stopsOnCancellation() async throws {
         let dir = try TempDir()
         for i in 0..<20 { try dir.file("f\(i)", bytes: 10) }

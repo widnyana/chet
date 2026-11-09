@@ -11,6 +11,13 @@ struct CleanerTests {
             url: url, categoryID: "test", risk: .safe, mode: mode, reclaimableBytes: stamp.size, stamp: stamp)
     }
 
+    private func adminItem(_ url: URL) throws -> ScanItem {
+        let stamp = try #require(FileStamp.read(url))
+        return ScanItem(
+            url: url, categoryID: "system-caches", risk: .review, mode: .permanent,
+            reclaimableBytes: stamp.size, stamp: stamp, requiresAdmin: true)
+    }
+
     private func cleaner(_ dir: TempDir, dryRun: Bool = false) -> Cleaner {
         var cleaner = Cleaner(
             policy: dir.policy, log: AuditLog(url: dir.url.appendingPathComponent("audit.log")),
@@ -188,6 +195,45 @@ struct CleanerTests {
         #expect(FileManager.default.fileExists(atPath: locked.path))
     }
 
+    @Test func adminItemGoesThroughTheHelper() throws {
+        let dir = try TempDir()
+        let file = try dir.file("Library/Caches/system/x", bytes: 1000)
+        var worker = cleaner(dir)
+        let visits = Visits()
+        worker.privileged = { item in
+            visits.append(item.url)
+            return .removed(item.reclaimableBytes)
+        }
+        let report = worker.clean([try adminItem(file)])
+        #expect(report.results.first?.outcome == .removed(1000))
+        #expect(report.freedBytes == 1000)
+        #expect(visits.value == [file])
+        // The helper owns the removal; the cleaner itself never touches a root path.
+        #expect(FileManager.default.fileExists(atPath: file.path))
+    }
+
+    @Test func adminItemWithoutHelperIsAPolicySkip() throws {
+        let dir = try TempDir()
+        let file = try dir.file("Library/Caches/system/x", bytes: 1000)
+        #expect(cleaner(dir).clean([try adminItem(file)]).results.first?.outcome == .skipped(.policy))
+        #expect(FileManager.default.fileExists(atPath: file.path))
+    }
+
+    @Test func adminItemUnderDryRunNeverCallsTheHelper() throws {
+        let dir = try TempDir()
+        let file = try dir.file("Library/Caches/system/x", bytes: 1000)
+        var worker = cleaner(dir, dryRun: true)
+        let visits = Visits()
+        worker.privileged = { item in
+            visits.append(item.url)
+            return .removed(item.reclaimableBytes)
+        }
+        let report = worker.clean([try adminItem(file)])
+        #expect(report.results.first?.outcome == .removed(1000))
+        #expect(visits.value.isEmpty)
+        #expect(FileManager.default.fileExists(atPath: file.path))
+    }
+
     @Test func dryRunIsRecordedHonestly() throws {
         let dir = try TempDir()
         let file = try dir.file("cache/x", bytes: 1000)
@@ -214,6 +260,23 @@ private final class ProgressRecorder: @unchecked Sendable {
     func append(_ progress: CleanProgress) {
         lock.lock()
         items.append(progress)
+        lock.unlock()
+    }
+}
+
+private final class Visits: @unchecked Sendable {
+    private let lock = NSLock()
+    private var urls: [URL] = []
+
+    var value: [URL] {
+        lock.lock()
+        defer { lock.unlock() }
+        return urls
+    }
+
+    func append(_ url: URL) {
+        lock.lock()
+        urls.append(url)
         lock.unlock()
     }
 }

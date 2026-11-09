@@ -36,6 +36,26 @@ Trash, or restarts an app. Build the gate into the test, not around it:
   `DRY_RUN=1 CHET_TWEAK_PREVIEW=confirm /tmp/ChetUITest.app/Contents/MacOS/chet &`.
   `open --env` with two flags did not carry the second variable.
 
+## Administrator cleanup
+
+Root cleanup is one gated path. `ChetCore` owns the contract: `ChetHelperProtocol`,
+`HelperGuard.refusal`, `HelperSession`, `PrivilegedClient`. The daemon target is `chet-helper`,
+embedded at `Contents/MacOS/chet-helper` with its plist in `Contents/Library/LaunchDaemons`.
+
+- Removal is permanent (`removeItem`), never the Trash. With no helper, an admin item is a
+  policy skip and its control reports `enabled: false`.
+- The approval is bounded: the daemon starts on the first request and exits at the deadline,
+  so a later request starts a new one. Lifetime is 1...60 minutes, 10 by default.
+- `HelperGuard` bounds the damage: absolute paths only, no `..`, no symlink in any parent, no
+  protected tree, and only children of `/Library/Caches`, `/Library/Logs`,
+  `/Library/Application Support`, `/Library/Preferences`, `/Library/LaunchAgents`,
+  `/Library/LaunchDaemons`.
+- `DRY_RUN=1` never registers the daemon, never calls it, and never changes a file.
+- Never install, approve, or exercise the daemon in an automated check. Registration and a
+  real removal are manual, from a copy in `/Applications`, with the user's consent.
+- `mise run build` builds `chet-helper` first; the app's post-build script copies and signs it
+  before Xcode signs the app, so the final signature covers both.
+
 ## Tweaks coverage
 
 The catalog has 55 entries: Finder 11, Dock 8, Keyboard 10, Trackpad 2, Screenshots 5,

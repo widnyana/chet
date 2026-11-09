@@ -103,12 +103,27 @@ Settings pane. Categories that hit a hidden folder show a lock icon.
 - [Development](DEVELOPMENT.md): build tasks, project layout, engines, Metal, and tests.
 - [Design](docs/DESIGN.md): the interface direction, tokens, and components.
 
+## Administrator cleanup
+
+Root-owned caches, logs, and app remnants need an administrator, so Chet ships a privileged
+helper. It is off until you turn it on, and it never asks for an administrator on its own.
+
+- Turn it on in Settings, pane Folders, panel Administrator. macOS then asks you to approve
+  Chet, and you can turn it off in the same panel.
+- The helper lives inside the app at `Contents/Library/LaunchDaemons`, starts on your first
+  removal, and exits when the approval runs out. An approval lasts from 1 to 60 minutes, 10
+  by default.
+- Removal is permanent: root-owned data has no Trash of its own. App bundles are never
+  touched, and every removal is checked again before it happens.
+- Covered: `/Library/Caches`, `/Library/Logs`, and app remnants under `/Library` such as
+  launch agents and daemons. Nothing else outside these trees.
+- With `DRY_RUN=1` the helper is never registered and never called.
+
 ## Limits
 
-Chet does not remove root-owned caches or system logs; that needs a privileged helper. It does
-not thin app binaries or remove app languages, because that breaks code signatures. It does
-not prune Docker or OrbStack images. It does not remove apps or files that need administrator
-rights. Tweaks changes only the preferences it can read back and verify.
+Chet does not thin app binaries or remove app languages, because that breaks code signatures.
+It does not prune Docker or OrbStack images. It never removes an app bundle that needs
+administrator rights. Tweaks changes only the preferences it can read back and verify.
 
 The app is ad-hoc signed and not notarized. On another Mac, macOS blocks the first launch.
 See the [user guide](docs/USER-GUIDE.md#install-on-another-mac).

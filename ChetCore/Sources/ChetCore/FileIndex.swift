@@ -264,7 +264,7 @@ public struct FileIndexBuilder: Sendable {
 
     /// The stamp and reclaimable size shared by every candidate path, so the two walks cannot
     /// drift.
-    private static func makeStamp(_ entry: Entry) -> FileStamp {
+    static func makeStamp(_ entry: Entry) -> FileStamp {
         FileStamp(
             inode: entry.inode, size: entry.size, modified: entry.modified, links: entry.links,
             isSymlink: false, isRegularFile: true, isDataless: false)

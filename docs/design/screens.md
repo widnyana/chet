@@ -220,6 +220,10 @@ repeated in the title bar.
 2. `Limits`: panels with the size sliders and the readout on the right.
 3. `Folders`: panels for skipped folders, added folders, and other disks; picker
    buttons sit at the panel's bottom right. Each added folder has a `Keep…` button.
+   Panel `Administrator` closes the pane: one note with the helper's state, the
+   `Administrator cleanup` action (`Turn On…` or `Turn Off`), an `Open System
+   Settings` action while macOS waits for approval, and the `Approval lifetime`
+   slider from 1 to 60 minutes with its readout on the right.
 4. `Tweaks`: panel `Changes Chet made` with the count of changed preferences and the
    path of the change record with a `Show` action; panel `Reset` with `Reset All…`,
    which asks once and then puts every changed tweak back to the macOS default.
@@ -227,7 +231,8 @@ repeated in the title bar.
 A set `DRY_RUN` adds one amber label above the panes: `Preview only. Nothing will be
 removed.` The `Tweaks` pane adds `Preview only. No tweak is changed.` and disables
 `Reset All…`. The Tweaks page in the main window shows its own gate and does not
-repeat the cleaning strip.
+repeat the cleaning strip. Under the gate the `Administrator` panel keeps its note but
+disables `Turn On…`, `Turn Off`, `Open System Settings`, and the lifetime slider.
 
 ## About
 

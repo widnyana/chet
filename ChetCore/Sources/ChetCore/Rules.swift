@@ -35,6 +35,8 @@ public struct Rule: Sendable, Identifiable {
     public let discovery: Discovery?
     /// When true, items are listed for size visibility only and the cleaner will never delete them.
     public let listOnly: Bool
+    /// Root-owned data: items are shown, and only the privileged helper can remove them.
+    public let requiresAdmin: Bool
 
     /// Root folders that need discovery at scan time instead of a fixed list.
     public enum Discovery: Sendable, Equatable {
@@ -48,7 +50,7 @@ public struct Rule: Sendable, Identifiable {
         owningBundleID: String? = nil, minAge: TimeInterval? = nil, extensions: Set<String>? = nil,
         excluded: Set<String> = [], keepNewest: Bool = false, wholeRoots: Bool = false,
         recursiveNames: Set<String>? = nil, prunedNames: Set<String> = [], discovery: Discovery? = nil,
-        listOnly: Bool = false
+        listOnly: Bool = false, requiresAdmin: Bool = false
     ) {
         self.id = id
         self.category = category ?? id
@@ -66,6 +68,7 @@ public struct Rule: Sendable, Identifiable {
         self.prunedNames = prunedNames
         self.discovery = discovery
         self.listOnly = listOnly
+        self.requiresAdmin = requiresAdmin
     }
 }
 
@@ -160,5 +163,11 @@ extension Rule {
             id: "nix", title: "Nix",
             roots: ["/nix/store", "/nix/var/nix/profiles"], risk: .informational, mode: .trash,
             wholeRoots: true, listOnly: true),
+        Rule(
+            id: "system-caches", title: "System caches", roots: ["/Library/Caches"],
+            risk: .review, mode: .permanent, requiresAdmin: true),
+        Rule(
+            id: "system-logs", title: "System logs", roots: ["/Library/Logs"],
+            risk: .review, mode: .permanent, requiresAdmin: true),
     ]
 }

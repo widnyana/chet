@@ -121,6 +121,9 @@ public struct Cleaner: Sendable {
     public var trash: @Sendable (URL) throws -> Void = { url in
         try FileManager.default.trashItem(at: url, resultingItemURL: nil)
     }
+    /// Root-owned items. Set only when the helper is registered and the dry-run gate is off;
+    /// without it a `requiresAdmin` item is a policy skip.
+    public var privileged: (@Sendable (ScanItem) -> CleanOutcome)?
 
     public init(
         policy: SafetyPolicy, log: AuditLog = AuditLog(), recorder: FlightRecorder? = nil, dryRun: Bool
@@ -193,6 +196,11 @@ public struct Cleaner: Sendable {
         // both modes so a Trash sweep cannot lose it either.
         if TerraformState.holdsLocalState(item.url) { return .skipped(.localState) }
         if let owner = owner(item), isRunning(owner) { return .skipped(.appRunning) }
+        if item.requiresAdmin {
+            if dryRun { return .removed(item.reclaimableBytes) }
+            guard let privileged else { return .skipped(.policy) }
+            return privileged(item)
+        }
         if dryRun {
             return item.mode == .permanent ? .removed(item.reclaimableBytes) : .trashed(item.reclaimableBytes)
         }

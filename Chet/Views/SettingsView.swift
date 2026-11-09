@@ -12,6 +12,9 @@ struct SettingsView: View {
     @State private var pane: SettingsPane = .whatToFind
     @State private var confirmingReset = false
     @State private var resetting = false
+    @State private var helperState = HelperService.state
+    @State private var helperBusy = false
+    @State private var helperError: String?
 
     private let optionalSteps: [ScanStep] = [.largeFiles, .duplicates, .leftovers, .photos, .videos, .snapshots]
 
@@ -217,7 +220,104 @@ struct SettingsView: View {
                         get: { model.scanOutsideHome },
                         set: { model.scanOutsideHome = $0 }))
             }
+            SettingsPanel(title: "Administrator") {
+                SettingsNote(helperStatusLine)
+                if let helperError {
+                    SettingsNote(helperError)
+                }
+                SettingsDivider()
+                SettingsRow(label: "Administrator cleanup") {
+                    SecondaryActionButton(
+                        title: helperOn ? "Turn Off" : "Turn On…",
+                        isEnabled: !DryRun.enabled && !helperBusy,
+                        help: "Turn on cleanup for system caches, logs, and app remnants",
+                        accessibilityLabel: "Administrator cleanup",
+                        action: { helperOn ? turnHelperOff() : turnHelperOn() }
+                    )
+                    .accessibilityIdentifier("settings.helper.toggle")
+                }
+                if helperState == .needsApproval {
+                    SettingsDivider()
+                    SettingsActionRow {
+                        SecondaryActionButton(
+                            title: "Open System Settings",
+                            isEnabled: !DryRun.enabled,
+                            help: "Approve Chet in Login Items and Extensions",
+                            action: openApprovalSettings
+                        )
+                        .accessibilityIdentifier("settings.helper.openSettings")
+                    }
+                }
+                SettingsDivider()
+                SettingsSliderRow(
+                    label: "Approval lifetime", readout: "\(model.helperLifetimeMinutes) minutes",
+                    value: Binding(
+                        get: { Double(model.helperLifetimeMinutes) },
+                        set: { model.helperLifetimeMinutes = Int($0) }),
+                    range: 1...60, step: 1, isEnabled: !DryRun.enabled
+                )
+                .accessibilityIdentifier("settings.helper.lifetime")
+            }
         }
+        .onAppear { refreshHelperStatus() }
+    }
+
+    // MARK: - Administrator helper
+
+    private var helperOn: Bool {
+        helperState == .enabled || helperState == .needsApproval
+    }
+
+    private var helperStatusLine: String {
+        switch helperState {
+        case .enabled:
+            return
+                "Administrator cleanup is on. Each approval lasts \(model.helperLifetimeMinutes) minutes."
+        case .needsApproval:
+            return "Approve Chet in System Settings to turn it on."
+        case .missing:
+            return "The helper is missing. Reinstall Chet in Applications."
+        case .off:
+            return "Administrator cleanup is off. Chet never asks for an administrator."
+        }
+    }
+
+    private func refreshHelperStatus() {
+        helperState = HelperService.state
+    }
+
+    private func turnHelperOn() {
+        guard !DryRun.enabled else { return }
+        helperError = nil
+        do {
+            try HelperService.register()
+        } catch {
+            helperError = error.localizedDescription
+        }
+        refreshHelperStatus()
+    }
+
+    private func turnHelperOff() {
+        guard !DryRun.enabled else { return }
+        helperError = nil
+        helperBusy = true
+        Task {
+            do {
+                try await HelperService.unregister()
+            } catch {
+                helperError = error.localizedDescription
+            }
+            helperBusy = false
+            refreshHelperStatus()
+        }
+    }
+
+    private func openApprovalSettings() {
+        guard
+            let url = URL(
+                string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension")
+        else { return }
+        NSWorkspace.shared.open(url)
     }
 
     // MARK: - Tweaks

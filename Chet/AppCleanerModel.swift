@@ -45,6 +45,8 @@ struct BulkUninstallReport {
 
     var trashedBytes: Int64 { items.reduce(0) { $0 + $1.report.trashedBytes } }
     var trashedCount: Int { items.reduce(0) { $0 + $1.report.trashedCount } }
+    var removedBytes: Int64 { items.reduce(0) { $0 + $1.report.removedBytes } }
+    var removedCount: Int { items.reduce(0) { $0 + $1.report.removedCount } }
     var resultCount: Int { items.reduce(0) { $0 + $1.report.results.count } }
 }
 
@@ -122,7 +124,15 @@ final class AppCleanerModel {
         selectedApp != nil && !isRunning && !isRemoving && !isLoadingDetail && selectedCount > 0
     }
 
-    var selectableComponents: [AppComponent] { components.filter(\.isSelectable) }
+    /// True when this row may be checked. A root-owned remnant needs the registered helper;
+    /// the dry-run gate is folded into `HelperService.isAvailable`, so a preview selects nothing
+    /// the app cannot remove.
+    func canSelect(_ component: AppComponent) -> Bool {
+        if component.ownership == .privileged { return HelperService.isAvailable }
+        return component.isSelectable
+    }
+
+    var selectableComponents: [AppComponent] { components.filter { canSelect($0) } }
 
     func load() {
         guard !isLoadingApps else { return }
@@ -316,7 +326,7 @@ final class AppCleanerModel {
     }
 
     func setComponent(_ component: AppComponent, _ selected: Bool) {
-        guard component.isSelectable else { return }
+        guard canSelect(component) else { return }
         if selected {
             selectedComponents.insert(component.url)
         } else {
@@ -368,6 +378,26 @@ final class AppCleanerModel {
     }
 
     private func makeUninstaller() -> AppUninstaller {
-        AppUninstaller(home: home, log: AuditLog(), recorder: FlightRecorder.shared)
+        AppUninstaller(
+            home: home, log: AuditLog(), recorder: FlightRecorder.shared,
+            privileged: Self.privilegedRemover())
+    }
+
+    /// Root remnants go through the daemon only when it is on and the gate is off. The app
+    /// bundle itself is never routed here: `appRevalidation` owns that decision.
+    @MainActor
+    private static func privilegedRemover() -> (@Sendable (URL, String) -> UninstallOutcome?)? {
+        guard HelperService.isAvailable else { return nil }
+        return { url, bundleID in
+            // Measured before the request; the core reports the row's own scanned size.
+            let bytes = FileStamp.read(url)?.size ?? 0
+            let reply = HelperService.remove(url, bundleID: bundleID)
+            switch reply {
+            case "ok": return .removed(bytes)
+            case let text where text.hasPrefix("failed:"):
+                return .failed(String(text.dropFirst("failed:".count)))
+            default: return .skipped(.requiresAdmin)
+            }
+        }
     }
 }
