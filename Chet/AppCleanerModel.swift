@@ -184,7 +184,7 @@ final class AppCleanerModel {
     func clearMarks() { markedApps.removeAll() }
 
     /// Sizes arrive live, one app at a time, lowest-cost first (alphabetical). A cell
-    /// shows "n/a" until its app's measurement lands. Unreadable apps simply get none.
+    /// shows "Unknown" until its app's measurement lands. Unreadable apps simply get none.
     private func startMeasuringSizes() {
         sizeTask?.cancel()
         let queue = apps.filter { appSizes[$0.url] == nil }

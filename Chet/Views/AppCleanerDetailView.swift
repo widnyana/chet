@@ -13,7 +13,7 @@ struct AppCleanerDetailView: View {
         VStack(spacing: 0) {
             PageHeader(
                 title: app.name,
-                subtitle: app.version.map { "Version \($0)" } ?? "Version unknown",
+                subtitle: subtitle,
                 metric: model.appBytes.formatted(.byteCount(style: .file)),
                 metricLabel: "app size",
                 icon: IconCache.icon(for: app.url)
@@ -23,21 +23,21 @@ struct AppCleanerDetailView: View {
             .padding(.bottom, Spacing.s2)
             details
             if model.isRunning {
-                warningRow("This app is open. Quit it before removing.", icon: "bolt.fill", tone: .amber)
+                warningRow("Running. Quit it before removing.", icon: "bolt.fill", tone: .amber)
             }
             if !app.isWritable {
                 warningRow(
-                    "Chet needs an administrator to remove this app.", icon: "lock.fill", tone: .amber)
+                    "Needs administrator. Chet cannot move this app.", icon: "lock.fill", tone: .amber)
             }
             appBundleRow(selected: $model.appSelected)
             if model.isLoadingDetail {
-                LoadingStateView(message: "Looking for files left by this app")
+                LoadingStateView(message: "Looking for related files")
                     .padding(.horizontal, Metrics.widePageMargin)
                 Spacer()
             } else if model.components.isEmpty {
                 EmptyStateView(
-                    title: "No files left behind",
-                    message: "The app can still be removed.",
+                    title: "No related files",
+                    message: "The app bundle can still be removed.",
                     systemImage: "folder.badge.questionmark"
                 )
                 .padding(.horizontal, Metrics.widePageMargin)
@@ -89,14 +89,22 @@ struct AppCleanerDetailView: View {
         }
     }
 
+    private var subtitle: String {
+        let parts = [
+            app.version.map { "Version \($0)" },
+            app.bundleID,
+        ].compactMap { $0 }
+        return parts.isEmpty ? "Unknown" : parts.joined(separator: ", ")
+    }
+
     private func appBundleRow(selected: Binding<Bool>) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: Spacing.s3) {
                 VStack(alignment: .leading, spacing: 1) {
-                    Toggle("Remove the app", isOn: selected)
+                    Toggle("Remove app bundle", isOn: selected)
                         .toggleStyle(.checkbox)
                         .disabled(model.isRunning || !app.isWritable)
-                        .accessibilityLabel("Remove \(app.name)")
+                        .accessibilityLabel("Remove \(app.name) app bundle")
                     if !selected.wrappedValue {
                         Text("The app stays installed.")
                             .font(Typography.caption)
@@ -118,20 +126,20 @@ struct AppCleanerDetailView: View {
     private var relatedFiles: some View {
         VStack(spacing: 0) {
             HStack(spacing: Spacing.s3) {
-                Text("Files left behind")
+                Text("Related files")
                     .font(Typography.section)
                     .foregroundStyle(Theme.ink)
-                Text("\(model.selectedComponentList.count) of \(model.components.count) chosen")
+                Text("\(model.selectedComponentList.count) of \(model.components.count) selected")
                     .font(Typography.caption)
                     .foregroundStyle(Theme.inkSecondary)
                     .monospacedDigit()
                 Spacer()
                 Menu {
-                    Button("Only exact matches", systemImage: "checkmark") { model.selectExact() }
-                    Button("All removable", systemImage: "checklist") { model.selectAllSelectable() }
+                    Button("Exact matches only", systemImage: "checkmark") { model.selectExact() }
+                    Button("All selectable", systemImage: "checklist") { model.selectAllSelectable() }
                     Button("None", systemImage: "circle") { model.clearComponents() }
                 } label: {
-                    Label("Choose", systemImage: "checklist")
+                    Label("Select", systemImage: "checklist")
                 }
                 .menuStyle(.borderlessButton)
                 .fixedSize()

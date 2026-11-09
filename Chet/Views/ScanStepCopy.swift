@@ -12,7 +12,7 @@ enum ScanStepCopy {
         case .leftovers: "Leftover app files"
         case .photos: "Similar photos"
         case .videos: "Similar videos"
-        case .snapshots: "Time Machine snapshots"
+        case .snapshots: "Local snapshots"
         }
     }
 }

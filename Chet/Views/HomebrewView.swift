@@ -1,3 +1,4 @@
+import AppKit
 import ChetCore
 import SwiftUI
 
@@ -12,7 +13,7 @@ struct HomebrewView: View {
                 subtitle: subtitle,
                 metric: model.packages.isEmpty
                     ? nil : model.totalBytes.formatted(.byteCount(style: .file)),
-                metricLabel: "installed"
+                metricLabel: "on disk"
             )
             .accessibilityIdentifier("homebrew.header")
             .padding(.horizontal, Metrics.widePageMargin)
@@ -43,43 +44,51 @@ struct HomebrewView: View {
         ) {
             Button("Uninstall", role: .destructive) { model.uninstall(zap: false) }
             if model.markedPackages.contains(where: { $0.kind == .cask }) {
-                Button("Uninstall and remove data", role: .destructive) { model.uninstall(zap: true) }
+                Button("Uninstall and delete data", role: .destructive) { model.uninstall(zap: true) }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text(
                 DryRun.enabled
                     ? "Preview only. Nothing will be removed."
-                    : "This runs brew uninstall. You can reinstall later.")
+                    : (model.markedPackages.contains(where: { $0.kind == .cask })
+                        ? "This removes the packages. Removing data also deletes their settings and saved files."
+                        : "This removes the packages. Homebrew can install them again."))
         }
     }
 
     private var subtitle: String {
         guard model.isAvailable else { return "Install Homebrew to manage packages here." }
         let count = model.packages.count
-        return "\(count) \(count == 1 ? "package" : "packages") installed"
+        return "\(count) \(count == 1 ? "package" : "packages"), \(model.marked.count) marked"
     }
 
     @ViewBuilder private var content: some View {
         if !model.isAvailable {
             EmptyStateView(
-                title: "Homebrew not found",
-                message: "Install Homebrew from brew.sh to manage formulae and casks here.",
-                systemImage: "shippingbox")
+                title: "Homebrew is not installed",
+                message: "Install it from brew.sh, then reload.",
+                systemImage: "shippingbox",
+                actionTitle: "Open brew.sh",
+                action: { NSWorkspace.shared.open(URL(string: "https://brew.sh")!) })
         } else if model.isLoading && model.packages.isEmpty {
             LoadingStateView(message: "Reading Homebrew packages")
         } else if let error = model.loadError, model.packages.isEmpty {
             EmptyStateView(
-                title: "Could not read Homebrew",
-                message: error,
+                title: "The Homebrew list could not be read.",
+                message: "Run brew list in Terminal, then reload.",
+                systemImage: "shippingbox",
+                actionTitle: "Reload",
+                action: { model.load() }
+            )
+            .help(error)
+        } else if model.packages.isEmpty {
+            EmptyStateView(
+                title: "No Homebrew packages",
+                message: "Install one with brew, then reload.",
                 systemImage: "shippingbox",
                 actionTitle: "Reload",
                 action: { model.load() })
-        } else if model.packages.isEmpty {
-            EmptyStateView(
-                title: "No packages installed",
-                message: "Formulae and casks you install with Homebrew appear here.",
-                systemImage: "shippingbox")
         } else {
             actionsRow
             list
@@ -87,7 +96,7 @@ struct HomebrewView: View {
                 CommandBar(
                     metric: model.markedBytes.formatted(.byteCount(style: .file)),
                     detail: "\(model.marked.count) selected",
-                    actionTitle: "Uninstall…",
+                    actionTitle: "Uninstall",
                     actionSystemImage: "shippingbox",
                     isDestructive: true,
                     isWorking: model.isWorking,
@@ -100,28 +109,33 @@ struct HomebrewView: View {
         }
     }
 
+    private var upgradeTitle: String {
+        let count = model.markedOutdated.count
+        return "Upgrade \(count) \(count == 1 ? "package" : "packages")"
+    }
+
     private var actionsRow: some View {
         HStack {
             Spacer()
             SecondaryActionButton(
-                title: "Update",
+                title: "Update catalog",
                 isEnabled: model.canAct,
                 help: "Refresh Homebrew's catalog with brew update.",
                 action: { model.update() })
             SecondaryActionButton(
-                title: "Upgrade selected (\(model.markedOutdated.count))",
+                title: upgradeTitle,
                 isEnabled: model.canUpgrade,
                 help: model.canUpgrade
                     ? "Upgrade the selected packages that have an update."
                     : "Mark a package with an update first.",
                 action: { model.upgrade() })
             SecondaryActionButton(
-                title: "Install…",
+                title: "Install packages…",
                 isEnabled: model.canAct,
                 help: "Search for a formula or cask to install.",
                 action: { model.openInstaller() })
             QuietActionButton(
-                title: "Clean up old versions",
+                title: "Remove old versions",
                 isEnabled: model.canAct,
                 help: "Remove old versions and the download cache.",
                 action: { model.cleanup() })
@@ -227,7 +241,7 @@ private struct HomebrewRow: View {
     @ViewBuilder private var statusLabel: some View {
         if package.outdated {
             StatusLabel(
-                text: "Update available", systemImage: "arrow.up.circle", tone: .amber,
+                text: "Outdated", systemImage: "arrow.up.circle", tone: .amber,
                 help: "Latest is \(package.latest).")
         } else if package.isUnusedDependency {
             StatusLabel(

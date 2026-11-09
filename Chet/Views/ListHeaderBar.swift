@@ -21,7 +21,7 @@ struct ListHeaderBar: View {
                 .accessibilityLabel(selected.count == items.count ? "Deselect all" : "Select all")
                 .accessibilityIdentifier("list.selectAll")
                 Text(
-                    "\(selected.count) of \(items.count) chosen · "
+                    "\(selected.count) of \(items.count) selected · "
                         + selected.reduce(0) { $0 + $1.reclaimableBytes }
                         .formatted(.byteCount(style: .file))
                 )
@@ -32,22 +32,25 @@ struct ListHeaderBar: View {
                 Menu {
                     Button("All", systemImage: "checkmark.circle") { model.setSelected(items.map(\.url), true) }
                     Button("None", systemImage: "circle") { model.setSelected(items.map(\.url), false) }
+                    Button("Invert", systemImage: "arrow.triangle.2.circlepath") {
+                        model.invertSelection(items.map(\.url))
+                    }
                     Divider()
-                    Button("Only safe items", systemImage: "checkmark") {
+                    Button("Safe items only", systemImage: "checkmark") {
                         model.setSelected(items.map(\.url), false)
                         model.setSelected(items.filter { $0.risk == .safe }.map(\.url), true)
                     }
-                    Button("Untouched for 30 days", systemImage: "calendar.badge.clock") {
+                    Button("Older than 30 days", systemImage: "calendar.badge.clock") {
                         let cutoff = Date().addingTimeInterval(-30 * 86_400)
                         model.setSelected(items.map(\.url), false)
                         model.setSelected(items.filter { $0.stamp.modified < cutoff }.map(\.url), true)
                     }
-                    Button("Bigger than 100 MB", systemImage: "arrow.up.forward.square") {
+                    Button("Larger than 100 MB", systemImage: "arrow.up.forward.square") {
                         model.setSelected(items.map(\.url), false)
                         model.setSelected(items.filter { $0.reclaimableBytes >= 100_000_000 }.map(\.url), true)
                     }
                 } label: {
-                    Label("Choose", systemImage: "checklist")
+                    Label("Select", systemImage: "checklist")
                 }
                 .menuStyle(.borderlessButton)
                 .fixedSize()

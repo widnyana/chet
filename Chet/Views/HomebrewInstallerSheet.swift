@@ -15,7 +15,7 @@ struct HomebrewInstallerSheet: View {
                     Text("Install a package")
                         .font(Typography.title)
                         .foregroundStyle(Theme.ink)
-                    Text("Search Homebrew's catalog, then mark the names to install.")
+                    Text("Search Homebrew's catalog, then select the packages to install.")
                         .font(Typography.caption)
                         .foregroundStyle(Theme.inkSecondary)
                 }

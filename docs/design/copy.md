@@ -25,10 +25,10 @@ work.
 |---|---|---|
 | Home, never scanned | `Clean up your Mac` | `A clear account of this disk` |
 | Home, results | `Clean up your Mac` | `N categories. Pick one to review.` |
-| Caches | `Caches` | `X across N items. Apps rebuild this data.` |
-| Logs | `Logs` | `X across N items. Apps rebuild this data.` |
-| Duplicates | `Duplicates` | `X across N groups. One copy stays in each group.` |
-| Large files | `Large and old files` | `X across N items. Review before removing.` |
+| Caches | `Caches` | `N items. Apps rebuild this data.` |
+| Logs | `Logs` | `N items. Apps rebuild this data.` |
+| Duplicates | `Duplicates` | `N groups. One copy stays in each group.` |
+| Large files | `Large and old files` | `N items. Review each item. Removed items go to the Trash.` |
 | Apps | `Apps` | `N installed, M marked` |
 | Homebrew | `Homebrew` | `N packages, M marked` |
 | App detail | app name | `Version X, bundle ID` |
@@ -121,7 +121,8 @@ A loading state never claims a number.
 - `The applications folder could not be read. Check Full Disk Access, then reload.`
 - `The Homebrew list could not be read. Run brew list in Terminal, then reload.`
 - `The disk map could not be read for this folder. Reveal it in Finder or try another folder.`
-- `The snapshot command failed. macOS returned: [message].`
+- `The snapshot command failed. Try again later.` The raw output is in the
+  details disclosure.
 - `Chet could not move this item. It may have changed since the scan.`
 - `Chet could not move this app. An administrator may need to remove it.`
 
@@ -164,6 +165,10 @@ Every item is checked again before removal.
 Cancel | Clean
 ```
 
+Use the title that matches the set: `Clean N items?` when it mixes deletion and
+Trash, `Move N items to the Trash?` for Trash only, `Delete N items?` for
+permanent removal only. The subtitle is always `N items in M categories`.
+
 Dry run adds one line. Cleaning confirmation:
 `Preview only. Nothing will be removed.` App confirmation:
 `Preview only. Nothing will be moved.`
@@ -202,10 +207,14 @@ not known yet, the subtitle says `Preparing the clean pass`.
 
 ## Summary copy
 
+The title follows what happened: `Removed` for a mixed set, `Moved to the
+Trash` for Trash only, `Deleted` for permanent removal only. Dry run uses
+`Dry run complete`.
+
 Clean:
 
 ```
-Clean complete
+Removed
 12.4 GB freed
 32 of 34 items cleaned
 2 items left alone
@@ -224,7 +233,7 @@ Nothing was deleted.
 Apps:
 
 ```
-Uninstall complete
+Removed
 920.3 MB moved to the Trash
 5 of 5 items moved
 [Done]
@@ -258,6 +267,31 @@ Uninstall complete
 - No line that could belong to any cleaner app after swapping the name.
 - No apology or filler.
 - No exclamation mark.
+
+## Homebrew
+
+- Header: `N packages, M marked`. Metric label `on disk`.
+- Actions: `Update catalog`, `Upgrade N packages`, `Install packages…`,
+  `Remove old versions`, `Uninstall`.
+- Empty, no packages: `No Homebrew packages. Install one with brew, then reload.`
+- Missing Homebrew: `Homebrew is not installed. Install it from brew.sh, then
+  reload.`
+- Error: `The Homebrew list could not be read. Run brew list in Terminal, then
+  reload.`
+- Gate, uninstall: `Preview only. Nothing will be removed.`
+- Gate, install: `Preview only. Nothing will be installed.`
+- Confirm: `Uninstall N packages?`, with `Uninstall` and, for casks,
+  `Uninstall and delete data`. The message names what the data option deletes.
+- Results: `Removed N packages.`, `Installed N packages.`,
+  `Upgraded N packages.`, `Added the tap name.`, `Freed X.`,
+  `No old versions to remove.`, `Homebrew's catalog is up to date.`
+- Status: `Outdated`, `Pinned`, `Unused`, `Installed`.
+
+## About
+
+- Status: `Granted` or `Not granted`.
+- Audit log detail: `A record of each item Chet removed.` or `No log yet.`
+- Missing value: `Unknown`.
 
 ## Tweaks
 

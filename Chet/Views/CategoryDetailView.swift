@@ -32,8 +32,8 @@ struct CategoryDetailView: View {
             .padding(.bottom, Spacing.s3)
             if category.items.isEmpty {
                 EmptyStateView(
-                    title: "Nothing here",
-                    message: "This group is empty. Scan again later.",
+                    title: "No entries in this category",
+                    message: "Scan again to look for new items.",
                     systemImage: "folder"
                 )
                 .padding(.horizontal, Metrics.widePageMargin)
@@ -59,11 +59,11 @@ struct CategoryDetailView: View {
     }
 
     private var riskSentence: String {
-        let count = category.items.count == 1 ? "1 file" : "\(category.items.count) files"
+        let count = category.items.count == 1 ? "1 item" : "\(category.items.count) items"
         switch section {
-        case .safe: return "\(count). Apps rebuild these, so they are safe to remove."
-        case .review: return "\(count). Check each one before removing."
-        case .informational: return "Chet does not remove these files."
+        case .safe: return "\(count). Apps rebuild this data."
+        case .review: return "\(count). Review each item. Removed items go to the Trash."
+        case .informational: return "Protected. Chet never removes this."
         }
     }
 
@@ -74,12 +74,12 @@ struct CategoryDetailView: View {
                     .formatted(.byteCount(style: .file)),
                 detail: categorySelected.count == 1
                     ? "1 item selected" : "\(categorySelected.count) items selected",
-                actionTitle: "Remove selected",
+                actionTitle: "Clean",
                 actionSystemImage: "trash",
                 isEnabled: !categorySelected.isEmpty && !model.isCleaning,
-                help: "Review and remove the selected items",
+                help: "Review and clean the selected items",
                 accessibilityLabel:
-                    "Remove selected, \(categorySelected.count) items",
+                    "Clean selected, \(categorySelected.count) items",
                 action: {
                     model.beginClean(categorySelected)
                     onClean()
@@ -106,7 +106,7 @@ struct CategoryDetailView: View {
             TableColumn("Name", value: \.url.lastPathComponent) { item in
                 ItemNameCell(item: item)
             }
-            TableColumn("Last changed", value: \.stamp.modified) { item in
+            TableColumn("Modified", value: \.stamp.modified) { item in
                 Text(item.stamp.modified, format: .relative(presentation: .named))
                     .font(Typography.row)
                     .foregroundStyle(Theme.inkSecondary)
@@ -121,13 +121,21 @@ struct CategoryDetailView: View {
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .width(90)
-            TableColumn("") { item in
-                if item.risk == .informational {
-                    StatusLabel(
-                        text: "Chet can't remove this",
-                        systemImage: "info.circle",
-                        tone: .neutral)
+            TableColumn("Risk") { item in
+                Group {
+                    if item.risk == .informational {
+                        StatusLabel(
+                            text: "Protected",
+                            systemImage: "shield.lefthalf.filled",
+                            tone: .red)
+                    } else if item.risk == .review {
+                        StatusLabel(
+                            text: "Review",
+                            systemImage: "exclamationmark.circle",
+                            tone: .amber)
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
             TableColumn("") { item in
                 Menu {

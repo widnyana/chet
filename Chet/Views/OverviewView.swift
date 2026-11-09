@@ -29,7 +29,7 @@ struct OverviewView: View {
             title: "Clean up your Mac",
             subtitle: subtitle,
             metric: metric,
-            metricLabel: "can be freed"
+            metricLabel: "can be reclaimed"
         )
         .accessibilityIdentifier("home.header")
     }
@@ -40,12 +40,13 @@ struct OverviewView: View {
     }
 
     private var subtitle: String {
-        if model.isScanning { return "Scanning caches, logs, and large files." }
+        if model.isScanning { return "Scanning caches and logs." }
         guard model.lastScan != nil else {
-            return "Scan for caches, logs, and large files. Nothing is removed until you choose."
+            return "A clear account of this disk."
         }
-        if model.totalBytes == 0 { return "Your Mac is tidy." }
-        return "You can free \(model.totalBytes.formatted(.byteCount(style: .file)))."
+        if model.totalBytes == 0 { return "This Mac is tidy." }
+        let count = rows(in: .safe).count + rows(in: .review).count
+        return "\(count) \(count == 1 ? "category" : "categories"). Pick one to review."
     }
 
     private var capacity: some View {
@@ -95,7 +96,7 @@ struct OverviewView: View {
     private var neverScanned: some View {
         EmptyStateView(
             title: "No scan yet",
-            message: "A scan measures your folders and shows what takes space.",
+            message: "Run a scan to see what can be reclaimed.",
             systemImage: "internaldrive"
         )
         .accessibilityIdentifier("home.empty")
@@ -107,8 +108,8 @@ struct OverviewView: View {
         VStack(alignment: .leading, spacing: Spacing.s6) {
             if safe.isEmpty && review.isEmpty {
                 EmptyStateView(
-                    title: "Nothing found",
-                    message: "Scan again after you use more apps.",
+                    title: "Nothing to reclaim",
+                    message: "This Mac is tidy.",
                     systemImage: "checkmark.circle")
             }
             if !safe.isEmpty { ledger("Safe to remove", safe) }
@@ -190,7 +191,7 @@ struct OverviewView: View {
 
     private var scanProgress: some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
-            SectionHeader(title: "Scanning your Mac")
+            SectionHeader(title: "Scanning caches and logs")
             ProgressView(value: progressFraction)
                 .tint(Theme.accent)
             Text(activityLabel)
@@ -246,11 +247,11 @@ struct OverviewView: View {
             CommandBar(
                 metric: model.selectedBytes.formatted(.byteCount(style: .file)),
                 detail: count == 1 ? "1 item selected" : "\(count) items selected",
-                actionTitle: "Remove selected",
+                actionTitle: "Clean selected",
                 actionSystemImage: "trash",
                 isEnabled: !model.isCleaning,
-                help: "Review and remove the selected items",
-                accessibilityLabel: "Remove selected, \(count) items",
+                help: "Review and clean the selected items",
+                accessibilityLabel: "Clean selected, \(count) items",
                 action: {
                     model.beginClean()
                     onClean()

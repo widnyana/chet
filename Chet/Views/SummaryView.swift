@@ -22,7 +22,7 @@ struct SummaryView: View {
 
     /// The verb comes from what actually happened, so a Trash run never says "Deleted".
     private var title: String {
-        if report.dryRun { return "Preview complete" }
+        if report.dryRun { return "Dry run complete" }
         var removed = 0
         var trashed = 0
         for result in report.results {
@@ -48,14 +48,14 @@ struct SummaryView: View {
                     .foregroundStyle(Theme.ink)
                 Text(
                     report.dryRun
-                        ? "would be freed. \(moved) of \(report.results.count) items would be removed. Nothing was deleted."
-                        : "freed. \(moved) of \(report.results.count) items removed."
+                        ? "would be freed. \(moved) of \(report.results.count) \(report.results.count == 1 ? "item" : "items") would be cleaned. Nothing was deleted."
+                        : "freed. \(moved) of \(report.results.count) \(report.results.count == 1 ? "item" : "items") cleaned."
                 )
                 .font(Typography.body)
                 .foregroundStyle(Theme.inkSecondary)
             }
             if !problems.isEmpty {
-                DisclosureGroup("\(problems.count) items not removed") {
+                DisclosureGroup("\(problems.count) \(problems.count == 1 ? "item" : "items") not removed") {
                     VStack(spacing: 0) {
                         ForEach(problems, id: \.item.url) { result in
                             HStack {
@@ -85,7 +85,7 @@ struct SummaryView: View {
             }
             HStack {
                 SecondaryActionButton(
-                    title: "Show activity log",
+                    title: "Show audit log",
                     action: { NSWorkspace.shared.open(AuditLog().url) })
                 Spacer()
                 PrimaryActionButton(

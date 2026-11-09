@@ -65,7 +65,7 @@ enum CategoryCopy {
             explanation: "Finder backups of your devices."),
         "tagged-caches": Entry(
             title: "Tagged cache folders", section: .safe,
-            explanation: "Folders tagged as cache. Check them before removing."),
+            explanation: "Folders macOS marks as cache. Apps rebuild them."),
         "duplicates": Entry(
             title: "Duplicate files", section: .review,
             explanation: "Extra copies of files. One copy stays."),
@@ -91,7 +91,7 @@ enum CategoryCopy {
             title: "Similar videos", section: .review,
             explanation: "Copies and re-encoded videos. One video stays."),
         "snapshots": Entry(
-            title: "Time Machine snapshots", section: .review,
+            title: "Local snapshots", section: .review,
             explanation: "Temporary Time Machine copies on this disk."),
         "nix": Entry(
             title: "Nix files", section: .informational,

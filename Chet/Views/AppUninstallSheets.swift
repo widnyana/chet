@@ -14,6 +14,8 @@ struct AppUninstallConfirmSheet: View {
                 (AppComponentKind.allCases.firstIndex(of: $0.kind) ?? Int.max)
                     < (AppComponentKind.allCases.firstIndex(of: $1.kind) ?? Int.max)
             }
+        let moveLabel =
+            "Move \(app?.name ?? "this app") and \(model.selectedCount) \(model.selectedCount == 1 ? "item" : "items") to the Trash"
         SheetFrame {
             VStack(alignment: .leading, spacing: Spacing.s4) {
                 VStack(alignment: .leading, spacing: Spacing.s1) {
@@ -21,7 +23,7 @@ struct AppUninstallConfirmSheet: View {
                         .font(Typography.title)
                         .foregroundStyle(Theme.ink)
                     Text(
-                        "\(model.selectedCount) items · \(model.selectedBytes.formatted(.byteCount(style: .file)))"
+                        "\(model.selectedCount) \(model.selectedCount == 1 ? "item" : "items") · \(model.selectedBytes.formatted(.byteCount(style: .file)))"
                     )
                     .font(Typography.body)
                     .monospacedDigit()
@@ -81,6 +83,8 @@ struct AppUninstallConfirmSheet: View {
                     DestructiveActionButton(
                         title: "Move to Trash",
                         isEnabled: model.canRemove,
+                        help: moveLabel,
+                        accessibilityLabel: moveLabel,
                         shortcut: .return,
                         action: {
                             model.remove()
@@ -153,7 +157,7 @@ struct UninstallSummaryView: View {
                 VStack(alignment: .leading, spacing: Spacing.s1) {
                     Text(
                         report.dryRun
-                            ? "Preview complete" : (report.removedCount > 0 ? "Removed" : "Moved to the Trash")
+                            ? "Dry run complete" : (report.removedCount > 0 ? "Removed" : "Moved to the Trash")
                     )
                     .font(Typography.title)
                     .foregroundStyle(Theme.ink)
@@ -163,14 +167,14 @@ struct UninstallSummaryView: View {
                         .foregroundStyle(Theme.ink)
                     Text(
                         report.dryRun
-                            ? "\(cleanedCount) of \(report.results.count) items would be cleaned. Nothing was moved or removed."
-                            : "\(cleanedCount) of \(report.results.count) items cleaned. Items marked removed are gone permanently."
+                            ? "\(cleanedCount) of \(report.results.count) \(report.results.count == 1 ? "item" : "items") would be cleaned. Nothing was moved or removed."
+                            : "\(cleanedCount) of \(report.results.count) \(report.results.count == 1 ? "item" : "items") cleaned. Items marked removed are gone permanently."
                     )
                     .font(Typography.body)
                     .foregroundStyle(Theme.inkSecondary)
                 }
                 if !problems.isEmpty {
-                    DisclosureGroup("\(problems.count) items not moved") {
+                    DisclosureGroup("\(problems.count) \(problems.count == 1 ? "item" : "items") not moved") {
                         VStack(spacing: 0) {
                             ForEach(problems) { result in
                                 HStack {
@@ -192,7 +196,7 @@ struct UninstallSummaryView: View {
                 }
                 HStack {
                     SecondaryActionButton(
-                        title: "Show activity log",
+                        title: "Show audit log",
                         action: { NSWorkspace.shared.open(AuditLog().url) })
                     Spacer()
                     PrimaryActionButton(
@@ -250,7 +254,7 @@ struct BulkUninstallConfirmSheet: View {
                                 Text(
                                     model.appSizes[app.url].map {
                                         $0.formatted(.byteCount(style: .file))
-                                    } ?? "n/a"
+                                    } ?? "Unknown"
                                 )
                                 .font(Typography.row)
                                 .monospacedDigit()
@@ -289,6 +293,8 @@ struct BulkUninstallConfirmSheet: View {
                     DestructiveActionButton(
                         title: "Move to Trash",
                         isEnabled: model.canBulkRemove,
+                        help: "Move \(model.markedApps.count) apps to the Trash",
+                        accessibilityLabel: "Move \(model.markedApps.count) apps to the Trash",
                         shortcut: .return,
                         action: {
                             model.removeMarked()
@@ -333,7 +339,7 @@ struct BulkUninstallSummaryView: View {
                 VStack(alignment: .leading, spacing: Spacing.s1) {
                     Text(
                         report.dryRun
-                            ? "Preview complete" : (report.removedCount > 0 ? "Removed" : "Moved to the Trash")
+                            ? "Dry run complete" : (report.removedCount > 0 ? "Removed" : "Moved to the Trash")
                     )
                     .font(Typography.title)
                     .foregroundStyle(Theme.ink)
@@ -346,7 +352,7 @@ struct BulkUninstallSummaryView: View {
                         .foregroundStyle(Theme.inkSecondary)
                 }
                 if !problems.isEmpty {
-                    DisclosureGroup("\(problems.count) items not moved") {
+                    DisclosureGroup("\(problems.count) \(problems.count == 1 ? "item" : "items") not moved") {
                         VStack(spacing: 0) {
                             ForEach(problems.indices, id: \.self) { index in
                                 let problem = problems[index]
@@ -373,7 +379,7 @@ struct BulkUninstallSummaryView: View {
                 }
                 HStack {
                     SecondaryActionButton(
-                        title: "Show activity log",
+                        title: "Show audit log",
                         action: { NSWorkspace.shared.open(AuditLog().url) })
                     Spacer()
                     PrimaryActionButton(

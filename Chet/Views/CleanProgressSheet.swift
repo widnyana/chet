@@ -34,7 +34,7 @@ struct CleanProgressSheet: View {
                     ProgressView()
                         .controlSize(.small)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(dryRun ? "Previewing removal" : title)
+                        Text(dryRun ? "Simulating clean" : "Cleaning")
                             .font(Typography.title)
                             .foregroundStyle(Theme.ink)
                         Text(headline(progress))
@@ -51,21 +51,15 @@ struct CleanProgressSheet: View {
                 ProgressView(value: itemFraction)
                     .tint(Theme.accent)
                 detailBox(progress, dryRun: dryRun)
-                Text("Chet checks every file and folder again before removing it.")
-                    .font(Typography.caption)
-                    .foregroundStyle(Theme.inkSecondary)
+                Text(
+                    dryRun
+                        ? "Every item would be checked again before removal."
+                        : "Every item is checked again before removal."
+                )
+                .font(Typography.caption)
+                .foregroundStyle(Theme.inkSecondary)
             }
         }
-    }
-
-    private var hasTrash: Bool { model.confirmItems.contains { $0.mode == .trash } }
-    private var hasPermanent: Bool {
-        model.confirmItems.contains { $0.mode == .permanent } || !model.confirmSnapshots.isEmpty
-    }
-
-    private var title: String {
-        if hasPermanent && hasTrash { return "Removing files" }
-        return hasTrash ? "Moving files to the Trash" : "Deleting files"
     }
 
     private func currentAction(_ progress: CleanProgress, dryRun: Bool) -> String {
@@ -76,12 +70,12 @@ struct CleanProgressSheet: View {
     }
 
     private func headline(_ progress: CleanProgress?) -> String {
-        guard let progress else { return "Getting ready" }
+        guard let progress else { return "Preparing the clean pass" }
         if progress.isFinal {
-            return model.cleanSnapshotCount > 0 ? "Finishing Time Machine snapshots" : "Finishing"
+            return model.cleanSnapshotCount > 0 ? "Finishing the snapshot removal" : "Finishing"
         }
-        if progress.currentPath.isEmpty { return "Getting ready" }
-        return "File \(progress.currentFileNumber) of \(progress.total)"
+        if progress.currentPath.isEmpty { return "Preparing the clean pass" }
+        return "Item \(progress.currentFileNumber) of \(progress.total)"
     }
 
     private func detailBox(_ progress: CleanProgress?, dryRun: Bool) -> some View {
@@ -89,11 +83,11 @@ struct CleanProgressSheet: View {
         let totalBytes = progress?.totalBytes ?? 0
         let freedBytes = progress?.freedBytes ?? 0
         return VStack(spacing: 0) {
-            detailRow("Files", "\(progress?.processed ?? 0) of \(progress?.total ?? 0)")
+            detailRow("Items", "\(progress?.processed ?? 0) of \(progress?.total ?? 0)")
             Hairline()
             VStack(alignment: .leading, spacing: Spacing.s1) {
                 HStack {
-                    Text("Size")
+                    Text("Bytes")
                         .font(Typography.caption)
                         .foregroundStyle(Theme.inkSecondary)
                     Spacer()
@@ -118,7 +112,7 @@ struct CleanProgressSheet: View {
             }
             if let progress, progress.failed > 0 {
                 Hairline()
-                detailRow(dryRun ? "Would leave" : "Could not remove", "\(progress.failed)")
+                detailRow(dryRun ? "Would fail" : "Failed", "\(progress.failed)")
             }
             if model.cleanSnapshotCount > 0 {
                 Hairline()
@@ -179,7 +173,7 @@ struct CleanProgressSheet: View {
                     .font(Typography.row)
                     .foregroundStyle(Theme.inkSecondary)
             } else {
-                Text("Getting ready")
+                Text("Preparing the clean pass")
                     .font(Typography.row)
                     .foregroundStyle(Theme.inkSecondary)
             }

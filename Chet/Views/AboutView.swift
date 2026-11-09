@@ -66,7 +66,7 @@ struct AboutView: View {
                 AboutPathRow(
                     label: "Audit log",
                     path: auditLog.url.path,
-                    detail: logExists ? "One JSON line per removed item." : "No log yet.",
+                    detail: logExists ? "A record of each item Chet removed." : "No log yet.",
                     actionTitle: logExists ? "Show" : nil,
                     actionHelp: "Open the clean log",
                     action: { _ = NSWorkspace.shared.open(auditLog.url) })

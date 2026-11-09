@@ -18,13 +18,13 @@ struct OnboardingView: View {
                     .font(Typography.title)
                     .foregroundStyle(Theme.ink)
                 Text(
-                    "macOS keeps some folders private, like caches and Mail downloads. Chet needs Full Disk Access to read them. The scan runs on this Mac and sends nothing off it."
+                    "macOS hides caches, logs, and some app data. Chet needs Full Disk Access to read them. The scan runs on this Mac."
                 )
                 .font(Typography.body)
                 .foregroundStyle(Theme.inkSecondary)
                 .fixedSize(horizontal: false, vertical: true)
                 VStack(spacing: 0) {
-                    step(1, "Open Privacy and Security in System Settings.")
+                    step(1, "Open Privacy & Security in System Settings.")
                     Hairline()
                     step(2, "Turn on Chet under Full Disk Access.")
                     Hairline()

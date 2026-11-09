@@ -84,7 +84,7 @@ struct AppBrowserView: View {
             .padding(.top, Spacing.s6)
             .padding(.bottom, Spacing.s3)
             if model.isLoadingApps {
-                LoadingStateView(message: "Reading your apps")
+                LoadingStateView(message: "Reading applications")
                     .padding(.horizontal, Metrics.widePageMargin)
                 Spacer()
             } else if model.apps.isEmpty {
@@ -92,8 +92,8 @@ struct AppBrowserView: View {
                     .padding(.horizontal, Metrics.widePageMargin)
             } else if model.filteredApps.isEmpty {
                 EmptyStateView(
-                    title: "No apps match",
-                    message: "No app name contains \"\(model.query)\".",
+                    title: "No application matches \"\(model.query)\"",
+                    message: "Clear the search to see all apps.",
                     systemImage: "magnifyingglass",
                     actionTitle: "Clear search",
                     action: { model.query = "" }
@@ -138,21 +138,21 @@ struct AppBrowserView: View {
     }
 
     private var subtitle: String {
-        model.apps.isEmpty ? "Installed apps" : "\(model.apps.count) installed"
+        "\(model.apps.count) installed, \(model.markedApps.count) marked"
     }
 
     @ViewBuilder private var noApps: some View {
         if model.hasFullDiskAccess {
             EmptyStateView(
-                title: "No apps found",
+                title: "No applications found",
                 message: "Try reading the Applications folder again.",
                 systemImage: "app.dashed",
                 actionTitle: "Reload",
                 action: { model.load() })
         } else {
             EmptyStateView(
-                title: "No apps found",
-                message: "Chet may not see every app without Full Disk Access.",
+                title: "No applications found",
+                message: "If this is unexpected, check Full Disk Access.",
                 systemImage: "app.dashed",
                 actionTitle: "Open Settings",
                 action: { NSWorkspace.shared.open(FullDiskAccess.settingsURL) })
@@ -230,12 +230,12 @@ struct AppBrowserView: View {
             metric: model.markedBytes.formatted(.byteCount(style: .file)),
             detail: model.markedApps.count == 1
                 ? "1 app selected" : "\(model.markedApps.count) apps selected",
-            actionTitle: "Move to Trash",
+            actionTitle: "Remove",
             isEnabled: model.canBulkRemove,
-            secondaryTitle: "Deselect",
+            secondaryTitle: "Clear",
             secondaryAction: { model.clearMarks() },
             help: "Review and move the selected apps to the Trash",
-            accessibilityLabel: "Move to Trash, \(model.markedApps.count) apps",
+            accessibilityLabel: "Remove, \(model.markedApps.count) apps",
             action: { model.beginBulkRemoval() })
     }
 }
@@ -273,7 +273,7 @@ private struct LastUsedText: View {
                 Text("Unknown").foregroundStyle(Theme.inkSecondary)
             }
         } else {
-            Text("...").foregroundStyle(Theme.inkTertiary)
+            Text("Reading").foregroundStyle(Theme.inkSecondary)
         }
     }
 }
@@ -357,7 +357,7 @@ private struct AppRow: View {
                 .font(Typography.row)
                 .lineLimit(1)
                 .frame(width: AppColumns.lastUsed, alignment: .leading)
-            Text(model.appSizes[app.url].map { $0.formatted(.byteCount(style: .file)) } ?? "n/a")
+            Text(model.appSizes[app.url].map { $0.formatted(.byteCount(style: .file)) } ?? "Unknown")
                 .font(Typography.row)
                 .monospacedDigit()
                 .foregroundStyle(Theme.inkSecondary)
@@ -387,11 +387,11 @@ private struct AppRow: View {
     @ViewBuilder private var status: some View {
         if model.isAppRunning(app) {
             StatusLabel(
-                text: "Open now", systemImage: "bolt.fill", tone: .amber,
+                text: "Running", systemImage: "bolt.fill", tone: .amber,
                 help: "\(app.name) is open. Quit it before removing.")
         } else if !app.isWritable {
             StatusLabel(
-                text: "Needs admin", systemImage: "lock.fill", tone: .amber,
+                text: "Needs administrator", systemImage: "lock.fill", tone: .amber,
                 help: "An administrator must remove this app.")
         } else {
             Color.clear.frame(height: 1)
@@ -420,9 +420,9 @@ private struct AppCell: View {
                 .accessibilityLabel("Select \(app.name) to remove")
                 Spacer()
                 if model.isAppRunning(app) {
-                    StatusLabel(text: "Open now", systemImage: "bolt.fill", tone: .amber)
+                    StatusLabel(text: "Running", systemImage: "bolt.fill", tone: .amber)
                 } else if !app.isWritable {
-                    StatusLabel(text: "Needs admin", systemImage: "lock.fill", tone: .amber)
+                    StatusLabel(text: "Needs administrator", systemImage: "lock.fill", tone: .amber)
                 }
             }
             Button {
@@ -441,7 +441,7 @@ private struct AppCell: View {
                         .font(Typography.caption)
                         .foregroundStyle(Theme.inkSecondary)
                         .lineLimit(1)
-                    Text(model.appSizes[app.url].map { $0.formatted(.byteCount(style: .file)) } ?? "n/a")
+                    Text(model.appSizes[app.url].map { $0.formatted(.byteCount(style: .file)) } ?? "Unknown")
                         .font(Typography.caption)
                         .monospacedDigit()
                         .foregroundStyle(Theme.inkSecondary)

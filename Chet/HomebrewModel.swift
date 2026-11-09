@@ -169,7 +169,7 @@ final class HomebrewModel {
                 self.actionResult = result.out
             } else {
                 self.actionResult =
-                    freed.map { "Freed about \($0)." } ?? "Cleaned up. Nothing to free."
+                    freed.map { "Freed \($0)." } ?? "No old versions to remove."
             }
             if !dryRun { self.load() }
         }

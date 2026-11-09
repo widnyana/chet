@@ -80,7 +80,7 @@ struct ChetApp: App {
         .commands {
             AboutCommand()
             CommandMenu("Scan") {
-                Button(model.isScanning ? "Stop Scan" : "Scan") {
+                Button(model.isScanning ? "Stop scan" : "Scan") {
                     if model.isScanning { model.cancel() } else { model.scan() }
                 }
                 .keyboardShortcut("r")

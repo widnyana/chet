@@ -325,8 +325,7 @@ struct SettingsView: View {
     private var tweaksPane: some View {
         SettingsPaneView(note: "Changes apply as soon as each value is written.") {
             SettingsPanel(title: "Changes Chet made") {
-                SettingsNote(
-                    "Each change is checked by reading the value back. A failed change restores the earlier value.")
+                SettingsNote(TweakCopy.verificationNote)
                 SettingsDivider()
                 SettingsRow(label: "Changed from the macOS default", detail: changedDetail) {
                     Text("\(tweaks.customizedCount)")

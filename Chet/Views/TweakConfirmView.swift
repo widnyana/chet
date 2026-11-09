@@ -28,6 +28,12 @@ struct TweakConfirmView: View {
                 .font(Typography.body)
                 .foregroundStyle(Theme.inkSecondary)
                 .fixedSize(horizontal: false, vertical: true)
+            if model.isGated {
+                StatusLabel(
+                    text: "Preview only. No tweak is changed.",
+                    systemImage: "eye.slash",
+                    tone: .amber)
+            }
             VStack(spacing: 0) {
                 DefinitionRow(label: "From", value: TweakCopy.value(current))
                 Hairline()
@@ -42,7 +48,7 @@ struct TweakConfirmView: View {
                     value: "The earlier value is restored and the failure is recorded.")
             }
             HStack(spacing: Spacing.s3) {
-                SecondaryActionButton(title: "Cancel") {
+                SecondaryActionButton(title: "Cancel", shortcut: .escape) {
                     model.cancelPendingChange()
                     dismiss()
                 }
@@ -54,7 +60,7 @@ struct TweakConfirmView: View {
             }
         }
         .padding(Spacing.s6)
-        .frame(width: 480, alignment: .leading)
+        .frame(width: 520, alignment: .leading)
         .background(Theme.paper)
         .accessibilityIdentifier("tweak.confirm.\(pending.tweak.id)")
     }

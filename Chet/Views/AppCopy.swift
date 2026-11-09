@@ -24,11 +24,11 @@ enum AppCopy {
 
     static func ownership(_ ownership: AppOwnership) -> String {
         switch ownership {
-        case .exclusive: "Belongs to this app"
-        case .probable: "Probably belongs"
-        case .shared: "Shared with another app"
-        case .privileged: "Needs an administrator"
-        case .systemProtected: "Protected by macOS"
+        case .exclusive: "Exact match"
+        case .probable: "Name match"
+        case .shared: "Shared"
+        case .privileged: "Needs administrator"
+        case .systemProtected: "Protected"
         }
     }
 

@@ -13,8 +13,8 @@ struct SnapshotsView: View {
     var body: some View {
         VStack(spacing: 0) {
             PageHeader(
-                title: "Time Machine snapshots",
-                subtitle: "Local copies on this disk. Removing one does not delete your backups.",
+                title: "Local snapshots",
+                subtitle: "macOS reports size only when deleted.",
                 metric: "\(model.snapshots.count)",
                 metricLabel: model.snapshots.count == 1 ? "snapshot" : "snapshots"
             )
@@ -26,12 +26,12 @@ struct SnapshotsView: View {
             }
             if model.snapshots.isEmpty {
                 if model.isScanning {
-                    LoadingStateView(message: "Checking for snapshots")
+                    LoadingStateView(message: "Checking snapshots")
                         .padding(.horizontal, Spacing.s6)
                 } else {
                     EmptyStateView(
-                        title: "No Time Machine snapshots",
-                        message: "There are no local snapshots to remove.",
+                        title: "No local snapshots",
+                        message: "Time Machine keeps them only while it has room.",
                         systemImage: "clock.arrow.circlepath")
                 }
             } else {
@@ -47,7 +47,7 @@ struct SnapshotsView: View {
                             .monospacedDigit()
                             .foregroundStyle(Theme.ink)
                         Spacer()
-                        Text("Local snapshot")
+                        Text("Local")
                             .font(Typography.caption)
                             .foregroundStyle(Theme.inkSecondary)
                     }
@@ -64,12 +64,12 @@ struct SnapshotsView: View {
                 metric: "\(model.selectedSnapshots.count)",
                 detail: model.selectedSnapshots.count == 1
                     ? "1 snapshot selected" : "\(model.selectedSnapshots.count) snapshots selected",
-                actionTitle: "Remove selected",
+                actionTitle: "Clean selected",
                 actionSystemImage: "trash",
                 isEnabled: !model.selectedSnapshots.isEmpty && !model.isCleaning,
-                help: "Review and remove the selected snapshots",
+                help: "Review and clean the selected snapshots",
                 accessibilityLabel:
-                    "Remove selected, \(model.selectedSnapshots.count) snapshots",
+                    "Clean selected, \(model.selectedSnapshots.count) snapshots",
                 action: onClean)
         }
     }
@@ -80,7 +80,7 @@ struct SnapshotsView: View {
                 text: "Could not read local snapshots",
                 systemImage: "exclamationmark.triangle",
                 tone: .red)
-            Text("macOS returned an error. Try again later.")
+            Text("The snapshot command failed. Try again later.")
                 .font(Typography.body)
                 .foregroundStyle(Theme.inkSecondary)
             DisclosureGroup("Details") {

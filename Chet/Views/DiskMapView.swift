@@ -115,9 +115,11 @@ struct DiskMapView: View {
                 }
             } else if !model.isScanning {
                 EmptyStateView(
-                    title: "See what uses your space",
-                    message: "Click Scan in the toolbar, then click a block to look inside.",
-                    systemImage: "internaldrive"
+                    title: "The disk map appears after a scan.",
+                    message: "Scan this Mac to see where the space goes.",
+                    systemImage: "internaldrive",
+                    actionTitle: "Scan this Mac",
+                    action: { model.scan() }
                 )
                 .padding(Spacing.s8)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -355,7 +357,7 @@ struct DiskMapChrome: View {
                                 .font(Typography.caption)
                                 .foregroundStyle(Theme.inkTertiary)
                         }
-                        Button(index == 0 ? "Home folder" : node.url.lastPathComponent) {
+                        Button(index == 0 ? "Home" : node.url.lastPathComponent) {
                             onSelect(index)
                         }
                         .buttonStyle(.plain)

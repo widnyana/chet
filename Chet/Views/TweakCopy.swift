@@ -3,6 +3,9 @@ import ChetCore
 /// Plain words for tweak state, risk, restarts, and history. One source, used by the list
 /// and the details sheet.
 enum TweakCopy {
+    static let verificationNote =
+        "Each change is checked by reading the value back. A failed change restores the earlier value."
+
     static func state(_ state: TweakState) -> String {
         switch state {
         case .on: "On"

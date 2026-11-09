@@ -544,9 +544,9 @@ struct CapacityBarView: View {
                     Rectangle().strokeBorder(Theme.hairline, lineWidth: 1)
                 }
                 HStack(spacing: Spacing.s4) {
-                    legend("In use", Theme.capacityUsed, used)
+                    legend("Used", Theme.capacityUsed, used)
                     if reclaimable > 0 {
-                        legend("Can be freed", Theme.accent, reclaimable)
+                        legend("Can be reclaimed", Theme.accent, reclaimable)
                     }
                     legend("Free", Theme.capacityFree, free)
                 }
@@ -556,7 +556,7 @@ struct CapacityBarView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "\(volumeName). In use \(used.formatted(.byteCount(style: .file))), can be freed \(reclaimable.formatted(.byteCount(style: .file))), free \(free.formatted(.byteCount(style: .file)))"
+            "\(volumeName). Used \(used.formatted(.byteCount(style: .file))), can be reclaimed \(reclaimable.formatted(.byteCount(style: .file))), free \(free.formatted(.byteCount(style: .file)))"
         )
     }
 

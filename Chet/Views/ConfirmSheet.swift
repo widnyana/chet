@@ -19,15 +19,15 @@ struct ConfirmSheet: View {
         let hasTrash = items.contains { $0.mode == .trash }
         let title =
             hasPermanent && hasTrash
-            ? "Remove \(itemText)?" : (hasTrash ? "Move \(itemText) to the Trash?" : "Delete \(itemText)?")
-        let action = hasPermanent && hasTrash ? "Remove" : (hasTrash ? "Move to Trash" : "Delete")
+            ? "Clean \(itemText)?" : (hasTrash ? "Move \(itemText) to the Trash?" : "Delete \(itemText)?")
+        let action = hasPermanent && hasTrash ? "Clean" : (hasTrash ? "Move to Trash" : "Delete")
         SheetFrame {
             VStack(alignment: .leading, spacing: Spacing.s4) {
                 VStack(alignment: .leading, spacing: Spacing.s1) {
                     Text(title)
                         .font(Typography.title)
                         .foregroundStyle(Theme.ink)
-                    Text("\(itemText) in \(groupCount == 1 ? "1 group" : "\(groupCount) groups")")
+                    Text("\(itemText) in \(groupCount == 1 ? "1 category" : "\(groupCount) categories")")
                         .font(Typography.body)
                         .foregroundStyle(Theme.inkSecondary)
                         .monospacedDigit()
@@ -77,7 +77,9 @@ struct ConfirmSheet: View {
                             Image(systemName: "trash.slash")
                                 .foregroundStyle(Theme.inkSecondary)
                             Text(
-                                "\(permanent.formatted(.byteCount(style: .file))) is deleted now. Apps rebuild these files."
+                                DryRun.enabled
+                                    ? "\(permanent.formatted(.byteCount(style: .file))) would be deleted. Apps rebuild these files."
+                                    : "\(permanent.formatted(.byteCount(style: .file))) is deleted now. Apps rebuild these files."
                             )
                             .font(Typography.body)
                             .foregroundStyle(Theme.ink)
@@ -88,16 +90,22 @@ struct ConfirmSheet: View {
                             Image(systemName: "trash")
                                 .foregroundStyle(Theme.inkSecondary)
                             Text(
-                                "\(trashed.formatted(.byteCount(style: .file))) moves to the Trash. You can restore it from the Trash."
+                                DryRun.enabled
+                                    ? "\(trashed.formatted(.byteCount(style: .file))) would move to the Trash."
+                                    : "\(trashed.formatted(.byteCount(style: .file))) moves to the Trash. You can restore it from the Trash."
                             )
                             .font(Typography.body)
                             .foregroundStyle(Theme.ink)
                         }
                     }
                 }
-                Text("Chet checks each file again before removing it. Files that changed are left alone.")
-                    .font(Typography.caption)
-                    .foregroundStyle(Theme.inkSecondary)
+                Text(
+                    DryRun.enabled
+                        ? "Every item would be checked again before removal. Files that changed would be left alone."
+                        : "Every item is checked again before removal. Files that changed are left alone."
+                )
+                .font(Typography.caption)
+                .foregroundStyle(Theme.inkSecondary)
                 if DryRun.enabled {
                     StatusLabel(
                         text: "Preview only. Nothing will be removed.",
@@ -110,6 +118,8 @@ struct ConfirmSheet: View {
                     DestructiveActionButton(
                         title: action,
                         isEnabled: true,
+                        help: "\(action) \(itemText)",
+                        accessibilityLabel: "\(action) \(itemText)",
                         shortcut: .return,
                         action: { model.clean() })
                 }

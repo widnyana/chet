@@ -115,11 +115,9 @@ struct TweaksView: View {
                 ForEach(model.matchingCategories, id: \.self) { category in
                     section(category)
                 }
-                Text(
-                    "Each change is checked by reading the value back. A failed change restores the earlier value."
-                )
-                .font(Typography.caption)
-                .foregroundStyle(Theme.inkSecondary)
+                Text(TweakCopy.verificationNote)
+                    .font(Typography.caption)
+                    .foregroundStyle(Theme.inkSecondary)
             }
         }
     }
@@ -209,7 +207,7 @@ private struct TweakRow: View {
 
     private var restartLine: String {
         reading.tweak.restart == .login
-            ? "Sign in again" : "Restart \(TweakCopy.processName(reading.tweak.restart))"
+            ? "Sign out and back in" : "Restart \(TweakCopy.processName(reading.tweak.restart))"
     }
 
     @ViewBuilder private var control: some View {
