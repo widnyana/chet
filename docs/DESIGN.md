@@ -217,8 +217,9 @@ that step found last time, so a step is never just a name.
   state: steps on, and the last scan time, `no scan yet`, or `scanning now`.
 - Steps ledger: column captions `Step`, `Found`, `On`. The always-on base (`Rules and
   folder index`) is a locked row with a lock label, never a dead switch. Optional rows
-  carry their switch and the last scan's result (`12 files`, `3 groups`). Before any scan
-  the column says `not run`, never a zero standing in for a value.
+  carry their switch and the last scan's result (`12 files`, `3 groups`). A step switched
+  off reads `off`. Before any scan the column says `not run`, never a zero standing in for
+  a value.
 - Limits: three sliders with tabular readouts.
 - Keep out: the outside-home switch with its consequence, the excluded folders list with a
   text `Remove`, an empty state that names the next action, and inline correction for a

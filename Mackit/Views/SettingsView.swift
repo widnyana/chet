@@ -60,7 +60,7 @@ struct SettingsView: View {
         }
         .background(Theme.paper)
         .tint(Theme.accent)
-        .frame(width: 600, height: 820)
+        .frame(width: 600, height: 680)
         .background(SettingsWindowTitle())
     }
 
@@ -132,9 +132,10 @@ struct SettingsView: View {
         return "\(count) items"
     }
 
-    /// What one optional step found last scan. When a scan has not run, it says so rather than
-    /// showing a zero that would read as "this step finds nothing".
+    /// What one optional step found last scan. A step switched off says `off`, not a stale or
+    /// zero count; a scan that has not run says `not run`, never a zero standing in for a value.
     private func foundText(for step: ScanStep) -> String {
+        guard model.isStepEnabled(step) else { return "off" }
         if model.isScanning { return "running" }
         guard model.lastScan != nil else { return "not run" }
         switch step {
