@@ -26,6 +26,8 @@
 !/README.md
 !/DEVELOPING.md
 !/.swift-format
+!/AGENTS.md
+!/CLAUDE.md
 !Chet/**
 !ChetCore/**
 !docs/DESIGN.md
