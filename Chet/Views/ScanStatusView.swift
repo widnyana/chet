@@ -33,19 +33,13 @@ struct ScanStatusView: View {
             .accessibilityLabel("Stop the scan")
             .accessibilityIdentifier("toolbar.scanStop")
         } else {
-            Button {
-                model.scan()
-            } label: {
-                // Toolbar items drop their word by default on macOS; the only scan control
-                // must read as a button, so the label is forced back.
-                Label(model.lastScan == nil ? "Scan" : "Scan again", systemImage: "magnifyingglass")
-                    .labelStyle(.titleAndIcon)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(Theme.accent)
-            .controlSize(.large)
-            .help("Find files you can remove (Command-R)")
-            .accessibilityLabel("Scan for files you can remove")
+            PrimaryActionButton(
+                title: model.lastScan == nil ? "Scan" : "Scan again",
+                systemImage: "magnifyingglass",
+                help: "Find files you can remove (Command-R)",
+                accessibilityLabel: "Scan for files you can remove",
+                action: { model.scan() }
+            )
             .accessibilityIdentifier("toolbar.scan")
         }
     }

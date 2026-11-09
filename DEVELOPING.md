@@ -34,6 +34,17 @@ Status strip precedence: `DryRun.enabled` wins over the access banner. With `DRY
 `.env`, Home shows `Preview only. No files will be moved.` and never `Limited access`.
 Remove the flag to see the access banner.
 
+## Buttons
+
+Every button comes from `DesignSystem.swift`: `PrimaryActionButton`,
+`DestructiveActionButton`, `SecondaryActionButton`, `QuietActionButton`, `IconActionButton`.
+They share the 6 pt control radius, the regular control size, the label style, the help and
+accessibility wiring, and an optional keyboard shortcut. Do not style a `Button` where it is
+used; a hand-styled toolbar button is how the scan control became an unlabeled glyph.
+
+Native styles stay for things that are not buttons: menu items, file pickers, the layout
+picker, and the text link on the permission screen.
+
 ## Drive it by selector
 
 Screenshots and pixel clicks are slow and brittle. The app exposes accessibility identifiers,
@@ -69,10 +80,11 @@ the full tree, around 230 elements on Home.
 | `gate.title`, `gate.openSettings`, `gate.continue` | permission screen |
 | `sidebar.<category id>`, `sidebar.apps`, `sidebar.storage`, `sidebar.home` | sidebar rows |
 | `toolbar.scan`, `toolbar.scanStop` | toolbar scan control |
-| `home.header`, `home.empty` | Home |
+| `home.header`, `home.empty`, `home.scan` | Home |
 | `apps.header` | Apps |
 | `storage.header` | Storage |
 | `settings.tabs` | Settings pane switcher |
+| `list.selectAll` | category table select-all |
 
 Add a new one with `.accessibilityIdentifier("screen.thing")` on the control, next to its
 `.accessibilityLabel`. Name it `screen.element`, lowercase, one dot.

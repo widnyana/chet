@@ -19,6 +19,7 @@ struct ListHeaderBar: View {
                 .buttonStyle(.plain)
                 .help(selected.count == items.count ? "Deselect all" : "Select all")
                 .accessibilityLabel(selected.count == items.count ? "Deselect all" : "Select all")
+                .accessibilityIdentifier("list.selectAll")
                 Text(
                     "\(selected.count) of \(items.count) chosen · "
                         + selected.reduce(0) { $0 + $1.reclaimableBytes }

@@ -38,9 +38,7 @@ struct CommandBar: View {
                         .controlSize(.small)
                 }
                 if let secondaryTitle, let secondaryAction {
-                    Button(secondaryTitle, action: secondaryAction)
-                        .buttonStyle(.bordered)
-                        .controlSize(.large)
+                    SecondaryActionButton(title: secondaryTitle, action: secondaryAction)
                 }
                 if !isWorking {
                     primaryButton
@@ -55,32 +53,23 @@ struct CommandBar: View {
 
     @ViewBuilder private var primaryButton: some View {
         if isDestructive {
-            Button(actionTitle, systemImage: actionSystemImage ?? "trash", action: action)
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.red)
-                .controlSize(.large)
-                .keyboardShortcut(.delete, modifiers: .command)
-                .disabled(!isEnabled)
-                .help(help ?? actionTitle)
-                .accessibilityLabel(accessibilityLabel ?? actionTitle)
+            DestructiveActionButton(
+                title: actionTitle,
+                systemImage: actionSystemImage ?? "trash",
+                isEnabled: isEnabled,
+                help: help,
+                accessibilityLabel: accessibilityLabel,
+                shortcut: .delete,
+                shortcutModifiers: .command,
+                action: action)
         } else {
-            if let actionSystemImage {
-                Button(actionTitle, systemImage: actionSystemImage, action: action)
-                    .buttonStyle(.borderedProminent)
-                    .tint(Theme.accent)
-                    .controlSize(.large)
-                    .disabled(!isEnabled)
-                    .help(help ?? actionTitle)
-                    .accessibilityLabel(accessibilityLabel ?? actionTitle)
-            } else {
-                Button(actionTitle, action: action)
-                    .buttonStyle(.borderedProminent)
-                    .tint(Theme.accent)
-                    .controlSize(.large)
-                    .disabled(!isEnabled)
-                    .help(help ?? actionTitle)
-                    .accessibilityLabel(accessibilityLabel ?? actionTitle)
-            }
+            PrimaryActionButton(
+                title: actionTitle,
+                systemImage: actionSystemImage,
+                isEnabled: isEnabled,
+                help: help,
+                accessibilityLabel: accessibilityLabel,
+                action: action)
         }
     }
 }

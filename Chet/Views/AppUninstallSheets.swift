@@ -69,18 +69,15 @@ struct AppUninstallConfirmSheet: View {
             }
             HStack {
                 Spacer()
-                Button("Cancel", role: .cancel) { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                    .controlSize(.large)
-                Button("Move to Trash", role: .destructive) {
-                    model.remove()
-                    dismiss()
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.red)
-                .controlSize(.large)
-                .keyboardShortcut(.defaultAction)
-                .disabled(!model.canRemove)
+                SecondaryActionButton(title: "Cancel", shortcut: .escape, action: { dismiss() })
+                DestructiveActionButton(
+                    title: "Move to Trash",
+                    isEnabled: model.canRemove,
+                    shortcut: .return,
+                    action: {
+                        model.remove()
+                        dismiss()
+                    })
             }
         }
         .padding(Spacing.s6)
@@ -180,14 +177,14 @@ struct UninstallSummaryView: View {
                 }
             }
             HStack {
-                Button("Show activity log") { NSWorkspace.shared.open(AuditLog().url) }
-                    .buttonStyle(.bordered)
+                SecondaryActionButton(
+                    title: "Show activity log",
+                    action: { NSWorkspace.shared.open(AuditLog().url) })
                 Spacer()
-                Button("Done") { model.report = nil }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Theme.accent)
-                    .controlSize(.large)
-                    .keyboardShortcut(.defaultAction)
+                PrimaryActionButton(
+                    title: "Done",
+                    shortcut: .return,
+                    action: { model.report = nil })
             }
         }
         .padding(Spacing.s6)
@@ -274,18 +271,15 @@ struct BulkUninstallConfirmSheet: View {
             }
             HStack {
                 Spacer()
-                Button("Cancel", role: .cancel) { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                    .controlSize(.large)
-                Button("Move to Trash", role: .destructive) {
-                    model.removeMarked()
-                    dismiss()
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.red)
-                .controlSize(.large)
-                .keyboardShortcut(.defaultAction)
-                .disabled(!model.canBulkRemove)
+                SecondaryActionButton(title: "Cancel", shortcut: .escape, action: { dismiss() })
+                DestructiveActionButton(
+                    title: "Move to Trash",
+                    isEnabled: model.canBulkRemove,
+                    shortcut: .return,
+                    action: {
+                        model.removeMarked()
+                        dismiss()
+                    })
             }
         }
         .padding(Spacing.s6)
@@ -361,14 +355,14 @@ struct BulkUninstallSummaryView: View {
                 }
             }
             HStack {
-                Button("Show activity log") { NSWorkspace.shared.open(AuditLog().url) }
-                    .buttonStyle(.bordered)
+                SecondaryActionButton(
+                    title: "Show activity log",
+                    action: { NSWorkspace.shared.open(AuditLog().url) })
                 Spacer()
-                Button("Done") { model.bulkReport = nil }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Theme.accent)
-                    .controlSize(.large)
-                    .keyboardShortcut(.defaultAction)
+                PrimaryActionButton(
+                    title: "Done",
+                    shortcut: .return,
+                    action: { model.bulkReport = nil })
             }
         }
         .padding(Spacing.s6)

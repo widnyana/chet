@@ -309,14 +309,12 @@ struct DiskMapView: View {
                 }
                 HStack(spacing: Spacing.s2) {
                     Spacer()
-                    Button("Pause") { model.togglePause() }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .disabled(model.isPaused)
-                    Button("Resume") { model.togglePause() }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .disabled(!model.isPaused)
+                    SecondaryActionButton(
+                        title: "Pause", isEnabled: !model.isPaused,
+                        action: { model.togglePause() })
+                    SecondaryActionButton(
+                        title: "Resume", isEnabled: model.isPaused,
+                        action: { model.togglePause() })
                 }
             }
             .padding(.horizontal, Spacing.s6)

@@ -68,6 +68,19 @@ struct OverviewView: View {
                     systemImage: "exclamationmark.triangle",
                     tone: .amber)
             }
+            if !model.isScanning {
+                HStack(spacing: Spacing.s3) {
+                    PrimaryActionButton(
+                        title: model.lastScan == nil ? "Scan" : "Scan again",
+                        systemImage: "magnifyingglass",
+                        help: "Find files you can remove (Command-R)",
+                        accessibilityLabel: "Scan for files you can remove",
+                        action: { model.scan() }
+                    )
+                    .accessibilityIdentifier("home.scan")
+                    Spacer()
+                }
+            }
             if model.isScanning {
                 scanProgress
             } else if model.lastScan == nil {
@@ -200,14 +213,12 @@ struct OverviewView: View {
                 }
             }
             HStack(spacing: Spacing.s2) {
-                Button("Pause") { model.togglePause() }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(model.isPaused)
-                Button("Resume") { model.togglePause() }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(!model.isPaused)
+                SecondaryActionButton(
+                    title: "Pause", isEnabled: !model.isPaused,
+                    action: { model.togglePause() })
+                SecondaryActionButton(
+                    title: "Resume", isEnabled: model.isPaused,
+                    action: { model.togglePause() })
             }
             .padding(.top, Spacing.s1)
         }

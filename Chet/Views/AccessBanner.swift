@@ -42,20 +42,16 @@ struct TopStatusStrip: View {
                     systemImage: "lock.shield",
                     tone: .amber)
                 Spacer(minLength: Spacing.s3)
-                Button("Open Settings") {
-                    model.recordGrantAttempt()
-                    NSWorkspace.shared.open(FullDiskAccess.settingsURL)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.regular)
-                Button {
-                    model.bannerDismissed = true
-                } label: {
-                    Image(systemName: "xmark")
-                }
-                .buttonStyle(.plain)
-                .help("Hide until the next launch")
-                .accessibilityLabel("Hide until the next launch")
+                SecondaryActionButton(
+                    title: "Open Settings",
+                    action: {
+                        model.recordGrantAttempt()
+                        NSWorkspace.shared.open(FullDiskAccess.settingsURL)
+                    })
+                IconActionButton(
+                    systemImage: "xmark",
+                    label: "Hide until the next launch",
+                    action: { model.bannerDismissed = true })
             }
             if model.grantAttempts >= 2 {
                 Text("Chet may appear more than once in the list. Remove the old entry.")
@@ -89,17 +85,10 @@ struct TopStatusStrip: View {
                 StatusLabel(text: text, systemImage: icon, tone: tone)
                 Spacer(minLength: Spacing.s3)
                 if let actionTitle, let action {
-                    Button(actionTitle, action: action)
-                        .buttonStyle(.bordered)
-                        .controlSize(.regular)
+                    SecondaryActionButton(title: actionTitle, action: action)
                 }
                 if let dismiss {
-                    Button(action: dismiss) {
-                        Image(systemName: "xmark")
-                    }
-                    .buttonStyle(.plain)
-                    .help("Dismiss")
-                    .accessibilityLabel("Dismiss")
+                    IconActionButton(systemImage: "xmark", label: "Dismiss", action: dismiss)
                 }
             }
             .padding(.horizontal, Spacing.s6)

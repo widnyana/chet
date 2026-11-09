@@ -66,11 +66,9 @@ struct AppCleanerDetailView: View {
                     .truncationMode(.middle)
                     .textSelection(.enabled)
                 Spacer(minLength: Spacing.s3)
-                Button("Show in Finder") {
-                    NSWorkspace.shared.activateFileViewerSelecting([app.url])
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                SecondaryActionButton(
+                    title: "Show in Finder",
+                    action: { NSWorkspace.shared.activateFileViewerSelecting([app.url]) })
             }
             .padding(.top, Spacing.s1)
         }

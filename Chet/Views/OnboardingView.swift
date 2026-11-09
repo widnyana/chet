@@ -30,13 +30,13 @@ struct OnboardingView: View {
                     Hairline()
                     step(3, "Come back here. Chet checks by itself.")
                 }
-                Button("Open System Settings") {
-                    model.recordGrantAttempt()
-                    NSWorkspace.shared.open(FullDiskAccess.settingsURL)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.accent)
-                .controlSize(.large)
+                PrimaryActionButton(
+                    title: "Open System Settings",
+                    action: {
+                        model.recordGrantAttempt()
+                        NSWorkspace.shared.open(FullDiskAccess.settingsURL)
+                    }
+                )
                 .accessibilityIdentifier("gate.openSettings")
                 .padding(.top, Spacing.s2)
                 VStack(alignment: .leading, spacing: Spacing.s1) {

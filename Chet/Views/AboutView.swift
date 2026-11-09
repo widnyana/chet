@@ -154,10 +154,7 @@ private struct AboutInfoRow: View {
                 }
             }
             if let actionTitle, let action {
-                Button(actionTitle, action: action)
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .help(actionHelp ?? actionTitle)
+                SecondaryActionButton(title: actionTitle, help: actionHelp, action: action)
             }
         }
         .padding(.vertical, Spacing.s2)
@@ -194,10 +191,7 @@ private struct AboutPathRow: View {
             }
             Spacer(minLength: Spacing.s3)
             if let actionTitle, let action {
-                Button(actionTitle, action: action)
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .help(actionHelp ?? actionTitle)
+                SecondaryActionButton(title: actionTitle, help: actionHelp, action: action)
             }
         }
         .padding(.vertical, Spacing.s2)

@@ -79,6 +79,9 @@ enum Metrics {
     static let contentMaxWidth: CGFloat = 880
     static let rowHeight: CGFloat = 40
     static let commandBarMinHeight: CGFloat = 56
+    /// Controls use one radius and one height so every primary action matches.
+    static let controlRadius: CGFloat = 6
+    static let controlMinWidth: CGFloat = 96
 }
 
 // MARK: - Primitives
@@ -171,6 +174,155 @@ struct PageHeader: View {
     }
 }
 
+/// Shortcut that only applies when one is given, so call sites stay flat.
+private struct ActionShortcut: ViewModifier {
+    let key: KeyEquivalent?
+    let modifiers: EventModifiers
+
+    func body(content: Content) -> some View {
+        if let key {
+            content.keyboardShortcut(key, modifiers: modifiers)
+        } else {
+            content
+        }
+    }
+}
+
+/// Filled accent action. One per screen.
+struct PrimaryActionButton: View {
+    let title: String
+    var systemImage: String?
+    var isEnabled = true
+    var help: String?
+    var accessibilityLabel: String?
+    var shortcut: KeyEquivalent?
+    var shortcutModifiers: EventModifiers = []
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            if let systemImage {
+                Label(title, systemImage: systemImage).labelStyle(.titleAndIcon)
+            } else {
+                Text(title)
+            }
+        }
+        .buttonStyle(.borderedProminent)
+        .buttonBorderShape(.roundedRectangle(radius: Metrics.controlRadius))
+        .controlSize(.regular)
+        .tint(Theme.accent)
+        .frame(minWidth: Metrics.controlMinWidth)
+        .disabled(!isEnabled)
+        .help(help ?? title)
+        .accessibilityLabel(accessibilityLabel ?? title)
+        .modifier(ActionShortcut(key: shortcut, modifiers: shortcutModifiers))
+    }
+}
+
+/// Filled red action. Permanent removal only.
+struct DestructiveActionButton: View {
+    let title: String
+    var systemImage: String?
+    var isEnabled = true
+    var help: String?
+    var accessibilityLabel: String?
+    var shortcut: KeyEquivalent?
+    var shortcutModifiers: EventModifiers = []
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            if let systemImage {
+                Label(title, systemImage: systemImage).labelStyle(.titleAndIcon)
+            } else {
+                Text(title)
+            }
+        }
+        .buttonStyle(.borderedProminent)
+        .buttonBorderShape(.roundedRectangle(radius: Metrics.controlRadius))
+        .controlSize(.regular)
+        .tint(Theme.red)
+        .frame(minWidth: Metrics.controlMinWidth)
+        .disabled(!isEnabled)
+        .help(help ?? title)
+        .accessibilityLabel(accessibilityLabel ?? title)
+        .modifier(ActionShortcut(key: shortcut, modifiers: shortcutModifiers))
+    }
+}
+
+/// Bordered action: cancel, pause, deselect, open elsewhere.
+struct SecondaryActionButton: View {
+    let title: String
+    var systemImage: String?
+    var isEnabled = true
+    var help: String?
+    var accessibilityLabel: String?
+    var shortcut: KeyEquivalent?
+    var shortcutModifiers: EventModifiers = []
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            if let systemImage {
+                Label(title, systemImage: systemImage).labelStyle(.titleAndIcon)
+            } else {
+                Text(title)
+            }
+        }
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.roundedRectangle(radius: Metrics.controlRadius))
+        .controlSize(.regular)
+        .disabled(!isEnabled)
+        .help(help ?? title)
+        .accessibilityLabel(accessibilityLabel ?? title)
+        .modifier(ActionShortcut(key: shortcut, modifiers: shortcutModifiers))
+    }
+}
+
+/// Text action inside a row or a list header: sort order, choose all copies.
+struct QuietActionButton: View {
+    let title: String
+    var font: Font = Typography.caption
+    var isEnabled = true
+    var help: String?
+    var accessibilityLabel: String?
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(font)
+                .foregroundStyle(isEnabled ? Theme.accent : Theme.inkTertiary)
+                .lineLimit(1)
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .help(help ?? title)
+        .accessibilityLabel(accessibilityLabel ?? title)
+    }
+}
+
+/// Glyph-only action. The label is required because there is no visible text.
+struct IconActionButton: View {
+    let systemImage: String
+    let label: String
+    var isEnabled = true
+    var help: String?
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(Typography.row)
+                .foregroundStyle(isEnabled ? Theme.inkSecondary : Theme.inkTertiary)
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .help(help ?? label)
+        .accessibilityLabel(label)
+    }
+}
+
 struct SectionHeader: View {
     let title: String
     var trailing: String?
@@ -213,10 +365,7 @@ struct EmptyStateView: View {
                 .font(Typography.body)
         } actions: {
             if let actionTitle, let action {
-                Button(actionTitle, action: action)
-                    .buttonStyle(.borderedProminent)
-                    .tint(Theme.accent)
-                    .controlSize(.large)
+                PrimaryActionButton(title: actionTitle, action: action)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -252,9 +401,7 @@ struct ErrorStateView: View {
                 .font(Typography.body)
                 .foregroundStyle(Theme.inkSecondary)
             if let actionTitle, let action {
-                Button(actionTitle, action: action)
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
+                SecondaryActionButton(title: actionTitle, action: action)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

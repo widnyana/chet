@@ -105,16 +105,12 @@ struct ConfirmSheet: View {
             }
             HStack {
                 Spacer()
-                Button("Cancel", role: .cancel) { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                    .controlSize(.large)
-                Button(action, role: .destructive) {
-                    model.clean()
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.red)
-                .controlSize(.large)
-                .keyboardShortcut(.defaultAction)
+                SecondaryActionButton(title: "Cancel", shortcut: .escape, action: { dismiss() })
+                DestructiveActionButton(
+                    title: action,
+                    isEnabled: true,
+                    shortcut: .return,
+                    action: { model.clean() })
             }
         }
         .padding(Spacing.s6)

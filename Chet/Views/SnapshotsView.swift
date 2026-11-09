@@ -116,13 +116,10 @@ struct SnapshotsView: View {
                     .font(Typography.section)
                     .foregroundStyle(Theme.ink)
                 Spacer()
-                Button(newestFirst ? "Newest first" : "Oldest first") {
-                    newestFirst.toggle()
-                }
-                .buttonStyle(.plain)
-                .font(Typography.caption)
-                .foregroundStyle(Theme.accent)
-                .help("Change the sort order")
+                QuietActionButton(
+                    title: newestFirst ? "Newest first" : "Oldest first",
+                    help: "Change the sort order",
+                    action: { newestFirst.toggle() })
             }
             .padding(.horizontal, Spacing.s6)
             .padding(.vertical, Spacing.s2)

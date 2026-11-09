@@ -172,13 +172,10 @@ struct GroupedItemsView: View {
             .font(Typography.section)
             .foregroundStyle(Theme.ink)
             Spacer()
-            Button("Choose all copies") {
-                model.setSelected(group.items.map(\.url), true)
-            }
-            .buttonStyle(.plain)
-            .font(Typography.caption)
-            .foregroundStyle(Theme.accent)
-            .help("Select every copy except the one that stays.")
+            QuietActionButton(
+                title: "Choose all copies",
+                help: "Select every copy except the one that stays.",
+                action: { model.setSelected(group.items.map(\.url), true) })
         }
     }
 

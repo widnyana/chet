@@ -199,18 +199,19 @@ struct SettingsView: View {
                     ForEach(model.excludedPaths, id: \.self) { path in
                         SettingsDivider()
                         SettingsRow(label: path) {
-                            Button("Stop skipping") { model.removeExcludedPath(path) }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-                                .accessibilityLabel("Stop skipping \(path)")
+                            SecondaryActionButton(
+                                title: "Stop skipping",
+                                accessibilityLabel: "Stop skipping \(path)",
+                                action: { model.removeExcludedPath(path) })
                         }
                     }
                 }
                 SettingsDivider()
                 SettingsActionRow {
-                    Button("Skip a Folder…") { chooseExcludedFolders() }
-                        .controlSize(.small)
-                        .accessibilityLabel("Choose a folder to skip")
+                    SecondaryActionButton(
+                        title: "Skip a Folder…",
+                        accessibilityLabel: "Choose a folder to skip",
+                        action: { chooseExcludedFolders() })
                 }
             }
             SettingsPanel(title: "Folders you want checked") {
@@ -225,23 +226,24 @@ struct SettingsView: View {
                             detail: userRule.keepNames.isEmpty ? nil : keepDetail(userRule.keepNames)
                         ) {
                             HStack(spacing: Spacing.s2) {
-                                Button("Keep…") { chooseKeepItems(for: userRule) }
-                                    .buttonStyle(.bordered)
-                                    .controlSize(.small)
-                                    .accessibilityLabel("Choose items to keep in \(userRule.path)")
-                                Button("Stop checking") { model.removeUserRule(userRule.id) }
-                                    .buttonStyle(.bordered)
-                                    .controlSize(.small)
-                                    .accessibilityLabel("Stop checking \(userRule.path)")
+                                SecondaryActionButton(
+                                    title: "Keep…",
+                                    accessibilityLabel: "Choose items to keep in \(userRule.path)",
+                                    action: { chooseKeepItems(for: userRule) })
+                                SecondaryActionButton(
+                                    title: "Stop checking",
+                                    accessibilityLabel: "Stop checking \(userRule.path)",
+                                    action: { model.removeUserRule(userRule.id) })
                             }
                         }
                     }
                 }
                 SettingsDivider()
                 SettingsActionRow {
-                    Button("Add a Folder…") { chooseRuleFolders() }
-                        .controlSize(.small)
-                        .accessibilityLabel("Add a folder to check")
+                    SecondaryActionButton(
+                        title: "Add a Folder…",
+                        accessibilityLabel: "Add a folder to check",
+                        action: { chooseRuleFolders() })
                 }
             }
             SettingsPanel(title: "Other disks") {

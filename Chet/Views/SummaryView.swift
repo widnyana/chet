@@ -84,17 +84,17 @@ struct SummaryView: View {
                 }
             }
             HStack {
-                Button("Show activity log") { NSWorkspace.shared.open(AuditLog().url) }
-                    .buttonStyle(.bordered)
+                SecondaryActionButton(
+                    title: "Show activity log",
+                    action: { NSWorkspace.shared.open(AuditLog().url) })
                 Spacer()
-                Button("Done") {
-                    model.report = nil
-                    dismiss()
-                }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Theme.accent)
-                    .controlSize(.large)
-                    .keyboardShortcut(.defaultAction)
+                PrimaryActionButton(
+                    title: "Done",
+                    shortcut: .return,
+                    action: {
+                        model.report = nil
+                        dismiss()
+                    })
             }
         }
         .padding(Spacing.s6)
