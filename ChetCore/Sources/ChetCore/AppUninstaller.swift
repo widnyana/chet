@@ -433,12 +433,17 @@ public struct AppUninstaller: Sendable {
         }
 
         // A matched ancestor makes its matched children redundant and would double-count.
-        let paths = Set(found.keys)
+        // Canonicalize each path once, then test every parent prefix against the set: O(k x depth).
+        let canonical = found.mapValues { Self.canonicalPath($0.url) }
+        let matchedPaths = Set(canonical.values)
         let kept = found.values.filter { candidate in
-            !Self.isInside(candidate.url, app.url)
-                && !paths.contains { ancestor in
-                    ancestor != candidate.url && Self.isInside(candidate.url, ancestor)
-                }
+            guard !Self.isInside(candidate.url, app.url) else { return false }
+            var parent = (canonical[candidate.url] ?? "") as NSString
+            while parent.length > 1 {
+                parent = parent.deletingLastPathComponent as NSString
+                if matchedPaths.contains(parent as String) { return false }
+            }
+            return true
         }
 
         var components: [AppComponent] = []
