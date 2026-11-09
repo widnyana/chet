@@ -31,6 +31,8 @@
 !Chet/**
 !ChetCore/**
 !docs/DESIGN.md
+!docs/images/
+!docs/images/**
 !docs/USER-GUIDE.md
 !docs/findings.md
 !docs/design/

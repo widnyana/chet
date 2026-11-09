@@ -10,6 +10,8 @@ appears when you open Finder and look for free space.
 Chet scans those places, adds up the space, and puts each finding in one ledger. You see the
 size, the reason it is there, and what happens when you remove it. Then you decide.
 
+![Chet Home after a scan, with the Safe to remove and Check first ledgers](docs/images/chet-home.png)
+
 ## One screen, one number
 
 Home starts with a scan. It counts what Chet can free and splits the result into two lists:
