@@ -1,6 +1,8 @@
 # Performance findings
 
-Status: review of the scan, duplicate, app, Homebrew, and disk map paths.
+Status: review of the scan, duplicate, app, Homebrew, and disk map paths. A second pass on
+2026-11-09 added speed findings, SwiftUI render findings, and a status table (see "Second
+pass" below). SwiftUI rules are in `docs/swiftui-performance.md`.
 Date: 2026-11-09.
 Machine: MacBook, 16 GB RAM, macOS 27.0.1, 8 cores. Chet scan limit: 1.5 GB peak RSS.
 
@@ -243,6 +245,107 @@ them, resetting only the counters between files.
 - Fix: sort paths once and keep a stack of kept ancestors for the filter; measure app
   sizes with a bounded pool or reuse the scan index when one exists.
 
+## Second pass: status and new findings
+
+Read-only review. No code was changed for this section. "Measured" means a command was run
+on this machine; "read" means seen in the source and not yet profiled.
+
+### Status of the first-pass findings
+
+|Finding|State in the tree|
+|---|---|
+|P0 duplicate memory growth|Landed in `72bef13`: POSIX `open`/`read` into one 1 MiB buffer and a table-based hex. Measured after: 19.3 MB peak RSS on a 4.29 GB fixture, 1.17 GB peak on `~/Development`.|
+|P1 event stream, rollup materialization|Landed in `72bef13`: `RollupGate` allows 4 updates a second and 512 rollups per walk; `TreeMerge.snapshots` filters before building and stops 2 levels below the node. `RollupBudgetTests` covers it.|
+|P1 live tree merge copies|Open.|
+|P1 rule scan re-walk|Open. Needs `ScanSession` to give `RuleScanner` an index size lookup.|
+|P1 Homebrew size pass|Landed in `72bef13`: 4 strided workers and one `autoreleasepool` per package. 211 packages load at 72 MB footprint. Per-folder `[URL]` arrays and one walk per old version remain.|
+|P2 treemap worst case|Landed: row sum, max, min are carried (`Treemap.swift`).|
+|P2 per-render totals|Landed in `72bef13`: `totalBytes`, `selectedBytes`, and `CategoryState.bytes` are stored; `countedURLs`, `bytesByURL`, and `itemsByURL` are maintained incrementally. Verified in the app: 267 items, 44.18 GB; deselect all in Logs gives 240 items, 44.01 GB; reselecting returns 267, 44.18 GB. The category re-sort per rule result is still there.|
+|P2 app inventory O(k^2) filter|Landed: ancestors are found by walking parent paths. `isShared` uses a dot-prefix index, so it is O(dots) per entry instead of O(installed apps).|
+|P2 app size measurement|Open. Still one app at a time.|
+|P2 video pair search|Landed for the common case: sweep in duration order, stop at the 2% window. Worst case is still O(v^2) when all durations match.|
+|P2 photo pair search|Open. See the analysis below; the simple split does not pay at the default distance.|
+|P2 subprocess output cap, GPU hasher buffers|Open.|
+
+### Speed findings
+
+**Photo pair search, why bucketing is weak at the default.** `SimilarPhotos.maxDistance` is 10
+bits on a 64-bit hash. An exact-chunk split (pigeonhole) needs 11 chunks of about 6 bits, so
+a bucket holds about n/64 hashes on uniform data. That is roughly a 6x cut from n^2, and real
+photo hashes are not uniform. A BK-tree or a multi-index with verification is the realistic
+route, or lowering the distance. Not measured; this is arithmetic on the defaults.
+
+**Photo decoding is serial.** `SimilarPhotos.scan` decodes one image at a time
+(`PerceptualHash.bitmap`, ImageIO) and then hashes a batch of 32 on the GPU. Decoding is the
+CPU-bound part, so the GPU waits and 7 of 8 cores sit idle. The source already carries a
+`ponytail:` note for `concurrentPerform`. Fix: decode a batch on a bounded pool of cores,
+keep the GPU call per batch. Memory: each decoded bitmap is 256 x 256 x 4 = 256 KiB, so a
+batch of 32 per core stays small.
+
+**Tweaks load spawns one process per setting.** `TweakEngine.readAll` maps `read` over the
+catalog in a serial loop, and each `.defaults` entry runs `/usr/bin/defaults read`
+(`Tweaks.swift` `readDefaults`). Measured on this machine: 20 reads of one key took 0.34 s and
+0.27 s, so 14-17 ms per read. The catalog has 46 `.defaults` targets, so the Tweaks page
+waits about 0.65-0.8 s on `defaults` alone, before the stat and probe checks. Fix: read
+through `CFPreferencesCopyAppValue` in process (no spawn), or run the reads on 4 workers.
+`write` and `restart` can keep the tools. Test with `TweaksTests`.
+
+**Cleaner does per-item work that can be shared.** In `Cleaner.clean(_:)` and `clean(_ item:)`:
+- `AuditLog.append` builds an `ISO8601DateFormatter` and a `JSONEncoder`, calls
+  `createDirectory`, then opens, seeks, writes, and closes the log file, for every item. For
+  100k items that is 100k open and close cycles. Fix: keep one handle open per run, reuse the
+  formatter and encoder, write in batches.
+- `isRunning(owner)` calls `NSRunningApplication.runningApplications` per item. Cache the
+  answer per bundle id for the run.
+- `TerraformState.holdsLocalState` enumerates the whole item tree for any path under a tool
+  folder (`.terraform`, `.terragrunt-cache`), once in the scan and again in the cleaner. A
+  provider cache can hold tens of thousands of files. Fix: stop at the first state file (it
+  already does) and skip descending into `providers`, or record the scan result on the item
+  and re-check only at the top level.
+- The progress callback fires per item. For many small items, coalesce to about 10 Hz.
+
+**Leftover scan walks twice.** `LeftoverScanner.scan` calls `walker.totalSize(entry)` for
+each candidate under `Library`. The same rule-scan duplication as `RuleScanner` applies.
+`installedBundleIDs` also loads `Bundle(url:)` for each app serially.
+
+**Folder tree build keys by `[String]`.** `FolderTree.build` (`LargeFiles.swift`) keeps
+`[[String]: Int64]` dictionaries and builds a key array per path depth for every entry, so
+each file allocates up to `maxDepth` arrays and hashes them. If this path is hot, key by an
+interned path id. Check callers before spending time; the index walk may have replaced it.
+
+### Memory findings
+
+**Per-item `reclaimableBytes` and `FileStamp` are retained for every found file.** A scan that
+finds 100k items keeps a `ScanItem` with URL, stamp, and strings for each, plus the
+`itemsByURL` index that duplicates references. Value storage is small per item, but the URL
+strings dominate. Measure with `heap` after a large scan before changing the model.
+
+**Bitmaps in `SimilarPhotos`.** `decoded` holds a batch of RGBA arrays; this is bounded by
+`batchSize`. If decoding moves to a pool, bound the in-flight count so memory stays flat.
+
+### SwiftUI render findings (read, not profiled)
+
+Details and the checking method are in `docs/swiftui-performance.md`. The suspects, in the
+order to check them in Instruments:
+
+1. `TreemapMTKView.tile(at:)`: allocates an array per mouse event and the hover handler
+   assigns state on every move.
+2. `DiskMapView` poll: a depth-first search of the live tree every 250 ms, and `pathNodes`
+   recomputed several times per body.
+3. `TreemapMTKView.relayout` on every resize step, with a second top-level layout in `labels`.
+4. Sorts and filters in view bodies: `CategoryDetailView`, `GroupedItemsView`,
+   `AppBrowserView`.
+
+## Updated order of work
+
+1. First-pass items 1-4 stay with the other session (duplicates, event stream, rollups).
+2. Profile Storage, Home, and a category table with the SwiftUI Instruments template, then
+   fix the top suspects from the list above.
+3. Tweaks load: in-process preference reads.
+4. Cleaner: one audit handle per run, cached owner check, coalesced progress.
+5. Photo decoding on a bounded pool, then a better pair search.
+6. Rule and leftover size reuse once `ScanSession` can supply index sizes.
+
 ## Reproduction
 
 Build the read-only benchmark and run it on a subtree, never on the whole home folder
@@ -284,6 +387,70 @@ then print `phys_footprint` from `task_info(TASK_VM_INFO)`.
 
 Numbers are from one machine and one 110 GB tree. The duplicate step's memory does
 scale with bytes read, so a larger tree or `.everything` scope makes it worse. The
-Homebrew figure was measured on the current installed set (211 packages). No fix is
-included in this document; it records evidence and the smallest safe change per
-finding.
+The Homebrew figure was measured on the current installed set (211 packages). The first-pass
+findings include no fix; the status table lists which have since landed. The second pass is
+read-only review plus one timing run (`defaults read`, 20 calls, twice).
+
+## Third pass: landed and measured
+
+Fixes landed on `feat/homebrew-browser` on 2026-11-09. Every number below was measured on
+this machine after the change.
+
+### Landed
+
+|Finding|Change|
+|---|---|
+|P0 duplicate memory growth|`DuplicateFinder.sameBytes`, `fullHash`, and `edgeHash` read through POSIX `open`/`read` into one 1 MiB `UnsafeMutableRawPointer`; `hex` uses a byte table. `import Darwin`.|
+|P1 rollup materialization|`TreeMerge.snapshots` filters ids before building and stops 2 levels below the node (`rollupLevels`); `RollupGate` allows 4 updates per second and 512 live rollups per walk. Roots stay ungated, the final `folderTrees` is exact.|
+|P1 event stream|`ScanSession.events()` stays unbounded; the producer is bounded by the rollup gate, progress is already 4 Hz.|
+|P2 per-render totals|`totalBytes`, `selectedBytes`, and `CategoryState.bytes` are stored. `countedURLs`, `bytesByURL`, and `itemsByURL` are maintained by `record`, `select`, `deselect`, and the clean removal loop. No per-read `Set`, no full `reindexItems` per category mutation.|
+|P1 Homebrew sizes|`sized` runs 4 strided workers with one `autoreleasepool` per package.|
+|per-directory allocation|`isCacheDir` reads the tag into `withUnsafeTemporaryAllocation` instead of a fresh array per folder.|
+
+### Measurements
+
+Duplicate fixture: 8 directories holding one 512 MiB file each (4.29 GB, identical bytes).
+
+|Metric|Value|
+|---|---|
+|Duplicate step|12.77 s|
+|Peak RSS|19.3 MB|
+|Peak memory footprint|11.3 MB|
+|Before the change|51.36 GB footprint in the same step on `~/Development`|
+
+Full tree: `chet-scan /Users/wid/Development`, 2,202,020 files, 123.93 GB seen.
+
+|Metric|Value|
+|---|---|
+|Total|312.5 s|
+|Duplicate step|46.89 s|
+|Peak RSS|1.17 GB (limit 1.5 GB)|
+|Termination|none|
+
+App checks, `DRY_RUN=1`:
+
+|Check|Result|
+|---|---|
+|Homebrew page, 211 packages|72 MB footprint after load (target < 150 MB)|
+|Home selection|267 items, 44.18 GB|
+|Deselect all in Logs (27 items, 171.2 MB)|Home 240 items, 44.01 GB; category bar `0 of 27 selected, Zero kB`|
+|Select all in Logs again|Home 267 items, 44.18 GB|
+|Disk map during the index step|live blocks from rollups, then the final 223.3 GB tree|
+
+Tests: 283 tests in 38 suites pass (`swift test --package-path ChetCore`), and
+`swift format lint --strict` is clean on the touched files.
+
+### Tooling
+
+- Time Profiler works: `xcrun xctrace record --template 'Time Profiler' --launch --
+  ChetCore/.build/release/chet-scan <dir>`, then
+  `xcrun xctrace export --xpath '/trace-toc/run[@number="1"]/data/table[@schema="time-profile"]'`.
+  The exported samples put the duplicate step in `DuplicateFinder.fullHash`,
+  `DuplicateFinder.sameBytes`, and `withBuffer`.
+- Allocations does not record heap tables on this host: macOS 27.0.1, Instruments 27.2,
+  template Allocations. The trace holds the Allocations and VM Tracker tracks but the export
+  holds no allocation or regions table, with and without `--recording-options`, for
+  `--launch` on a get-task-allow signed binary, for `--attach`, and for `/bin/ls`, before and
+  after `DevToolsSecurity -enable`.
+- `sample`, `vmmap -summary`, and `heap` remain the working CLI route for memory
+  (WWDC 2018 session 416).
