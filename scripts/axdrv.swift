@@ -55,7 +55,12 @@ func click(_ el: AXUIElement) -> Bool {
 }
 
 let args = CommandLine.arguments
-guard args.count > 1 else { print("usage: axdrv dump|texts|press <id>|click <text>|clickid <id>"); exit(2) }
+guard args.count > 1 else {
+    print(
+        "usage: axdrv dump|texts|press <id>|select <row id>|click <text>|"
+            + "clickid <id>|clicktitle <title>|frame <id>")
+    exit(2)
+}
 guard AXIsProcessTrusted() else { print("AX NOT TRUSTED"); exit(3) }
 // More than one build of the app can be running (a `.build/xc` copy and another build).
 // AXDRV_PID picks the target; without it the first instance by bundle id is used.
@@ -93,6 +98,20 @@ case "press":
     } else {
         print("no element with id \(target)")
     }
+case "select":
+    let target = args[2]
+    for outline in els where str(outline, kAXRoleAttribute as String) == "AXOutline" {
+        for row in all(outline) where str(row, kAXRoleAttribute as String) == "AXRow" {
+            if all(row).contains(where: { str($0, "AXIdentifier") == target }) {
+                let set = AXUIElementSetAttributeValue(
+                    outline, "AXSelectedRows" as CFString, [row] as CFArray)
+                print(set == .success ? "selected \(target)" : "select failed")
+                exit(0)
+            }
+        }
+    }
+    print("no selectable row with id \(target)")
+    exit(4)
 case "clicktitle":
     let target = args[2]
     if let hit = els.first(where: { str($0, kAXTitleAttribute as String) == target }) {

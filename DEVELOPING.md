@@ -1,7 +1,7 @@
 # Developing Chet
 
 Notes for working on the app. The design rules are in `docs/DESIGN.md`, the architecture is
-in `README.md`. This file covers how to run and drive the app while you change it.
+in `README.md`. This file covers how to run, drive, and test the app while you change it.
 
 ## Run it
 
@@ -14,25 +14,158 @@ mise run lint     # format check
 The main window remembers its frame. Keep it at `960 x 632`, the supported minimum, instead
 of full screen. The design is checked at that size.
 
-## The first screen is the permission gate
+## First launch
 
-`ContentView` shows only `OnboardingView` while Full Disk Access is denied and the user has
-not skipped it. There is no sidebar and no toolbar on that screen.
+`ContentView` decides between the permission gate and the app:
 
-Two exits:
+```swift
+if model.access == .denied && !model.accessSkipped {
+    OnboardingView()
+} else {
+    NavigationSplitView { SidebarView(...) } detail: { ... }
+}
+```
 
-- **Open System Settings** opens the pane and leaves the app on the gate. macOS expects a
-  restart after the grant, so the gate is normal even right after granting.
-- **Continue with limited results** sets `accessSkipped`, which lasts one launch. The gate
-  returns on the next start until access is granted.
+### Without Full Disk Access
 
-Any UI run that assumes a sidebar has to click through the gate first, or grant Full Disk
-Access and restart. A rebuild also changes the code signature, so a fresh build can land on
-the gate again.
+Only `OnboardingView` is visible. No sidebar, no scan toolbar, no command bar.
 
-Status strip precedence: `DryRun.enabled` wins over the access banner. With `DRY_RUN=1` in
-`.env`, Home shows `Preview only. Nothing will be removed.` and never `Limited access`.
-Remove the flag to see the access banner.
+Top to bottom:
+
+| Element | Identifier | Kind |
+|---|---|---|
+| Padlock icon | none | `AXImage`, label `lock.shield` |
+| `Chet needs Full Disk Access` | `gate.title` | `AXStaticText` |
+| One-sentence explanation | none | `AXStaticText` |
+| Three numbered steps | none | `AXStaticText` |
+| `Open System Settings` | `gate.openSettings` | `AXButton` |
+| `Continue with limited results` | `gate.continue` | `AXLink` |
+| `Without access, Chet finds less...` | none | `AXStaticText` |
+| `Checking for access` with spinner | none | `AXStaticText` + progress |
+
+The screen polls `FullDiskAccess.status()` once a second and leaves by itself when the probe
+file becomes readable. macOS can keep a stale denial for an already running process; if the
+gate stays after the grant, relaunch the app. A rebuild changes the signature, so a fresh
+build can land on the gate again.
+
+### With Full Disk Access
+
+The window becomes the split view:
+
+- Sidebar, top to bottom: `Home` (`sidebar.overview`), then after a scan the category rows
+  split into `Safe to remove` and `Check first` (`sidebar.<category id>`), then
+  `Configure > Tweaks` (`sidebar.tweaks`), then `Tools > Apps` (`sidebar.applications`) and
+  `Storage` (`sidebar.disk-map`). The footer holds the startup disk capacity and the Trash.
+- Detail: Home (`OverviewView`). It has three states:
+  - never scanned: capacity bar, `Scan` (`home.scan`), empty state `No scan yet` (`home.empty`);
+  - scanning: the step list, linear progress, `Pause` (`home.pause`) and `Resume`
+    (`home.resume`);
+  - finished: `Safe to remove` and `Check first` ledgers, total metric, command bar.
+- Toolbar: the scan control (`toolbar.scan`, or `toolbar.scanStop` while scanning) on every
+  destination except Apps and Tweaks. Apps owns search, layout, and reload. Tweaks owns
+  search and `Read again` (`tweaks.reload`).
+- Status strip: absent by default. It appears for `DRY_RUN` (`Preview only. Nothing will be
+  removed.`), for limited access, or for four seconds after a scan finishes. Tweaks hides the
+  cleaning strip and shows its own preview gate.
+
+### Skipping the gate
+
+Yes, skipping exists. It is a text link, not a button:
+
+- Control: `Continue with limited results`, identifier `gate.continue`, role `AXLink`.
+- Code: `OnboardingView` sets `model.accessSkipped = true`.
+- Session only: `ScanModel.accessSkipped` is a plain `var` with no `UserDefaults` write. The
+  gate returns on the next launch until access is granted.
+- Command: `axdrv press gate.continue`.
+
+Impact while skipped:
+
+- The app is fully usable, but folders macOS protects stay unreadable.
+- The top strip says `Limited access. Some folders are hidden.` with `Open Settings` and
+  `Hide until the next launch` (dismissal is session-only; `ScanModel.bannerDismissed`).
+- A category whose scan hit a denied path carries a lock icon; its tooltip says some folders
+  need Full Disk Access (`RuleScanner` sets `needsFullDiskAccess`, `SidebarView` draws
+  `lock.fill`).
+- Home can show `Some folders could not be read. Results may be incomplete.`
+  (`model.readErrors`).
+- Nothing is removed automatically. Review categories stay review, and every removal still
+  needs a selection and a confirmation.
+- Tweaks is unaffected: preferences are user-level and need no Full Disk Access.
+- After a second `Open Settings`, the strip adds `Chet may be listed twice in Full Disk
+  Access. Remove the old entry.`
+
+### Screen flow
+
+| Trigger | Result |
+|---|---|
+| Launch, access denied, not skipped | Permission gate |
+| Launch, access granted | Sidebar + Home |
+| Gate: `Continue with limited results` | Sidebar + Home, access banner |
+| Gate: `Open System Settings` | System Settings, gate stays |
+| Grant lands (or relaunch) | Sidebar + Home, no gate |
+| Scan (toolbar, `home.scan`, Cmd-R) | Home scanning state, then ledgers; sidebar gains category rows |
+| Sidebar category row | Category detail for that category |
+| Home ledger row | Category detail (same destination) |
+| Sidebar `snapshots`, when local snapshots exist | Time Machine snapshots |
+| Sidebar `Tweaks` | Tweaks catalog |
+| Sidebar `Apps` | App inventory |
+| App row chevron (`Show files left by <app>`) or double-click | App detail, pushed |
+| Sidebar `Storage` | Storage map |
+| Category command bar `Remove selected` | Clean sheet: confirm, progress, summary |
+| Snapshot command bar | Clean sheet with snapshots |
+| Footer `Empty` on Trash | Trash confirmation dialog |
+| Cmd-, or Chet > Settings… | Settings window, four panes |
+| Chet > About Chet | About window |
+| Sidebar toggle in the toolbar | Hide or show the sidebar |
+
+## Navigating back
+
+- **App detail** is the only pushed screen. `NavigationStack` supplies the back control; it is
+  an `AXButton` whose description is `Back` and whose identifier is `chevron.backward`. Press
+  it and the app inventory returns. No custom back control is needed or present.
+- **Every sidebar destination** (Home, a category, snapshots, Tweaks, Apps, Storage) is a
+  destination, not a stack entry. The way back is the sidebar: select another row, including
+  `Home`. This is the macOS split-view convention; a history stack would fight the sidebar.
+- **When the sidebar is hidden**, the toolbar button `Hide Sidebar` becomes `Show Sidebar`.
+  Press it to bring the sidebar back.
+- **Sheets** close with their own control: `Cancel` or `Close`, and `Escape` on the uninstall
+  sheets. The clean sheet cannot be dismissed while cleaning; it ends at the summary.
+- **Settings and About** are separate windows. Close them with Cmd-W or the red button; they
+  do not replace the detail pane.
+
+No back control is missing, so none was added. If a future screen is pushed outside a
+`NavigationStack`, add the same automatic back affordance rather than a custom button.
+
+## What goes where and why
+
+- `Home` answers one question: what can be removed, and what do I do next. It holds the total,
+  the capacity bar, the scan state, and the two ledgers. It is the sidebar's default.
+- Categories are split by decision, not by data source: `Safe to remove` is selected for you,
+  `Check first` never is. That split is why the sidebar groups them under those headings.
+- `Configure > Tweaks` is configuration, not cleanup. It stays out of the clean ledger and
+  does not appear in the scan steps.
+- `Tools > Apps` and `Tools > Storage` are tools, not findings. Apps is a destination with its
+  own `NavigationStack`; Storage is a map of the same disk data.
+- The footer holds machine state that is always true, not a scan result: capacity, purgeable
+  space, and the Trash.
+- The status strip holds global, transient state in flow: dry run, limited access, scan
+  finished. It never floats over content.
+- Sheets hold a decision or an operation: clean confirmation and progress, uninstall
+  confirmation and summary, tweak details and confirmation.
+- Settings and About are separate windows because they are not destinations and can stay
+  open while the ledger runs.
+
+## States to test
+
+| Axis | Values |
+|---|---|
+| Access | granted, denied, denied and skipped, skipped and banner dismissed |
+| Scan | never scanned, scanning, paused, finished with results, finished empty |
+| Dry run | off, on (`DRY_RUN=1` in `.env` or the process environment) |
+| Sidebar | shown, hidden |
+| Window | 960 x 632 minimum, wider |
+| Tweaks | supported, unknown, unsupported, unchanged, changed, failed, pending restart, pending confirmation |
+| Sheets | open, closed with Cancel, closed with Escape, non-dismissible while cleaning |
 
 ## Buttons
 
@@ -52,141 +185,172 @@ spacing on a call site.
 
 - One component per pattern. Settings uses `SettingsPaneSwitcher`, `SettingsPanel`,
   `SettingsRow`, `SettingsActionRow`, `SettingsNote`, and `SettingsDivider`; nothing else
-  draws a settings pane or a settings row.
+  draws a settings pane or a settings row. Tweaks uses `PreferenceRow` and `DefinitionRow`;
+  do not hand-build a preference row in a screen.
 - Geometry lives in the component. `SettingsGrid` owns the row height and the row padding,
-  and each panel's `Grid` sizes the control column to its widest control. A pane adds rows,
-  never its own `padding` or `frame` around them, because that is how two rows end up with
-  different rhythm.
-- A variant is a parameter, not a copy. `SettingsRow` takes an optional `detail`; it does not
-  need a second row type for rows with a subtitle.
+  and each panel's `Grid` sizes the control column to its widest control. `PreferenceRow`
+  owns its 150 pt control column and the 8 pt row padding. A pane or a list adds rows, never
+  its own `padding` or `frame` around them.
+- A variant is a parameter, not a copy. `SettingsRow` takes an optional `detail`;
+  `PreferenceRow` takes notes and an accessory; neither needs a second row type.
 - Tokens only. Sizes come from `Spacing`, `Metrics`, and `Typography`. A literal number next
   to a view is a design change that skipped the token table.
 - Copy has one source. Category names come from `CategoryCopy`, step names from
-  `ScanStepCopy`, app parts and skip reasons from `AppCopy`. Do not retype a category name in
-  a view or in a settings table.
+  `ScanStepCopy`, app parts and skip reasons from `AppCopy`, tweak words from `TweakCopy`.
+  Do not retype them in a view.
 - When a pattern appears a third time, extract it into `DesignSystem.swift` (generic UI) or
-  the feature's own parts block (single-screen parts). Do not copy the third one.
-
-To change how settings look, change `SettingsGrid` or the row components once. To change a
-category name, change `CategoryCopy` once. If a change needs edits in more than one place,
-the pattern is not yet shared.
+  the feature's own parts file. Do not copy the third one.
 
 ## Drive it by selector
 
 Screenshots and pixel clicks are slow and brittle. The app exposes accessibility identifiers,
-and `scripts/axdrv.swift` reads the accessibility tree directly.
+and the accessibility tree is the closest thing it has to a DOM.
+
+Build the driver once:
 
 ```sh
 swiftc -O scripts/axdrv.swift -o /tmp/axdrv
 ```
 
-The terminal running it needs Accessibility permission. The tool prints `AX NOT TRUSTED` and
-exits if it does not have it.
+The terminal needs Accessibility permission. The driver prints `AX NOT TRUSTED` and exits if
+it is missing.
 
 | Command | What it does |
 |---|---|
-| `/tmp/axdrv texts` | prints every static text on screen |
-| `/tmp/axdrv dump` | prints role, identifier, title, value for every element |
-| `/tmp/axdrv press gate.continue` | performs `AXPress` on the element with that identifier |
-| `/tmp/axdrv clickid apps.header` | posts a real mouse click at that element's center |
-| `/tmp/axdrv click Apps` | posts a real mouse click on the element with that exact text value |
+| `/tmp/axdrv dump` | role, identifier, title, value for every element |
+| `/tmp/axdrv texts` | every static text value on screen |
+| `/tmp/axdrv press gate.continue` | `AXPress` on an element by identifier |
+| `/tmp/axdrv select sidebar.tweaks` | sets `AXSelectedRows` on the sidebar row containing that identifier |
+| `/tmp/axdrv clickid apps.header` | real mouse click at that element's center |
+| `/tmp/axdrv click <text>` | real mouse click on the element whose value has that text |
+| `/tmp/axdrv clicktitle <title>` | real mouse click on an element by title |
+| `/tmp/axdrv frame <id>` | position and size of an element |
 
-`press` is the right choice for buttons that keep their identifier. `click` covers anything
-that does not: SwiftUI `List` rows wrap their content, so a sidebar row identifier lands on a
-child the driver cannot press. Clicking the row's text value works.
+Use `press` for buttons and links, `select` for sidebar rows. Use `click` only for controls
+that have no press action, and never as the default: a coordinate clicks whatever window is
+on top.
 
-Do not drive the app with AppleScript's `entire contents`. For this app it returns an empty
-list, which looks exactly like a screen with no elements. The AX API behind `axdrv` returns
-the full tree, around 230 elements on Home.
+### How selectors map from SwiftUI
+
+| SwiftUI control | AX role | How to match |
+|---|---|---|
+| `Button` from `DesignSystem` | `AXButton` | identifier; description carries the accessibility label |
+| Link-style `Button` (the gate) | `AXLink` | identifier; `press` works |
+| `Toggle` with `.switch` | `AXCheckBox` | identifier; `press` toggles |
+| `Toggle` with `.checkbox` (rows) | `AXCheckBox` | description, e.g. `Select to remove` |
+| `Picker` with `.menu` | `AXPopUpButton` | identifier; description carries the label |
+| Segmented `Picker` | `AXRadioGroup` + `AXRadioButton` | description, e.g. `All`, `Changed` |
+| `Slider` | `AXSlider` | identifier; drag or set `AXValue`, then end editing to commit |
+| `TextField` or `.searchable` | `AXTextField` | identifier or description; focus it first |
+| `List` sidebar | `AXOutline` > `AXRow` > `AXCell` | identifier sits on the `AXStaticText`; select the row, do not press it |
+| `NavigationSplitView` sidebar toggle | `AXButton` | description `Hide Sidebar` / `Show Sidebar` |
+| Push back control | `AXButton` | description `Back`, identifier `chevron.backward` |
+| Sheet | `AXSheet` | its controls keep their identifiers |
+
+SwiftUI propagates an identifier down to descendants. An identifier on a wrapper replaces the
+identifiers of the controls inside it. Put the identifier on the control you will press.
 
 ### Identifiers in place
 
 | Identifier | Element |
 |---|---|
 | `gate.title`, `gate.openSettings`, `gate.continue` | permission screen |
-| `sidebar.<category id>`, `sidebar.apps`, `sidebar.storage`, `sidebar.home` | sidebar rows |
+| `sidebar.overview` | Home |
+| `sidebar.applications` | Apps |
+| `sidebar.disk-map` | Storage |
+| `sidebar.tweaks` | Tweaks |
+| `sidebar.<category id>` | category rows: `trash`, `caches`, `logs`, `xcode`, `dev-garbage`, `browser`, `duplicates`, `large-files`, `leftovers`, `snapshots`, and the rest |
 | `toolbar.scan`, `toolbar.scanStop` | toolbar scan control |
-| `home.header`, `home.empty`, `home.scan` | Home |
+| `home.header`, `home.empty`, `home.scan`, `home.pause`, `home.resume` | Home |
 | `apps.header` | Apps |
-| `storage.header` | Storage |
-| `settings.pane.whatToFind`, `settings.pane.limits`, `settings.pane.folders` | Settings pane buttons |
+| `storage.header`, `storage.pause`, `storage.resume` | Storage |
 | `list.selectAll` | category table select-all |
+| `tweaks.header`, `tweaks.page`, `tweaks.reload`, `tweaks.loading`, `tweaks.empty` | Tweaks page |
+| `tweak.toggle.<tweak id>`, `tweak.choice.<tweak id>`, `tweak.folder.<tweak id>`, `tweak.inspect.<tweak id>` | tweak controls |
+| `tweak.detail.<tweak id>`, `tweak.confirm.<tweak id>` | tweak sheets |
+| `settings.pane.whatToFind`, `settings.pane.limits`, `settings.pane.folders`, `settings.pane.tweaks` | Settings panes |
+
+Controls without an identifier are matched by role and description: `Back`,
+`Hide Sidebar`/`Show Sidebar`, `Empty the Trash`, `Show files left by <app>`,
+`Open Settings`, `All`/`Changed`.
 
 Add a new one with `.accessibilityIdentifier("screen.thing")` on the control, next to its
 `.accessibilityLabel`. Name it `screen.element`, lowercase, one dot.
 
-### Press by identifier, not by coordinate
+### Extract the selector map to a file
 
-A label can change and a screen coordinate clicks whatever window happens to be on top. Use
-the identifier.
+`scripts/ui_selectors.py` compiles `scripts/ax_selectors.swift`, dumps the running window, and
+merges the result into `docs/ui-selectors.json` under a screen name. Positions, roles,
+descriptions, values, and actions are kept, so the file can be diffed and reused.
 
 ```sh
-/tmp/axdrv press gate.continue          # Continue with limited results, whatever its label
-/tmp/axdrv press settings.pane.limits   # switch the Settings pane
-/tmp/axdrv press settings.pane.folders
+python3 scripts/ui_selectors.py --pid 1234 --screen home
+python3 scripts/ui_selectors.py --pid 1234 --screen tweaks
+python3 scripts/ui_selectors.py --list        # summary only, writes nothing
 ```
 
-Do not use `System Events ... click at {x, y}` to reach app controls. With two windows or two
-copies of the app it hits the wrong element, and a screenshot of the result proves nothing.
+- Run it once per screen you care about; each run replaces that screen's entry.
+- `--pid` is required when more than one Chet process is running. Without it the tool aborts
+  rather than guess.
+- The extractor skips rows whose description names an installed app, and it drops the
+  auto-generated `SwiftUI.WindowGroup...` identifier, so the saved file does not drift with
+  the machine.
+- `docs/ui-selectors.json` is generated and gitignored, so it stays local. Regenerate it
+  after a UI change; do not hand-edit.
+- The gate is a one-shot screen: relaunch the app, dump `gate`, then press `gate.continue`.
 
-More than one Chet can run at once, for example a `.build/xc` copy and a second build. `axdrv`
-then targets the first instance by bundle id. Pass the pid to choose one:
+More than one Chet can run at once. Pick the instance explicitly:
 
 ```sh
-pgrep -f chet.app/Contents/MacOS/chet          # candidate pids
+pgrep -f chet.app/Contents/MacOS/chet
 AXDRV_PID=63481 /tmp/axdrv press gate.continue
 ```
 
+Treat `mise run dev` as destructive to other test runs: it starts with `pkill -x chet` and
+ends every instance. During a selector session, launch by path instead and kill only your pid.
+
 ### Pitfalls found the hard way
 
+- **Sidebar rows do not take `AXPress`.** The identifier lands on the `AXStaticText` inside
+  the row, and the row's only actions are `AXShowDefaultUI`/`AXShowAlternateUI`. Set
+  `AXSelectedRows` on the outline with `axdrv select`.
+- **`gate.continue` is `AXLink`, not `AXButton`.** Match the role or the identifier, not the
+  button query.
 - **System Events cannot press SwiftUI custom buttons.** `click button "Limits"` fails with
-  `-1728` because the button has no title. Press the accessibility identifier instead.
+  `-1728` because the button has no title. Press the accessibility identifier.
 - **Menu items do work**: `click menu item "Settings…" of menu 1 of menu bar item 2 of menu
   bar 1` opens the Settings window. That is a reliable way to open it after the gate.
-- **The Settings window opens even while the permission gate is up.** You do not have to clear
-  the gate to inspect Settings.
-- **`screencapture -R x,y,w,h` captures the screen, not the window.** If another app is on top,
-  the image shows that app. Capture by window id instead, and read ids from `CGWindowList`:
-  a window reported by System Events on another Space still has a valid id.
-- **A container identifier overwrites its children.** `.accessibilityIdentifier("settings.tabs")`
-  on the switcher replaced every segment id with `settings.tabs`. Put the identifier on the
-  control that must be pressed, never on the wrapper above it.
+- **The Settings window opens even while the permission gate is up.**
+- **A container identifier overwrites its children.** An identifier on a wrapper replaces the
+  identifiers below it. Put it on the control.
+- **`screencapture -R` captures the screen, not the window.** Capture by window id from
+  `CGWindowList`; a window on another Space still has a valid id.
 - **`open -a` activates an existing instance.** Use `open -n <path>` to launch one more.
-
-A window-id helper, if none is at hand:
-
-```sh
-# prints "<window id> | <name>" for one pid
-cat > /tmp/winid.swift <<'EOF'
-import CoreGraphics
-import Foundation
-let pid = Int(CommandLine.arguments[1])!
-let list = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]] ?? []
-for w in list where (w[kCGWindowOwnerPID as String] as? Int) == pid {
-    print(w[kCGWindowNumber as String] as? Int ?? 0, "|", w[kCGWindowName as String] as? String ?? "")
-}
-EOF
-swiftc -O /tmp/winid.swift -o /tmp/winid
-/tmp/winid 12345
-screencapture -x -o -l <id> /tmp/shot.png
-```
+- **Window position changes between launches.** Never hard-code click coordinates; read them
+  with `axdrv frame` or the selector JSON.
+- **A `.env` with `DRY_RUN=1` turns every removal into a preview** and disables tweak controls.
+  Remove it to test a real write.
 
 ### Recipe
 
 ```sh
-open .build/xc/Build/Products/Debug/chet.app && sleep 5
-/tmp/axdrv press gate.continue          # leave the permission gate
+open -n .build/xc/Build/Products/Debug/chet.app && sleep 5
+pgrep -f chet.app/Contents/MacOS/chet            # pick the pid you launched
+AXDRV_PID=<pid> /tmp/axdrv press gate.continue   # leave the permission gate
 sleep 2
-/tmp/axdrv texts | grep "Clean up your Mac"
-/tmp/axdrv click Apps                   # sidebar row, click by text
+AXDRV_PID=<pid> /tmp/axdrv select sidebar.overview
+AXDRV_PID=<pid> /tmp/axdrv texts | grep "No scan yet"
+AXDRV_PID=<pid> /tmp/axdrv press home.scan       # start a scan
 sleep 2
-/tmp/axdrv texts | head -18             # app rows: name, vendor, size
-/tmp/axdrv click Home
-osascript -e 'tell application "chet" to quit'
+AXDRV_PID=<pid> /tmp/axdrv press toolbar.scanStop
+AXDRV_PID=<pid> /tmp/axdrv select sidebar.tweaks
+sleep 2
+python3 scripts/ui_selectors.py --pid <pid> --screen tweaks
+python3 scripts/ui_selectors.py --list
 ```
 
-Quit with `osascript -e 'tell application "chet" to quit'` after the last assertion. Leaving
-the window open blocks whoever else shares the machine.
+Quit with `kill <pid>` or `osascript -e 'tell application id "id.web.widnyana.chet" to quit'`
+after the last assertion. Leaving the window open blocks whoever else shares the machine.
 
 ## Another agent in the same tree
 
