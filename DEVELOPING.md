@@ -137,6 +137,40 @@ pgrep -f chet.app/Contents/MacOS/chet          # candidate pids
 AXDRV_PID=63481 /tmp/axdrv press gate.continue
 ```
 
+### Pitfalls found the hard way
+
+- **System Events cannot press SwiftUI custom buttons.** `click button "Limits"` fails with
+  `-1728` because the button has no title. Press the accessibility identifier instead.
+- **Menu items do work**: `click menu item "Settings…" of menu 1 of menu bar item 2 of menu
+  bar 1` opens the Settings window. That is a reliable way to open it after the gate.
+- **The Settings window opens even while the permission gate is up.** You do not have to clear
+  the gate to inspect Settings.
+- **`screencapture -R x,y,w,h` captures the screen, not the window.** If another app is on top,
+  the image shows that app. Capture by window id instead, and read ids from `CGWindowList`:
+  a window reported by System Events on another Space still has a valid id.
+- **A container identifier overwrites its children.** `.accessibilityIdentifier("settings.tabs")`
+  on the switcher replaced every segment id with `settings.tabs`. Put the identifier on the
+  control that must be pressed, never on the wrapper above it.
+- **`open -a` activates an existing instance.** Use `open -n <path>` to launch one more.
+
+A window-id helper, if none is at hand:
+
+```sh
+# prints "<window id> | <name>" for one pid
+cat > /tmp/winid.swift <<'EOF'
+import CoreGraphics
+import Foundation
+let pid = Int(CommandLine.arguments[1])!
+let list = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]] ?? []
+for w in list where (w[kCGWindowOwnerPID as String] as? Int) == pid {
+    print(w[kCGWindowNumber as String] as? Int ?? 0, "|", w[kCGWindowName as String] as? String ?? "")
+}
+EOF
+swiftc -O /tmp/winid.swift -o /tmp/winid
+/tmp/winid 12345
+screencapture -x -o -l <id> /tmp/shot.png
+```
+
 ### Recipe
 
 ```sh
@@ -153,3 +187,31 @@ osascript -e 'tell application "chet" to quit'
 
 Quit with `osascript -e 'tell application "chet" to quit'` after the last assertion. Leaving
 the window open blocks whoever else shares the machine.
+
+## Another agent in the same tree
+
+Two agents can work in this checkout at once. Expect untracked files from the other session,
+or edits to tracked files, while you work.
+
+- Do not delete, move, or repair a file you did not create. An untracked file that fails to
+  compile is the other session's work in progress, not a broken repo.
+- One broken WIP file fails the whole `xcodebuild`. Verify your own change against a clean
+  snapshot instead of waiting:
+
+```sh
+rm -rf /tmp/verify && mkdir -p /tmp/verify
+git archive HEAD | tar -x -C /tmp/verify
+cp Chet/Views/SettingsComponents.swift /tmp/verify/Chet/Views/   # repeat for every file you changed
+cd /tmp/verify && xcodegen generate --quiet
+xcodebuild -project chet.xcodeproj -scheme chet -configuration Debug \
+  -destination 'platform=macOS' -derivedDataPath /tmp/verify/.build build
+```
+
+- Stage only your own paths. `git add -A` in a shared tree stages the other session's partial
+  work.
+- `chet.xcodeproj` is generated and not tracked. Run `mise run gen` after adding a Swift file;
+  `mise run build` depends on it.
+- `docs/plans` is gitignored. A plan written there stays local and never reaches a commit.
+- `mise run dev` starts with `pkill -x chet`, which ends every running instance, including one
+  the other session launched for its own test. Avoid it while they are driving the app.
+- The design document is `docs/DESIGN.md`. There is no `DESIGNS.md`.
