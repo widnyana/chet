@@ -55,6 +55,7 @@ struct TopStatusStrip: View {
                 }
                 .buttonStyle(.plain)
                 .help("Hide until the next launch")
+                .accessibilityLabel("Hide until the next launch")
             }
             if model.grantAttempts >= 2 {
                 Text("Chet may appear more than once in the list. Remove the old entry.")
@@ -98,6 +99,7 @@ struct TopStatusStrip: View {
                     }
                     .buttonStyle(.plain)
                     .help("Dismiss")
+                    .accessibilityLabel("Dismiss")
                 }
             }
             .padding(.horizontal, Spacing.s6)
