@@ -10,7 +10,7 @@ struct OverviewView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Spacing.s8) {
+            VStack(alignment: .leading, spacing: Spacing.s6) {
                 pageHeader
                 capacity
                 content
