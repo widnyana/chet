@@ -20,7 +20,7 @@ app.
 The scan button is in the toolbar on every destination except Applications.
 The Applications destination owns its own toolbar: Done, search, layout, reload.
 
-`Mackit > About Mackit` opens a separate fixed window. It is not a sidebar
+`Chet > About Chet` opens a separate fixed window. It is not a sidebar
 destination and it does not replace the detail pane.
 
 ## Overview
@@ -185,7 +185,7 @@ Job: answer "what will the next scan do?" in words a non-technical person alread
 One fixed 520 x 500 window, toolbar panes with an icon and a word: `Scan`, `Sizes`, `Folders`.
 The pane name is not repeated in the title bar.
 
-1. `Scan`: panel `What Mackit looks for` with the note and the six switches, then panel
+1. `Scan`: panel `What Chet looks for` with the note and the six switches, then panel
    `Speed` with the `Threads` pop-up and the note `Auto uses one thread per core.`
 2. `Sizes`: panels `Copies`, `Big files`, `Old files`; sliders with the value on the right.
 3. `Folders`: panels `Folders to skip`, `Folders you add`, `Other drives`; picker buttons sit
@@ -199,12 +199,12 @@ A set `DRY_RUN` adds one amber label above the panes: `Preview only. Nothing is 
 Job: answer "which build is running, whether access is granted, and where are
 the logs?".
 
-`Mackit > About Mackit` opens one fixed 560 x 620 window. It is independent of
+`Chet > About Chet` opens one fixed 560 x 620 window. It is independent of
 the main window and can stay open during a scan.
 
 Top to bottom:
 
-1. `PageHeader`: app icon, `Mackit`, the one-sentence product line, metric: the
+1. `PageHeader`: app icon, `Chet`, the one-sentence product line, metric: the
    version.
 2. `This build`: build, minimum macOS.
 3. `Status`: Full Disk Access with `Granted` or the amber `Not granted` plus
@@ -228,9 +228,9 @@ Job: get Full Disk Access or let the user continue honestly.
 
 Top to bottom:
 
-1. Title: `Mackit needs access to the folders it measures`.
+1. Title: `Chet needs access to the folders it measures`.
 2. One paragraph: what macOS hides and why the app needs it.
-3. Three plain rows: open Privacy & Security, turn on Mackit under Full Disk
+3. Three plain rows: open Privacy & Security, turn on Chet under Full Disk
    Access, come back here. Numbers in `inkSecondary`, no circles.
 4. Primary `Open System Settings`.
 5. Link `Continue without access`.

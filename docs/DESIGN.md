@@ -1,4 +1,4 @@
-# Mackit UI design
+# Chet UI design
 
 Status: canonical design direction.
 Detailed references: [design/README.md](design/README.md),
@@ -15,7 +15,7 @@ Reading this as: a native macOS utility for people who want to reclaim disk
 space, in a quiet paper-and-ink ledger language, dial ENERGY 1 / RHYTHM 2 /
 MOTION 1.
 
-Mackit is a ledger for disk space. It shows what is there, what can be
+Chet is a ledger for disk space. It shows what is there, what can be
 reclaimed, and what will happen when you act. It does not decorate the act of
 cleaning. The interface is quiet because the decision is serious.
 
@@ -24,25 +24,29 @@ cleaning. The interface is quiet because the decision is serious.
 ```
 NavigationSplitView
   Sidebar
-    Overview
-    Clean
-      Caches and logs
-      Developer build data
-      Browser caches
+    Home
+    Safe to remove
+      App caches
+      Logs
+      Xcode files
+      ...
+    Check first
+      Duplicate files
+      Large files
       ...
     Tools
-      Applications
-      Disk map
+      Apps
+      Storage
   Detail
     one destination at a time
 ```
 
 - The sidebar is the route. The detail pane shows one destination.
-- Applications uses its own `NavigationStack` for the inventory and one app.
-- The toolbar carries Scan / Stop on every destination except Applications.
-- Applications owns Done, Search, Layout, and Reload.
-- There are no mode tabs. Applications is a destination, not a mode.
-- About is not a destination. `Mackit > About Mackit` opens one fixed window,
+- Apps uses its own `NavigationStack` for the inventory and one app.
+- The toolbar carries Scan / Stop on every destination except Apps.
+- Apps owns Search, Layout, and Reload.
+- There are no mode tabs. Apps is a destination, not a mode.
+- About is not a destination. `Chet > About Chet` opens one fixed window,
   separate from the main window.
 
 ## Visual language
@@ -114,13 +118,13 @@ real operation runs.
 
 ## Screen rules
 
-### Overview
+### Home
 
 One focal point: the reclaimable total and the capacity bar.
 
 Top to bottom:
 
-1. Page header: `Overview`, a one-line subtitle, the reclaimable total.
+1. Page header: `Clean up your Mac`, a one-line subtitle, the amount that can be freed.
 2. Capacity bar: volume name, capacity, used, reclaimable, free, text legend.
 3. Scan state:
    - never scanned: an empty state with `Scan this Mac`;
@@ -130,7 +134,7 @@ Top to bottom:
    Clicking a row opens the category.
 5. Command bar: Scan, Stop, or Clean selected.
 
-No chart. The ledger is the chart. No uninstall card. Applications is in the
+No chart. The ledger is the chart. No uninstall card. Apps is in the
 sidebar.
 
 ### Category
@@ -183,7 +187,7 @@ Rules:
   language. It exists because the operation is a foreground, destructive task.
 - No per-item animation. The linear bars and the current path update in place.
 
-### Applications
+### Apps
 
 A searchable inventory: list first, grid second. Every row and cell has a mark
 checkbox, name, publisher or bundle ID, location, version, size, and a text
@@ -197,7 +201,7 @@ row is the only control that targets the app. Related files are grouped by
 component kind and show a plain status label. The command bar reports selected
 count and bytes and opens the confirmation.
 
-### Disk map
+### Storage
 
 One encoding: size share as a neutral ramp. Plain breadcrumb, four-step legend,
 canvas, hover label. The detailed scan strip lives here and nowhere else. The
@@ -215,7 +219,7 @@ word per pane, then grouped panels on `paperRaised` with the label on the left a
 on the right. The words are for someone who has never opened a terminal: no cache jargon, no
 "duplicate scope".
 
-- `Scan`: panel `What Mackit looks for`, note `Two checks always run: Mackit's own folder
+- `Scan`: panel `What Chet looks for`, note `Two checks always run: Chet's own folder
   list, and measuring your folders.`, then the six checks as switches. Panel `Speed` holds
   `Threads` as a pop-up with the note `Auto uses one thread per core.`
 - `Sizes`: panel `Copies` with `Smallest copy` and the switch `Look inside temporary app
@@ -228,7 +232,7 @@ on the right. The words are for someone who has never opened a terminal: no cach
 - A set `DRY_RUN` shows one amber label above the panes: `Preview only. Nothing is deleted.`
 
 Panels are the app's only raised surface: radius 10, `paperRaised`, hairline border. Every
-other page stays flat, so Settings cannot be mistaken for a second Overview. Inside a pane the
+other page stays flat, so Settings cannot be mistaken for a second Home. Inside a pane the
 row shape repeats, because a preference list is scanned, not read.
 
 ### Permission page
@@ -238,13 +242,13 @@ spinner while checking. No glass card and no pulsing dot.
 
 ### About
 
-One fixed 560 x 620 window, opened from `Mackit > About Mackit`. It is a
+One fixed 560 x 620 window, opened from `Chet > About Chet`. It is a
 ledger of app facts, not a landing page and not a system report. The window
-title is `About Mackit`; the page header names the app.
+title is `About Chet`; the page header names the app.
 
 Top to bottom:
 
-1. Page header: app icon, `Mackit`, one sentence, the version.
+1. Page header: app icon, `Chet`, one sentence, the version.
 2. This build: build number, minimum macOS.
 3. Status: Full Disk Access with `Open Settings` when denied, last scan.
 4. Logs: selectable audit log and logs folder paths with `Show` and `Open`.
@@ -330,7 +334,7 @@ Rules the script enforces:
   "chrome": [
     {
       "id": "top-status-strip",
-      "file": "Mackit/Views/ContentView.swift",
+      "file": "Chet/Views/ContentView.swift",
       "mechanism": "safeAreaInset-top",
       "height": 56,
       "verify": {
@@ -340,21 +344,21 @@ Rules the script enforces:
     },
     {
       "id": "command-bar",
-      "file": "Mackit/Views/CommandBar.swift",
+      "file": "Chet/Views/CommandBar.swift",
       "mechanism": "in-flow-bottom",
       "height": 52,
       "verify": {"contains": ["struct CommandBar"]}
     },
     {
       "id": "scan-toolbar",
-      "file": "Mackit/Views/ScanStatusView.swift",
+      "file": "Chet/Views/ScanStatusView.swift",
       "mechanism": "toolbar-inline",
       "height": 28,
       "verify": {"contains": ["struct ScanStatusView"]}
     },
     {
       "id": "disk-map-chrome",
-      "file": "Mackit/Views/DiskMapView.swift",
+      "file": "Chet/Views/DiskMapView.swift",
       "mechanism": "in-flow-header",
       "height": 44,
       "verify": {"contains": ["DiskMapChrome"]}

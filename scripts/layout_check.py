@@ -20,7 +20,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DOC = ROOT / "docs" / "DESIGN.md"
-VIEWS = ROOT / "Mackit"
+VIEWS = ROOT / "Chet"
 
 
 def load_registry():

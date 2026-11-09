@@ -2,45 +2,45 @@
 xcodegen = "2.46.0"
 
 [tasks.gen]
-description = "Generate Mackit.xcodeproj from project.yml"
+description = "Generate chet.xcodeproj from project.yml"
 run = "xcodegen generate --quiet"
 
 [tasks.build]
 description = "Debug build of the app into .build/xc"
 depends = ["gen"]
-run = "xcodebuild -project Mackit.xcodeproj -scheme Mackit -configuration Debug -derivedDataPath .build/xc -quiet build"
+run = "xcodebuild -project chet.xcodeproj -scheme chet -configuration Debug -derivedDataPath .build/xc -quiet build"
 
 [tasks.dev]
 description = "Build and launch the debug app (one LaunchServices registration only)"
 depends = ["build"]
 run = [
-  "pkill -x Mackit || true",
-  "./scripts/dedupe-launchservices.sh .build/xc/Build/Products/Debug/Mackit.app",
-  "open .build/xc/Build/Products/Debug/Mackit.app",
+  "pkill -x chet || true",
+  "./scripts/dedupe-launchservices.sh .build/xc/Build/Products/Debug/chet.app",
+  "open .build/xc/Build/Products/Debug/chet.app",
 ]
 
 [tasks.test]
-description = "Run MackitCore tests (pass a filter: mise run test -- --filter Cleaner)"
-run = "swift test --package-path MackitCore"
+description = "Run ChetCore tests (pass a filter: mise run test -- --filter Cleaner)"
+run = "swift test --package-path ChetCore"
 
 [tasks.release]
-description = "Release build, arm64 check, zipped to dist/Mackit.zip"
+description = "Release build, arm64 check, zipped to dist/chet.zip"
 depends = ["gen"]
 run = [
-  "xcodebuild -project Mackit.xcodeproj -scheme Mackit -configuration Release -derivedDataPath .build/xc -quiet build",
-  "test \"$(lipo -archs .build/xc/Build/Products/Release/Mackit.app/Contents/MacOS/Mackit)\" = arm64",
-  "mkdir -p dist && rm -f dist/Mackit.zip && ditto -c -k --keepParent .build/xc/Build/Products/Release/Mackit.app dist/Mackit.zip",
-  "echo dist/Mackit.zip",
+  "xcodebuild -project chet.xcodeproj -scheme chet -configuration Release -derivedDataPath .build/xc -quiet build",
+  "test \"$(lipo -archs .build/xc/Build/Products/Release/chet.app/Contents/MacOS/chet)\" = arm64",
+  "mkdir -p dist && rm -f dist/chet.zip && ditto -c -k --keepParent .build/xc/Build/Products/Release/chet.app dist/chet.zip",
+  "echo dist/chet.zip",
 ]
 
 [tasks.check]
 description = "Tests, debug build, and arm64-only binary check"
 depends = ["test", "build"]
-run = "test \"$(lipo -archs .build/xc/Build/Products/Debug/Mackit.app/Contents/MacOS/Mackit)\" = arm64 && echo arm64 ok"
+run = "test \"$(lipo -archs .build/xc/Build/Products/Debug/chet.app/Contents/MacOS/chet)\" = arm64 && echo arm64 ok"
 
 [tasks.bench]
 description = "Benchmark GPU vs SHA-256 duplicate hashing (writes 1 GB of temp files)"
-run = "MACKIT_BENCH=1 swift test --package-path MackitCore --filter hashingBenchmark"
+run = "CHET_BENCH=1 swift test --package-path ChetCore --filter hashingBenchmark"
 
 [tasks.layout]
 description = "Check floating chrome positions against the registry in docs/DESIGN.md"
@@ -48,25 +48,25 @@ run = "python3 scripts/layout_check.py"
 
 [tasks.fmt]
 description = "Format all Swift sources in place"
-run = "swift format --in-place --recursive Mackit MackitCore/Sources MackitCore/Tests MackitCore/Package.swift"
+run = "swift format --in-place --recursive Chet ChetCore/Sources ChetCore/Tests ChetCore/Package.swift"
 
 [tasks.lint]
 description = "Check Swift formatting without changing files"
-run = "swift format lint --strict --recursive Mackit MackitCore/Sources MackitCore/Tests MackitCore/Package.swift"
+run = "swift format lint --strict --recursive Chet ChetCore/Sources ChetCore/Tests ChetCore/Package.swift"
 
 [tasks.xcode]
 description = "Open the generated project in Xcode"
 depends = ["gen"]
-run = "xed Mackit.xcodeproj"
+run = "xed chet.xcodeproj"
 
 [tasks.log]
 description = "Follow the clean audit log"
-run = "tail -f ~/Library/Logs/Mackit/clean.log"
+run = "tail -f ~/Library/Logs/chet/clean.log"
 
 [tasks.clean]
 description = "Remove build output, generated project and dist/"
-run = "rm -rf .build MackitCore/.build Mackit.xcodeproj dist || true"
+run = "rm -rf .build ChetCore/.build chet.xcodeproj dist || true"
 
 [tasks.scan-bench]
 description = "Read-only scan benchmark (pass a folder: mise run scan-bench -- /path)"
-run = "swift run --package-path MackitCore mackit-scan"
+run = "swift run --package-path ChetCore chet-scan"

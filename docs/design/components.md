@@ -389,7 +389,7 @@ Rules:
 ## PermissionPage
 
 ```
-Mackit needs access to the folders it measures.    (title)
+Chet needs access to the folders it measures.    (title)
 macOS hides these folders from apps.               (body)
 [short list of what access unlocks]                (body)
 [Open System Settings]                             (primary)

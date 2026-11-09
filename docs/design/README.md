@@ -1,4 +1,4 @@
-# Mackit design system
+# Chet design system
 
 Status: canonical direction for the UI redesign.
 Date: 2026-11-08.
@@ -7,7 +7,7 @@ inside the app.
 
 ## The idea
 
-Mackit is a ledger for disk space.
+Chet is a ledger for disk space.
 
 It shows what is there, what can be reclaimed, and what will happen when you
 act. It does not decorate the act of cleaning. The interface is quiet because

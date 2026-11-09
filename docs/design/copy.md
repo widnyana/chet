@@ -1,6 +1,6 @@
 # Copy and voice
 
-Mackit speaks like a careful person who knows the machine. It is direct, calm,
+Chet speaks like a careful person who knows the machine. It is direct, calm,
 and specific. It does not sell, reassure with slogans, or apologize for the
 work.
 
@@ -56,9 +56,9 @@ inspection surface.
 - Safe: `Apps rebuild this data.`
 - Review: `Review each item. Removed items go to the Trash.`
 - Running: `Running. Quit it before removing.`
-- Admin only: `Needs administrator. Mackit cannot move this app.`
+- Admin only: `Needs administrator. Chet cannot move this app.`
 - Shared: `Shared with another app. Not selected.`
-- Protected: `Protected. Mackit never removes this.`
+- Protected: `Protected. Chet never removes this.`
 - Dry run: `Dry run. No files will be moved.`
 - Partial access: `Limited access. Some folders are hidden.`
 
@@ -91,8 +91,8 @@ A loading state never claims a number.
 - `The applications folder could not be read. Check Full Disk Access, then reload.`
 - `The disk map could not be read for this folder. Reveal it in Finder or try another folder.`
 - `The snapshot command failed. macOS returned: [message].`
-- `Mackit could not move this item. It may have changed since the scan.`
-- `Mackit could not move this app. An administrator may need to remove it.`
+- `Chet could not move this item. It may have changed since the scan.`
+- `Chet could not move this app. An administrator may need to remove it.`
 
 The first line names the failed action. The second names the likely cause and
 the next action. The raw error is secondary.

@@ -1,4 +1,4 @@
-# Mackit codebase findings
+# Chet codebase findings
 
 Date: 2026-11-03
 
@@ -6,18 +6,18 @@ Date: 2026-11-03
 
 ## Architecture
 
-Mackit splits into two Swift targets:
+Chet splits into two Swift targets:
 
-- `MackitCore/` - a Swift package containing all scanning, safety, and cleaning logic, the Metal shaders, and the test suite. No SwiftUI. Fully testable in isolation.
-- `Mackit/` - a SwiftUI app that holds the views and `ScanModel`. It has no domain logic of its own; it wires the `MackitCore` types to the UI.
+- `ChetCore/` - a Swift package containing all scanning, safety, and cleaning logic, the Metal shaders, and the test suite. No SwiftUI. Fully testable in isolation.
+- `Chet/` - a SwiftUI app that holds the views and `ScanModel`. It has no domain logic of its own; it wires the `ChetCore` types to the UI.
 
-`ScanModel` is `@MainActor @Observable` and acts as the single coordinator: it owns the scan task, the category list, selection state, and the clean flow. Everything below it in `MackitCore` is a value type (`struct`), marked `Sendable`, and can run concurrently. There are no third-party dependencies. The stack is Metal, CryptoKit, ImageIO, CoreGraphics, AppKit, Foundation, and Synchronization (all Apple). Swift 6.2 strict concurrency is enabled throughout.
+`ScanModel` is `@MainActor @Observable` and acts as the single coordinator: it owns the scan task, the category list, selection state, and the clean flow. Everything below it in `ChetCore` is a value type (`struct`), marked `Sendable`, and can run concurrently. There are no third-party dependencies. The stack is Metal, CryptoKit, ImageIO, CoreGraphics, AppKit, Foundation, and Synchronization (all Apple). Swift 6.2 strict concurrency is enabled throughout.
 
 ---
 
 ## Scanning subsystems
 
-Each subsystem is an independent struct that takes a `SafetyPolicy` and returns results. `ScanSession.run()` (in `MackitCore`) drives the steps one after another at background IO priority, emitting `ScanEvent`s into an `AsyncStream` that `ScanModel` consumes. Rule scans run inside the step in a 4-wide task group; every post-index step (large files, duplicates, photos, videos) is fed from `index.candidates` so the home folder is walked once, metadata only. `ScanModel.scan()` just starts the session task and applies events.
+Each subsystem is an independent struct that takes a `SafetyPolicy` and returns results. `ScanSession.run()` (in `ChetCore`) drives the steps one after another at background IO priority, emitting `ScanEvent`s into an `AsyncStream` that `ScanModel` consumes. Rule scans run inside the step in a 4-wide task group; every post-index step (large files, duplicates, photos, videos) is fed from `index.candidates` so the home folder is walked once, metadata only. `ScanModel.scan()` just starts the session task and applies events.
 
 | Subsystem | File | Approach |
 |---|---|---|
@@ -40,7 +40,7 @@ Every path goes through `SafetyPolicy.isDeletable(_:)` at scan time and again ri
 
 `FileStamp` captures inode, size, and modification time at scan time. Before deletion, the stamp is re-read and compared. If any field differs, the file is skipped with outcome `.skipped(.changed)`. If the owner app (stored in `ScanItem.ownerBundleID`) is currently running, deletion is also skipped.
 
-Every clean action is written to `~/Library/Logs/Mackit/clean.log` as JSON Lines with time, path, byte count, delete mode, and outcome.
+Every clean action is written to `~/Library/Logs/chet/clean.log` as JSON Lines with time, path, byte count, delete mode, and outcome.
 
 ---
 
@@ -87,7 +87,7 @@ Both walkers skip dataless files and deduplicate hard links by inode.
 
 ## Test coverage
 
-23 test files under `MackitCore/Tests/MackitCoreTests/`. Coverage includes:
+23 test files under `ChetCore/Tests/ChetCoreTests/`. Coverage includes:
 
 - Every scanner (rule, duplicate, large files, leftovers, photos, videos, snapshots)
 - `SafetyPolicy` with exhaustive deny-list cases

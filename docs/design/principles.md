@@ -4,7 +4,7 @@
 
 An operating system utility should feel like part of the operating system. Not a
 dashboard, not a landing page, not a branded experience placed on top of macOS.
-Mackit earns trust by being clear about consequences and quiet about itself.
+Chet earns trust by being clear about consequences and quiet about itself.
 
 The design language is called the **ledger**. It borrows the structure of a
 well-kept account book:
@@ -156,7 +156,7 @@ The capacity bar is the repeated gesture. It appears:
 
 The bar is always horizontal, always uses the same ink and accent, and always
 labels its segments with text. It is the one visual element that belongs to
-Mackit and to no other product.
+Chet and to no other product.
 
 ## Anti-slop commitments
 
