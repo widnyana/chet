@@ -262,4 +262,53 @@ public enum Homebrew {
         if !casks.isEmpty { outs.append(run(["upgrade", "--cask"] + casks, timeout: 1800)) }
         return combine(outs)
     }
+
+    /// One name from `brew search`.
+    public struct SearchResult: Sendable, Hashable, Identifiable {
+        public let name: String
+        public let isCask: Bool
+        public var id: String { (isCask ? "cask:" : "formula:") + name }
+    }
+
+    /// Names matching `query`, formulae then casks, plus a message when brew could not search.
+    /// Read-only: `HOMEBREW_NO_AUTO_UPDATE` is already set, so it reads the local index only.
+    public static func search(_ query: String) -> (results: [SearchResult], message: String?) {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return ([], nil) }
+        func names(_ output: String) -> [String] {
+            output.split(separator: "\n")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty && !$0.hasPrefix("==>") }
+        }
+        let formulae = run(["search", "--formula", trimmed])
+        let casks = run(["search", "--cask", trimmed])
+        let results =
+            names(formulae.out).map { SearchResult(name: $0, isCask: false) }
+            + names(casks.out).map { SearchResult(name: $0, isCask: true) }
+        let failures = [formulae, casks].filter { !$0.ok }
+        let message =
+            results.isEmpty && !failures.isEmpty
+            ? failures.map(\.message).joined(separator: "\n") : nil
+        return (results, message)
+    }
+
+    /// `brew install` the given names, formulae then casks. A dry run reports the commands.
+    public static func install(
+        formulae: [String], casks: [String], dryRun: Bool
+    ) -> Subprocess.Result {
+        guard !dryRun else {
+            return wouldRun(formulae: formulae, casks: casks, verb: "install")
+        }
+        var outs: [Subprocess.Result] = []
+        if !formulae.isEmpty { outs.append(run(["install", "--formula"] + formulae, timeout: 1800)) }
+        if !casks.isEmpty { outs.append(run(["install", "--cask"] + casks, timeout: 1800)) }
+        return combine(outs)
+    }
+
+    /// `brew tap`. A dry run reports the command.
+    public static func addTap(_ name: String, dryRun: Bool) -> Subprocess.Result {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !dryRun else { return wouldRun("brew tap " + trimmed) }
+        return run(["tap", trimmed], timeout: 300)
+    }
 }

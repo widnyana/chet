@@ -461,6 +461,20 @@ struct ColumnTable<Item: Identifiable, Header: View, Row: View>: View {
     }
 }
 
+/// The geometry every action sheet shares: 520 pt wide, 24 pt padding, paper on the body, and an
+/// optional fixed height. A sheet supplies its own stack and its own footer row.
+struct SheetFrame<Content: View>: View {
+    var height: CGFloat?
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        content
+            .padding(Spacing.s6)
+            .frame(width: 520, height: height)
+            .background(Theme.paper)
+    }
+}
+
 struct ErrorStateView: View {
     let title: String
     let message: String

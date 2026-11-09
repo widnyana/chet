@@ -14,82 +14,81 @@ struct AppUninstallConfirmSheet: View {
                 (AppComponentKind.allCases.firstIndex(of: $0.kind) ?? Int.max)
                     < (AppComponentKind.allCases.firstIndex(of: $1.kind) ?? Int.max)
             }
-        VStack(alignment: .leading, spacing: Spacing.s4) {
-            VStack(alignment: .leading, spacing: Spacing.s1) {
-                Text("Move \(app?.name ?? "this app") to the Trash?")
-                    .font(Typography.title)
-                    .foregroundStyle(Theme.ink)
-                Text(
-                    "\(model.selectedCount) items · \(model.selectedBytes.formatted(.byteCount(style: .file)))"
-                )
-                .font(Typography.body)
-                .monospacedDigit()
-                .foregroundStyle(Theme.inkSecondary)
-            }
-            ScrollView {
-                VStack(spacing: 0) {
-                    if model.appSelected, let app {
-                        confirmRow(
-                            symbol: "app.dashed", title: app.name,
-                            detail: AppCopy.component(.application),
-                            bytes: model.appBytes)
-                        Hairline()
+        SheetFrame {
+            VStack(alignment: .leading, spacing: Spacing.s4) {
+                VStack(alignment: .leading, spacing: Spacing.s1) {
+                    Text("Move \(app?.name ?? "this app") to the Trash?")
+                        .font(Typography.title)
+                        .foregroundStyle(Theme.ink)
+                    Text(
+                        "\(model.selectedCount) items · \(model.selectedBytes.formatted(.byteCount(style: .file)))"
+                    )
+                    .font(Typography.body)
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.inkSecondary)
+                }
+                ScrollView {
+                    VStack(spacing: 0) {
+                        if model.appSelected, let app {
+                            confirmRow(
+                                symbol: "app.dashed", title: app.name,
+                                detail: AppCopy.component(.application),
+                                bytes: model.appBytes)
+                            Hairline()
+                        }
+                        ForEach(rows) { row in
+                            confirmRow(
+                                symbol: "folder", title: AppCopy.component(row.kind),
+                                detail: row.count == 1 ? "1 item" : "\(row.count) items", bytes: row.bytes)
+                            if row.kind != rows.last?.kind { Hairline() }
+                        }
                     }
-                    ForEach(rows) { row in
-                        confirmRow(
-                            symbol: "folder", title: AppCopy.component(row.kind),
-                            detail: row.count == 1 ? "1 item" : "\(row.count) items", bytes: row.bytes)
-                        if row.kind != rows.last?.kind { Hairline() }
+                    .padding(.horizontal, Spacing.s3)
+                    .padding(.vertical, Spacing.s2)
+                }
+                .frame(maxHeight: 220)
+                .background(Theme.paperRaised, in: RoundedRectangle(cornerRadius: 6))
+                VStack(alignment: .leading, spacing: Spacing.s2) {
+                    labeled("The app and the files you chose move to the Trash.", icon: "trash")
+                    labeled("You can restore them from the Trash.", icon: "arrow.uturn.backward")
+                    labeled("Chet checks each item again before it moves.", icon: "checkmark.shield")
+                    if !DryRun.enabled,
+                        model.selectedComponentList.contains(where: { $0.requiresAdmin })
+                    {
+                        labeled(
+                            "Items that need an administrator are removed permanently, not moved to the Trash.",
+                            icon: "lock.open")
+                    }
+                    if let app, !model.appSelected, app.isWritable, !model.isRunning {
+                        labeled("The app stays installed.", icon: "app.dashed")
                     }
                 }
-                .padding(.horizontal, Spacing.s3)
-                .padding(.vertical, Spacing.s2)
-            }
-            .frame(maxHeight: 220)
-            .background(Theme.paperRaised, in: RoundedRectangle(cornerRadius: 6))
-            VStack(alignment: .leading, spacing: Spacing.s2) {
-                labeled("The app and the files you chose move to the Trash.", icon: "trash")
-                labeled("You can restore them from the Trash.", icon: "arrow.uturn.backward")
-                labeled("Chet checks each item again before it moves.", icon: "checkmark.shield")
-                if !DryRun.enabled,
-                    model.selectedComponentList.contains(where: { $0.requiresAdmin })
-                {
-                    labeled(
-                        "Items that need an administrator are removed permanently, not moved to the Trash.",
-                        icon: "lock.open")
+                if model.isRunning {
+                    StatusLabel(
+                        text: "Quit the app before removing it.",
+                        systemImage: "exclamationmark.triangle",
+                        tone: .amber)
                 }
-                if let app, !model.appSelected, app.isWritable, !model.isRunning {
-                    labeled("The app stays installed.", icon: "app.dashed")
+                if DryRun.enabled {
+                    StatusLabel(
+                        text: "Preview only. Nothing will be moved.",
+                        systemImage: "exclamationmark.triangle",
+                        tone: .amber)
                 }
-            }
-            if model.isRunning {
-                StatusLabel(
-                    text: "Quit the app before removing it.",
-                    systemImage: "exclamationmark.triangle",
-                    tone: .amber)
-            }
-            if DryRun.enabled {
-                StatusLabel(
-                    text: "Preview only. Nothing will be moved.",
-                    systemImage: "exclamationmark.triangle",
-                    tone: .amber)
-            }
-            HStack {
-                Spacer()
-                SecondaryActionButton(title: "Cancel", shortcut: .escape, action: { dismiss() })
-                DestructiveActionButton(
-                    title: "Move to Trash",
-                    isEnabled: model.canRemove,
-                    shortcut: .return,
-                    action: {
-                        model.remove()
-                        dismiss()
-                    })
+                HStack {
+                    Spacer()
+                    SecondaryActionButton(title: "Cancel", shortcut: .escape, action: { dismiss() })
+                    DestructiveActionButton(
+                        title: "Move to Trash",
+                        isEnabled: model.canRemove,
+                        shortcut: .return,
+                        action: {
+                            model.remove()
+                            dismiss()
+                        })
+                }
             }
         }
-        .padding(Spacing.s6)
-        .frame(width: 520)
-        .background(Theme.paper)
     }
 
     private struct ConfirmRow: Identifiable {
@@ -149,61 +148,60 @@ struct UninstallSummaryView: View {
     private var cleanedCount: Int { report.trashedCount + report.removedCount }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s4) {
-            VStack(alignment: .leading, spacing: Spacing.s1) {
-                Text(
-                    report.dryRun
-                        ? "Preview complete" : (report.removedCount > 0 ? "Removed" : "Moved to the Trash")
-                )
-                .font(Typography.title)
-                .foregroundStyle(Theme.ink)
-                Text(cleanedBytes.formatted(.byteCount(style: .file)))
-                    .font(Typography.display)
-                    .monospacedDigit()
+        SheetFrame {
+            VStack(alignment: .leading, spacing: Spacing.s4) {
+                VStack(alignment: .leading, spacing: Spacing.s1) {
+                    Text(
+                        report.dryRun
+                            ? "Preview complete" : (report.removedCount > 0 ? "Removed" : "Moved to the Trash")
+                    )
+                    .font(Typography.title)
                     .foregroundStyle(Theme.ink)
-                Text(
-                    report.dryRun
-                        ? "\(cleanedCount) of \(report.results.count) items would be cleaned. Nothing was moved or removed."
-                        : "\(cleanedCount) of \(report.results.count) items cleaned. Items marked removed are gone permanently."
-                )
-                .font(Typography.body)
-                .foregroundStyle(Theme.inkSecondary)
-            }
-            if !problems.isEmpty {
-                DisclosureGroup("\(problems.count) items not moved") {
-                    VStack(spacing: 0) {
-                        ForEach(problems) { result in
-                            HStack {
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(result.name)
-                                        .font(Typography.row)
-                                        .foregroundStyle(Theme.ink)
-                                    Text(Self.reason(result.outcome, dryRun: result.dryRun))
-                                        .font(Typography.caption)
-                                        .foregroundStyle(Theme.inkSecondary)
+                    Text(cleanedBytes.formatted(.byteCount(style: .file)))
+                        .font(Typography.display)
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.ink)
+                    Text(
+                        report.dryRun
+                            ? "\(cleanedCount) of \(report.results.count) items would be cleaned. Nothing was moved or removed."
+                            : "\(cleanedCount) of \(report.results.count) items cleaned. Items marked removed are gone permanently."
+                    )
+                    .font(Typography.body)
+                    .foregroundStyle(Theme.inkSecondary)
+                }
+                if !problems.isEmpty {
+                    DisclosureGroup("\(problems.count) items not moved") {
+                        VStack(spacing: 0) {
+                            ForEach(problems) { result in
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(result.name)
+                                            .font(Typography.row)
+                                            .foregroundStyle(Theme.ink)
+                                        Text(Self.reason(result.outcome, dryRun: result.dryRun))
+                                            .font(Typography.caption)
+                                            .foregroundStyle(Theme.inkSecondary)
+                                    }
+                                    Spacer()
                                 }
-                                Spacer()
+                                .padding(.vertical, Spacing.s1)
+                                Hairline()
                             }
-                            .padding(.vertical, Spacing.s1)
-                            Hairline()
                         }
                     }
                 }
-            }
-            HStack {
-                SecondaryActionButton(
-                    title: "Show activity log",
-                    action: { NSWorkspace.shared.open(AuditLog().url) })
-                Spacer()
-                PrimaryActionButton(
-                    title: "Done",
-                    shortcut: .return,
-                    action: { model.report = nil })
+                HStack {
+                    SecondaryActionButton(
+                        title: "Show activity log",
+                        action: { NSWorkspace.shared.open(AuditLog().url) })
+                    Spacer()
+                    PrimaryActionButton(
+                        title: "Done",
+                        shortcut: .return,
+                        action: { model.report = nil })
+                }
             }
         }
-        .padding(Spacing.s6)
-        .frame(width: 520)
-        .background(Theme.paper)
     }
 
     static func reason(_ outcome: UninstallOutcome, dryRun: Bool = false) -> String {
@@ -222,84 +220,83 @@ struct BulkUninstallConfirmSheet: View {
 
     var body: some View {
         let apps = model.markedAppsList
-        VStack(alignment: .leading, spacing: Spacing.s4) {
-            VStack(alignment: .leading, spacing: Spacing.s1) {
-                Text(apps.count == 1 ? "Move 1 app to the Trash?" : "Move \(apps.count) apps to the Trash?")
-                    .font(Typography.title)
-                    .foregroundStyle(Theme.ink)
-                Text("\(model.markedBytes.formatted(.byteCount(style: .file))) total")
-                    .font(Typography.body)
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.inkSecondary)
-            }
-            ScrollView {
-                VStack(spacing: 0) {
-                    ForEach(apps) { app in
-                        HStack(spacing: Spacing.s2) {
-                            Image(nsImage: IconCache.icon(for: app.url))
-                                .resizable()
-                                .frame(width: 22, height: 22)
-                            Text(app.name)
+        SheetFrame {
+            VStack(alignment: .leading, spacing: Spacing.s4) {
+                VStack(alignment: .leading, spacing: Spacing.s1) {
+                    Text(apps.count == 1 ? "Move 1 app to the Trash?" : "Move \(apps.count) apps to the Trash?")
+                        .font(Typography.title)
+                        .foregroundStyle(Theme.ink)
+                    Text("\(model.markedBytes.formatted(.byteCount(style: .file))) total")
+                        .font(Typography.body)
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.inkSecondary)
+                }
+                ScrollView {
+                    VStack(spacing: 0) {
+                        ForEach(apps) { app in
+                            HStack(spacing: Spacing.s2) {
+                                Image(nsImage: IconCache.icon(for: app.url))
+                                    .resizable()
+                                    .frame(width: 22, height: 22)
+                                Text(app.name)
+                                    .font(Typography.row)
+                                    .foregroundStyle(Theme.ink)
+                                    .lineLimit(1)
+                                Spacer()
+                                Text(model.locationLabel(app))
+                                    .font(Typography.caption)
+                                    .foregroundStyle(Theme.inkSecondary)
+                                    .lineLimit(1)
+                                Text(
+                                    model.appSizes[app.url].map {
+                                        $0.formatted(.byteCount(style: .file))
+                                    } ?? "n/a"
+                                )
                                 .font(Typography.row)
-                                .foregroundStyle(Theme.ink)
-                                .lineLimit(1)
-                            Spacer()
-                            Text(model.locationLabel(app))
-                                .font(Typography.caption)
+                                .monospacedDigit()
                                 .foregroundStyle(Theme.inkSecondary)
-                                .lineLimit(1)
-                            Text(
-                                model.appSizes[app.url].map {
-                                    $0.formatted(.byteCount(style: .file))
-                                } ?? "n/a"
-                            )
-                            .font(Typography.row)
-                            .monospacedDigit()
-                            .foregroundStyle(Theme.inkSecondary)
-                            .frame(width: 84, alignment: .trailing)
+                                .frame(width: 84, alignment: .trailing)
+                            }
+                            .padding(.vertical, Spacing.s1)
+                            if app.id != apps.last?.id { Hairline() }
                         }
-                        .padding(.vertical, Spacing.s1)
-                        if app.id != apps.last?.id { Hairline() }
+                    }
+                    .padding(.horizontal, Spacing.s3)
+                    .padding(.vertical, Spacing.s2)
+                }
+                .frame(maxHeight: 220)
+                .background(Theme.paperRaised, in: RoundedRectangle(cornerRadius: 6))
+                VStack(alignment: .leading, spacing: Spacing.s2) {
+                    labeled("The apps and the files you chose move to the Trash.", icon: "trash")
+                    labeled("You can restore them from the Trash.", icon: "arrow.uturn.backward")
+                    labeled("Chet checks each item again before it moves.", icon: "checkmark.shield")
+                    if model.markedRunningCount > 0 {
+                        StatusLabel(
+                            text: "Running apps are skipped.",
+                            systemImage: "exclamationmark.triangle",
+                            tone: .amber)
                     }
                 }
-                .padding(.horizontal, Spacing.s3)
-                .padding(.vertical, Spacing.s2)
-            }
-            .frame(maxHeight: 220)
-            .background(Theme.paperRaised, in: RoundedRectangle(cornerRadius: 6))
-            VStack(alignment: .leading, spacing: Spacing.s2) {
-                labeled("The apps and the files you chose move to the Trash.", icon: "trash")
-                labeled("You can restore them from the Trash.", icon: "arrow.uturn.backward")
-                labeled("Chet checks each item again before it moves.", icon: "checkmark.shield")
-                if model.markedRunningCount > 0 {
+                if DryRun.enabled {
                     StatusLabel(
-                        text: "Running apps are skipped.",
+                        text: "Preview only. Nothing will be moved.",
                         systemImage: "exclamationmark.triangle",
                         tone: .amber)
                 }
-            }
-            if DryRun.enabled {
-                StatusLabel(
-                    text: "Preview only. Nothing will be moved.",
-                    systemImage: "exclamationmark.triangle",
-                    tone: .amber)
-            }
-            HStack {
-                Spacer()
-                SecondaryActionButton(title: "Cancel", shortcut: .escape, action: { dismiss() })
-                DestructiveActionButton(
-                    title: "Move to Trash",
-                    isEnabled: model.canBulkRemove,
-                    shortcut: .return,
-                    action: {
-                        model.removeMarked()
-                        dismiss()
-                    })
+                HStack {
+                    Spacer()
+                    SecondaryActionButton(title: "Cancel", shortcut: .escape, action: { dismiss() })
+                    DestructiveActionButton(
+                        title: "Move to Trash",
+                        isEnabled: model.canBulkRemove,
+                        shortcut: .return,
+                        action: {
+                            model.removeMarked()
+                            dismiss()
+                        })
+                }
             }
         }
-        .padding(Spacing.s6)
-        .frame(width: 520)
-        .background(Theme.paper)
     }
 
     private func labeled(_ text: String, icon: String) -> some View {
@@ -331,62 +328,61 @@ struct BulkUninstallSummaryView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s4) {
-            VStack(alignment: .leading, spacing: Spacing.s1) {
-                Text(
-                    report.dryRun
-                        ? "Preview complete" : (report.removedCount > 0 ? "Removed" : "Moved to the Trash")
-                )
-                .font(Typography.title)
-                .foregroundStyle(Theme.ink)
-                Text((report.trashedBytes + report.removedBytes).formatted(.byteCount(style: .file)))
-                    .font(Typography.display)
-                    .monospacedDigit()
+        SheetFrame {
+            VStack(alignment: .leading, spacing: Spacing.s4) {
+                VStack(alignment: .leading, spacing: Spacing.s1) {
+                    Text(
+                        report.dryRun
+                            ? "Preview complete" : (report.removedCount > 0 ? "Removed" : "Moved to the Trash")
+                    )
+                    .font(Typography.title)
                     .foregroundStyle(Theme.ink)
-                Text(summaryLine)
-                    .font(Typography.body)
-                    .foregroundStyle(Theme.inkSecondary)
-            }
-            if !problems.isEmpty {
-                DisclosureGroup("\(problems.count) items not moved") {
-                    VStack(spacing: 0) {
-                        ForEach(problems.indices, id: \.self) { index in
-                            let problem = problems[index]
-                            HStack {
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(problem.app.name)
-                                        .font(Typography.row)
-                                        .foregroundStyle(Theme.ink)
-                                    Text(
-                                        problem.result.name + " · "
-                                            + UninstallSummaryView.reason(
-                                                problem.result.outcome, dryRun: problem.result.dryRun)
-                                    )
-                                    .font(Typography.caption)
-                                    .foregroundStyle(Theme.inkSecondary)
+                    Text((report.trashedBytes + report.removedBytes).formatted(.byteCount(style: .file)))
+                        .font(Typography.display)
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.ink)
+                    Text(summaryLine)
+                        .font(Typography.body)
+                        .foregroundStyle(Theme.inkSecondary)
+                }
+                if !problems.isEmpty {
+                    DisclosureGroup("\(problems.count) items not moved") {
+                        VStack(spacing: 0) {
+                            ForEach(problems.indices, id: \.self) { index in
+                                let problem = problems[index]
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(problem.app.name)
+                                            .font(Typography.row)
+                                            .foregroundStyle(Theme.ink)
+                                        Text(
+                                            problem.result.name + " · "
+                                                + UninstallSummaryView.reason(
+                                                    problem.result.outcome, dryRun: problem.result.dryRun)
+                                        )
+                                        .font(Typography.caption)
+                                        .foregroundStyle(Theme.inkSecondary)
+                                    }
+                                    Spacer()
                                 }
-                                Spacer()
+                                .padding(.vertical, Spacing.s1)
+                                Hairline()
                             }
-                            .padding(.vertical, Spacing.s1)
-                            Hairline()
                         }
                     }
                 }
-            }
-            HStack {
-                SecondaryActionButton(
-                    title: "Show activity log",
-                    action: { NSWorkspace.shared.open(AuditLog().url) })
-                Spacer()
-                PrimaryActionButton(
-                    title: "Done",
-                    shortcut: .return,
-                    action: { model.bulkReport = nil })
+                HStack {
+                    SecondaryActionButton(
+                        title: "Show activity log",
+                        action: { NSWorkspace.shared.open(AuditLog().url) })
+                    Spacer()
+                    PrimaryActionButton(
+                        title: "Done",
+                        shortcut: .return,
+                        action: { model.bulkReport = nil })
+                }
             }
         }
-        .padding(Spacing.s6)
-        .frame(width: 520)
-        .background(Theme.paper)
     }
 
     private var summaryLine: String {

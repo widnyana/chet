@@ -28,35 +28,34 @@ struct CleanProgressSheet: View {
         let progress = model.cleanProgress
         let dryRun = DryRun.enabled
         let itemFraction = progress?.itemFraction ?? 0
-        VStack(alignment: .leading, spacing: Spacing.s4) {
-            HStack(spacing: Spacing.s3) {
-                ProgressView()
-                    .controlSize(.small)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(dryRun ? "Previewing removal" : title)
-                        .font(Typography.title)
-                        .foregroundStyle(Theme.ink)
-                    Text(headline(progress))
-                        .font(Typography.body)
-                        .foregroundStyle(Theme.inkSecondary)
+        SheetFrame {
+            VStack(alignment: .leading, spacing: Spacing.s4) {
+                HStack(spacing: Spacing.s3) {
+                    ProgressView()
+                        .controlSize(.small)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(dryRun ? "Previewing removal" : title)
+                            .font(Typography.title)
+                            .foregroundStyle(Theme.ink)
+                        Text(headline(progress))
+                            .font(Typography.body)
+                            .foregroundStyle(Theme.inkSecondary)
+                            .monospacedDigit()
+                    }
+                    Spacer(minLength: Spacing.s3)
+                    Text("\(Int((itemFraction * 100).rounded()))%")
+                        .font(Typography.metric)
                         .monospacedDigit()
+                        .foregroundStyle(Theme.ink)
                 }
-                Spacer(minLength: Spacing.s3)
-                Text("\(Int((itemFraction * 100).rounded()))%")
-                    .font(Typography.metric)
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.ink)
+                ProgressView(value: itemFraction)
+                    .tint(Theme.accent)
+                detailBox(progress, dryRun: dryRun)
+                Text("Chet checks every file and folder again before removing it.")
+                    .font(Typography.caption)
+                    .foregroundStyle(Theme.inkSecondary)
             }
-            ProgressView(value: itemFraction)
-                .tint(Theme.accent)
-            detailBox(progress, dryRun: dryRun)
-            Text("Chet checks every file and folder again before removing it.")
-                .font(Typography.caption)
-                .foregroundStyle(Theme.inkSecondary)
         }
-        .padding(Spacing.s6)
-        .frame(width: 520)
-        .background(Theme.paper)
     }
 
     private var hasTrash: Bool { model.confirmItems.contains { $0.mode == .trash } }

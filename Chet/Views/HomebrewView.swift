@@ -24,6 +24,9 @@ struct HomebrewView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Theme.paper)
         .onAppear { model.load() }
+        .sheet(isPresented: $model.showInstaller) {
+            HomebrewInstallerSheet()
+        }
         .alert(
             "Homebrew",
             isPresented: Binding(
@@ -112,6 +115,11 @@ struct HomebrewView: View {
                     ? "Upgrade the selected packages that have an update."
                     : "Mark a package with an update first.",
                 action: { model.upgrade() })
+            SecondaryActionButton(
+                title: "Install…",
+                isEnabled: model.canAct,
+                help: "Search for a formula or cask to install.",
+                action: { model.openInstaller() })
             QuietActionButton(
                 title: "Clean up old versions",
                 isEnabled: model.canAct,
