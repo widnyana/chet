@@ -264,7 +264,7 @@ on this machine; "read" means seen in the source and not yet profiled.
 |P2 app inventory O(k^2) filter|Landed: ancestors are found by walking parent paths. `isShared` uses a dot-prefix index, so it is O(dots) per entry instead of O(installed apps).|
 |P2 app size measurement|Open. Still one app at a time.|
 |P2 video pair search|Landed for the common case: sweep in duration order, stop at the 2% window. Worst case is still O(v^2) when all durations match.|
-|P2 photo pair search|Open. See the analysis below; the simple split does not pay at the default distance.|
+|P2 photo pair search|Open. The pair kernel is still O(n^2) work in tiles. The photo step's memory and speed moved: landed in `8f99ef2` and `ae542f6` (one threadgroup per image, decode into the batch buffer, one buffer set per scan, 6 decode workers). Photos 329 s to 84 s, step footprint 6.9 GB to 1.23 GB.|
 |P2 subprocess output cap, GPU hasher buffers|Open.|
 
 ### Speed findings
@@ -406,6 +406,7 @@ this machine after the change.
 |P2 per-render totals|`totalBytes`, `selectedBytes`, and `CategoryState.bytes` are stored. `countedURLs`, `bytesByURL`, and `itemsByURL` are maintained by `record`, `select`, `deselect`, and the clean removal loop. No per-read `Set`, no full `reindexItems` per category mutation.|
 |P1 Homebrew sizes|`sized` runs 4 strided workers with one `autoreleasepool` per package.|
 |per-directory allocation|`isCacheDir` reads the tag into `withUnsafeTemporaryAllocation` instead of a fresh array per folder.|
+|P2 photo step memory and time|`photo_features` runs one 256-thread threadgroup per image instead of one thread per image; ImageIO decodes straight into the batch's Metal buffer; one buffer set per scan; 6 decode workers and 64-image batches.|
 
 ### Measurements
 
@@ -419,13 +420,21 @@ Duplicate fixture: 8 directories holding one 512 MiB file each (4.29 GB, identic
 |`CFData` in `heap` through the step|26 objects, 1536 B, unchanged at every sample|
 |Before the change|51.36 GB footprint in the same step on `~/Development`|
 
-Full tree: `chet-scan /Users/wid/Development`, 2,202,416 files, 123.94 GB seen.
+Photo fixture: 600 copies of five JPEGs (584 MB).
 
 |Metric|Value|
 |---|---|
-|Total|427.5 s|
-|Duplicate step|58.9 s|
-|Peak RSS|1.18 GB (limit 1.5 GB)|
+|Photo step, before|10.5 s, 190 MB footprint, 20.7 ms longest GPU submission|
+|Photo step, after|1.3 to 1.6 s, 63.5 MB RSS, 2.5 to 2.8 ms longest GPU submission|
+
+Full tree: `chet-scan /Users/wid/Development`, 2,181,740 files, 115.39 GB seen.
+
+|Metric|Value|
+|---|---|
+|Total|184.4 s (was 427.5 s before the photo work)|
+|Duplicate step|60.2 s|
+|Photo step|84.0 s (was 329.0 s)|
+|Peak RSS|1.27 GB (limit 1.5 GB)|
 |Termination|none|
 
 Physical footprint sampled every 3 s across that run, assigned to the step windows the
@@ -433,14 +442,16 @@ scan prints:
 
 |Step|Wall time|Footprint|
 |---|---|---|
-|Index|19.1 s|208 MB peak|
-|Duplicates|58.9 s|163 MB peak, flat for the whole step (was 51.36 GB)|
-|Photos|329.0 s|6.9 GB peak, still climbing at the end of the step|
-|Videos and snapshots|20.3 s|412 MB peak|
+|Index|23.1 s|224 MB peak|
+|Duplicates|60.2 s|222 MB peak, flat for the whole step (was 51.36 GB)|
+|Photos|84.0 s|1.23 GB peak (was 6.9 GB)|
+|Videos and snapshots|17.0 s|1.13 GB peak, the photo step's freed pages, not new work|
 
-The remaining multi-GB peak belongs to the photo step (`PerceptualHash` decode and GPU
-batches), not to the duplicate reads. `heap` on the scanning process showed no `NSData`
-or `NSFileHandle` growth in the duplicate window.
+`vmmap` at mid-photo splits the 1.2 GB: 9 MB in `IOAccelerator` regions (Metal buffers),
+597 MB resident in `Malloc Large (empty)` regions (ImageIO decode slabs the allocator keeps
+after freeing), and the rest in small-allocation zones. Metal is not the consumer.
+`heap` on the scanning process showed no `NSData` or `NSFileHandle` growth in the duplicate
+window.
 
 App checks, `DRY_RUN=1`:
 
@@ -452,7 +463,7 @@ App checks, `DRY_RUN=1`:
 |Select all in Logs again|Home 267 items, 44.18 GB|
 |Disk map during the index step|live blocks from rollups, then the final 223.3 GB tree|
 
-Tests: 285 tests in 38 suites pass (`swift test --package-path ChetCore`), and
+Tests: 286 tests in 38 suites pass (`swift test --package-path ChetCore`), and
 `swift format lint --strict` is clean on the touched files.
 
 ### Tooling
