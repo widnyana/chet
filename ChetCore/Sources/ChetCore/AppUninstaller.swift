@@ -52,6 +52,38 @@ public enum AppConfidence: String, Sendable, Codable {
     case high, medium, low
 }
 
+/// Other apps' bundle ids with every proper dot-prefix precomputed, so "is this identifier the
+/// same as, a parent of, or a child of another app's id" costs O(dots) instead of O(apps).
+struct BundleIDIndex: ExpressibleByArrayLiteral, Sendable {
+    let ids: Set<String>
+    private let parents: Set<String>
+
+    init(_ ids: Set<String>) {
+        self.ids = ids
+        var parents = Set<String>()
+        for id in ids {
+            var parts = id.split(separator: ".")
+            while parts.count > 1 {
+                parts.removeLast()
+                parents.insert(parts.joined(separator: "."))
+            }
+        }
+        self.parents = parents
+    }
+
+    init(arrayLiteral elements: String...) { self.init(Set(elements)) }
+
+    func isShared(_ identifier: String) -> Bool {
+        if ids.contains(identifier) || parents.contains(identifier) { return true }
+        var parts = identifier.split(separator: ".")
+        while parts.count > 1 {
+            parts.removeLast()
+            if ids.contains(parts.joined(separator: ".")) { return true }
+        }
+        return false
+    }
+}
+
 /// One installed application bundle. Sizes are measured on demand, never at discovery.
 public struct InstalledApp: Identifiable, Hashable, Sendable {
     public var id: URL { url }
@@ -420,7 +452,7 @@ public struct AppUninstaller: Sendable {
     /// whole scan is cancellable; the caller drops results from a stale generation.
     public func components(for app: InstalledApp, installedApps: [InstalledApp]) async -> [AppComponent] {
         let others = installedApps.filter { $0.url != app.url }
-        let otherIDs = Set(others.flatMap(\.allBundleIDs))
+        let otherIDs = BundleIDIndex(Set(others.flatMap(\.allBundleIDs)))
         let otherNames = Set(others.map { $0.name.lowercased() })
         var found: [URL: FoundComponent] = [:]
 
@@ -470,7 +502,7 @@ public struct AppUninstaller: Sendable {
     }
 
     private func scan(
-        _ folder: URL, root: AppSearchRoot, depth: Int, app: InstalledApp, otherIDs: Set<String>,
+        _ folder: URL, root: AppSearchRoot, depth: Int, app: InstalledApp, otherIDs: BundleIDIndex,
         otherNames: Set<String>, into found: inout [URL: FoundComponent]
     ) {
         guard depth <= root.maxDepth else { return }
@@ -512,7 +544,7 @@ public struct AppUninstaller: Sendable {
     }
 
     static func match(
-        _ url: URL, kind: AppComponentKind, depth: Int, app: InstalledApp, otherIDs: Set<String>,
+        _ url: URL, kind: AppComponentKind, depth: Int, app: InstalledApp, otherIDs: BundleIDIndex,
         otherNames: Set<String>
     ) -> Matched? {
         let name = url.lastPathComponent
@@ -549,7 +581,7 @@ public struct AppUninstaller: Sendable {
 
     static func matchName(
         _ name: String, kind: AppComponentKind, depth: Int, app: InstalledApp,
-        otherIDs: Set<String>, otherNames: Set<String>
+        otherIDs: BundleIDIndex, otherNames: Set<String>
     ) -> Matched? {
         guard kind == .applicationSupport || kind == .caches || kind == .logs else { return nil }
         let lower = name.lowercased()
@@ -562,7 +594,7 @@ public struct AppUninstaller: Sendable {
         // A vendor folder ("google") is not the app unless the app is actually named that
         // and no other installed app shares the vendor.
         if let vendor = app.vendorLabel, lower == vendor {
-            let sharedVendor = otherIDs.contains { Self.vendorLabel($0) == vendor }
+            let sharedVendor = otherIDs.ids.contains { Self.vendorLabel($0) == vendor }
             if sharedVendor || appName != vendor { return nil }
         }
         return Matched(
@@ -628,9 +660,8 @@ public struct AppUninstaller: Sendable {
         name.lowercased().hasPrefix("group.")
     }
 
-    static func isShared(_ identifier: String, with otherIDs: Set<String>) -> Bool {
-        otherIDs.contains(identifier)
-            || otherIDs.contains { $0.hasPrefix(identifier + ".") || identifier.hasPrefix($0 + ".") }
+    static func isShared(_ identifier: String, with otherIDs: BundleIDIndex) -> Bool {
+        otherIDs.isShared(identifier)
     }
 
     static func shouldDescend(_ url: URL, app: InstalledApp) -> Bool {
@@ -660,7 +691,7 @@ public struct AppUninstaller: Sendable {
     public func uninstall(_ plan: UninstallPlan, dryRun: Bool) async -> UninstallReport {
         var report = UninstallReport(dryRun: dryRun)
         let appRunning = isRunning(plan.app.allBundleIDs)
-        let otherIDs = plan.otherBundleIDs
+        let otherIDs = BundleIDIndex(plan.otherBundleIDs)
         let otherNames = plan.otherNames
 
         if appRunning {
@@ -756,7 +787,7 @@ public struct AppUninstaller: Sendable {
     }
 
     private func revalidate(
-        _ component: AppComponent, app: InstalledApp, otherIDs: Set<String>, otherNames: Set<String>
+        _ component: AppComponent, app: InstalledApp, otherIDs: BundleIDIndex, otherNames: Set<String>
     ) -> UninstallSkipReason? {
         guard let current = FileStamp.read(component.url) else { return .missing }
         guard !current.isSymlink, current == component.stamp else { return .changed }
