@@ -457,7 +457,7 @@ public struct AppUninstaller: Sendable {
             if let match = Self.match(
                 url, kind: root.kind, depth: depth, app: app, otherIDs: otherIDs, otherNames: otherNames)
             {
-                let protected = Self.isProtected(url, home: home)
+                let protected = policy.isProtectedPath(url)
                 let writable = Self.isWritable(url.deletingLastPathComponent())
                 let ownership: AppOwnership =
                     protected ? .systemProtected : (root.requiresAdmin || !writable ? .privileged : match.ownership)
@@ -709,7 +709,7 @@ public struct AppUninstaller: Sendable {
     ) -> UninstallSkipReason? {
         guard let current = FileStamp.read(component.url) else { return .missing }
         guard !current.isSymlink, current == component.stamp else { return .changed }
-        guard !Self.isProtected(component.url, home: home) else { return .protected }
+        guard !policy.isProtectedPath(component.url) else { return .protected }
         guard !component.requiresAdmin else { return .requiresAdmin }
         guard component.isSelectable else { return component.ownership == .shared ? .shared : .protected }
         if Self.isInside(component.url, home) {
@@ -729,7 +729,7 @@ public struct AppUninstaller: Sendable {
         guard let currentApp = Self.readApp(app.url), currentApp.bundleID == app.bundleID else {
             return .changed
         }
-        guard !Self.isProtected(app.url, home: home) else { return .protected }
+        guard !policy.isProtectedPath(app.url) else { return .protected }
         guard appFolders.contains(where: { Self.isInside(app.url, $0) }) else { return .policy }
         guard Self.isWritable(app.url.deletingLastPathComponent()) else { return .requiresAdmin }
         return nil
@@ -758,23 +758,6 @@ public struct AppUninstaller: Sendable {
 
     // MARK: - Path helpers
 
-    static func isProtected(_ url: URL, home: URL) -> Bool {
-        let path = canonicalPath(url)
-        let systemPrefixes = [
-            "/System", "/usr", "/bin", "/sbin", "/private/etc", "/private/var/db", "/private/var/root",
-            "/Library/Apple", "/Library/Extensions", "/Library/Frameworks", "/Library/Keychains",
-            "/Library/Mail", "/Library/Messages",
-        ]
-        if systemPrefixes.contains(where: { path == $0 || path.hasPrefix($0 + "/") }) { return true }
-        let homePath = canonicalPath(home)
-        guard path.hasPrefix(homePath + "/") else { return false }
-        let rel = String(path.dropFirst(homePath.count + 1))
-        let homePrefixes = [
-            "Library/Keychains", "Library/Mail", "Library/Messages", "Library/Mobile Documents", ".Trash",
-        ]
-        return homePrefixes.contains { rel == $0 || rel.hasPrefix($0 + "/") }
-    }
-
     static func isInside(_ url: URL, _ folder: URL) -> Bool {
         let path = canonicalPath(url)
         let base = canonicalPath(folder)
@@ -785,11 +768,7 @@ public struct AppUninstaller: Sendable {
     /// `URL.standardizedFileURL` leaves in place, so a temp home compares equal to the
     /// URLs Foundation returns from `contentsOfDirectory`.
     static func canonicalPath(_ url: URL) -> String {
-        var resolved = [CChar](repeating: 0, count: Int(PATH_MAX))
-        let result = url.path.withCString { realpath($0, &resolved) }
-        guard result != nil else { return url.standardizedFileURL.path }
-        let bytes = resolved.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
-        return String(decoding: bytes, as: UTF8.self)
+        FS.canonicalPath(url)
     }
 
     static func isWritable(_ url: URL) -> Bool {

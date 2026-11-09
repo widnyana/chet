@@ -225,3 +225,16 @@ Uninstall complete
 - No line that could belong to any cleaner app after swapping the name.
 - No apology or filler.
 - No exclamation mark.
+
+## Tweaks
+
+- State: `On`, `Off`, a choice label (`PNG`), `Set to <value>`, or the reason for
+  `Unsupported` / `Unknown`. Never translate an unknown value into `Off`.
+- Risk: `Low risk`, `Medium risk`, `High risk`. Show the label only above low;
+  low is the baseline for a reversible preference write.
+- Restart: `Restart Finder to see the change.`, `Restart the Dock to see the
+  change.`, `Restart the menu bar to see the change.`, `Sign out and back in to
+  see the change.`
+- Gate: `Preview only. No tweak is changed.`
+- Empty: `No tweaks match`, `No changed tweaks`. Loading: `Reading your settings.`
+- These strings live in `TweakCopy`; a view does not retype them.

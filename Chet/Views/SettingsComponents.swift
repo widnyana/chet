@@ -10,6 +10,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case whatToFind
     case limits
     case folders
+    case tweaks
 
     var id: String { rawValue }
 
@@ -18,6 +19,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .whatToFind: "What to find"
         case .limits: "Limits"
         case .folders: "Folders"
+        case .tweaks: "Tweaks"
         }
     }
 
@@ -26,6 +28,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .whatToFind: "magnifyingglass"
         case .limits: "ruler"
         case .folders: "folder"
+        case .tweaks: "slider.horizontal.3"
         }
     }
 }
@@ -109,12 +112,13 @@ struct SettingsWindowChrome: NSViewRepresentable {
 /// the panels, on the page margin. It fills the window width so every panel ends on the
 /// same edge.
 struct SettingsPaneView<Content: View>: View {
+    var note = "Changes apply to the next scan."
     @ViewBuilder var content: Content
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s4) {
-                Text("Changes apply to the next scan.")
+                Text(note)
                     .font(Typography.caption)
                     .foregroundStyle(Theme.inkSecondary)
                 content

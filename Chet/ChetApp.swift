@@ -68,11 +68,13 @@ private struct AboutCommand: Commands {
 struct ChetApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var model = ScanModel()
+    @State private var tweaks = TweaksModel()
 
     var body: some Scene {
         WindowGroup("Chet") {
             ContentView()
                 .environment(model)
+                .environment(tweaks)
                 .frame(minWidth: 960, minHeight: 600)
         }
         .commands {
@@ -98,6 +100,7 @@ struct ChetApp: App {
         Settings {
             SettingsView()
                 .environment(model)
+                .environment(tweaks)
         }
         .windowResizability(.contentSize)
         .commands { AboutCommand() }

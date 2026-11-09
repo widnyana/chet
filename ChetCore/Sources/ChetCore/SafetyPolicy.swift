@@ -98,6 +98,26 @@ public struct SafetyPolicy: Sendable {
         externalRoots.contains { path == $0 || path.hasPrefix($0 + "/") }
     }
 
+    /// Paths no engine may remove, whatever its own identification rules say: the system and
+    /// private trees, and the home folders macOS protects. Symlinks are resolved first, so a
+    /// link cannot smuggle a protected path past the check.
+    public func isProtectedPath(_ url: URL) -> Bool {
+        let path = FS.canonicalPath(url)
+        let systemPrefixes = [
+            "/System", "/usr", "/bin", "/sbin", "/private/etc", "/private/var/db", "/private/var/root",
+            "/Library/Apple", "/Library/Extensions", "/Library/Frameworks", "/Library/Keychains",
+            "/Library/Mail", "/Library/Messages",
+        ]
+        if systemPrefixes.contains(where: { path == $0 || path.hasPrefix($0 + "/") }) { return true }
+        let homePath = FS.canonicalPath(URL(fileURLWithPath: home))
+        guard path.hasPrefix(homePath + "/") else { return false }
+        let rel = String(path.dropFirst(homePath.count + 1))
+        let homePrefixes = [
+            "Library/Keychains", "Library/Mail", "Library/Messages", "Library/Mobile Documents", ".Trash",
+        ]
+        return homePrefixes.contains { rel == $0 || rel.hasPrefix($0 + "/") }
+    }
+
     public func isDeletable(_ url: URL) -> Verdict {
         let standard = url.standardizedFileURL
         let path = standard.deletingLastPathComponent().resolvingSymlinksInPath()

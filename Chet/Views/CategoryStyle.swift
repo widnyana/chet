@@ -10,6 +10,7 @@ struct CategoryStyle {
 
     private static let symbols: [String: String] = [
         "overview": "house",
+        "tweaks": "slider.horizontal.3",
         "applications": "app.dashed",
         "trash": "trash",
         "caches": "archivebox",

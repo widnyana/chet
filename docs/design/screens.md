@@ -7,6 +7,8 @@ Sidebar
   Overview
   Clean
     <category rows>
+  Configure
+    Tweaks
   Tools
     Applications
     Disk map
@@ -17,8 +19,9 @@ Applications destination uses its own `NavigationStack` for the app detail, so
 the sidebar does not change while the user moves between the inventory and one
 app.
 
-The scan button is in the toolbar on every destination except Applications.
-The Applications destination owns its own toolbar: Done, search, layout, reload.
+The scan button is in the toolbar on every destination except Applications and
+Tweaks. The Applications destination owns its own toolbar: Done, search, layout,
+reload. Tweaks uses the toolbar search field only.
 
 `Chet > About Chet` opens a separate fixed window. It is not a sidebar
 destination and it does not replace the detail pane.
@@ -179,20 +182,52 @@ The map uses one encoding: size share as a neutral ramp. Darker means a larger
 share in light mode; lighter means a larger share in dark mode. The labels use
 the ink that contrasts with the block. The map does not encode categories.
 
+## Tweaks
+
+Job: answer "what does this preference do, what is it now, and how do I put it
+back?".
+
+The page is a preference list, not a card grid:
+
+1. Page header: `Tweaks`, one sentence, no metric.
+2. Filter row: `All` / `Changed` segmented control, the visible count, `Read again`.
+3. Gate: when `DRY_RUN` is set, one amber label, `Preview only. No tweak is
+   changed.`, and every control is disabled while the states stay readable.
+4. Sections by part of macOS: Finder, Dock, Keyboard, Screenshots, Appearance,
+   Windows. Each section header carries the row count.
+5. A row: name, one-line explanation, current value and impact
+   (`On · Finder windows`), notes (`Restart Finder`, `Medium risk`), the control,
+   and an info button. Rows are separated by hairlines, not cards.
+6. The details sheet: the full explanation, current state, impact, risk, when the
+   change applies, the preference key, the last recorded change, and the actions
+   `Reset to Default`, `Revert last change`, a restart when one is pending, and
+   `Turn On` / `Turn Off` for a switch.
+
+States: loading (`Reading your settings.`), empty (`No tweaks match` or `No
+changed tweaks`), unknown (the reason from `defaults` in the row, control
+disabled), unsupported (the reason in the row, control disabled). An unknown
+value is never shown as Off.
+
 ## Settings
 
-Job: answer "what will the next scan do?" in words a non-technical person already uses.
-One fixed 520 x 500 window, toolbar panes with an icon and a word: `Scan`, `Sizes`, `Folders`.
-The pane name is not repeated in the title bar.
+Job: answer "what will the next scan do, and what has Chet changed?" in words a
+non-technical person already uses. One fixed 560 x 560 window, panes with an icon
+and a word: `What to find`, `Limits`, `Folders`, `Tweaks`. The pane name is not
+repeated in the title bar.
 
-1. `Scan`: panel `What Chet looks for` with the note and the six switches, then panel
-   `Speed` with the `Threads` pop-up and the note `Auto uses one thread per core.`
-2. `Sizes`: panels `Copies`, `Big files`, `Old files`; sliders with the value on the right.
-3. `Folders`: panels `Folders to skip`, `Folders you add`, `Other drives`; picker buttons sit
-   at the panel's bottom right. Each folder in `Folders you add` has a `Keep…` button to mark
-   items inside it the scan must never remove.
+1. `What to find`: panel `What to look for` with the note and the six switches, then
+   panel `Speed` with the `Threads` pop-up.
+2. `Limits`: panels with the size sliders and the readout on the right.
+3. `Folders`: panels for skipped folders, added folders, and other disks; picker
+   buttons sit at the panel's bottom right. Each added folder has a `Keep…` button.
+4. `Tweaks`: panel `Changes Chet made` with the count of changed preferences and the
+   path of the change record with a `Show` action; panel `Reset` with `Reset All…`,
+   which asks once and then puts every changed tweak back to the macOS default.
 
-A set `DRY_RUN` adds one amber label above the panes: `Preview only. Nothing is deleted.`
+A set `DRY_RUN` adds one amber label above the panes: `Preview only. Nothing will be
+removed.` The `Tweaks` pane adds `Preview only. No tweak is changed.` and disables
+`Reset All…`. The Tweaks page in the main window shows its own gate and does not
+repeat the cleaning strip.
 
 ## About
 

@@ -4,6 +4,7 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(ScanModel.self) private var model
+    @Environment(TweaksModel.self) private var tweaks
     @State private var appCleaner = AppCleanerModel()
     @State private var selection: String? = "overview"
     @State private var confirming = false
@@ -22,11 +23,15 @@ struct ContentView: View {
                 } detail: {
                     detail
                         .safeAreaInset(edge: .top, spacing: 0) {
-                            TopStatusStrip()
+                            // Tweaks carries its own preview gate; the cleaning strip would
+                            // repeat it with the wrong verb.
+                            if selection != "tweaks" {
+                                TopStatusStrip()
+                            }
                         }
                         .background(Theme.paper)
                         .toolbar {
-                            if selection != "applications" {
+                            if selection != "applications" && selection != "tweaks" {
                                 scanButton
                             }
                         }
@@ -45,6 +50,9 @@ struct ContentView: View {
                 appCleaner.hasFullDiskAccess = FullDiskAccess.status() == .granted
                 appCleaner.refreshRunningState()
             }
+            if selection == "tweaks" {
+                Task { await tweaks.reload() }
+            }
         }
     }
 
@@ -53,6 +61,8 @@ struct ContentView: View {
             UninstallWorkspace()
         } else if selection == "disk-map" {
             DiskMapView()
+        } else if selection == "tweaks" {
+            TweaksView()
         } else if selection == "snapshots" {
             SnapshotsView(onClean: {
                 model.beginClean(nil)

@@ -12,6 +12,17 @@ enum FS {
         .isDirectoryKey, .totalFileAllocatedSizeKey, .isSymbolicLinkKey,
     ]
 
+    /// realpath(3) form of a URL path. `standardizedFileURL` leaves the `/var` link in place;
+    /// the directory walk, `realpath`, and Foundation's `contentsOfDirectory` do not. Falls
+    /// back to the standardized path when the entry does not exist.
+    static func canonicalPath(_ url: URL) -> String {
+        var resolved = [CChar](repeating: 0, count: Int(PATH_MAX))
+        let result = url.path.withCString { realpath($0, &resolved) }
+        guard result != nil else { return url.standardizedFileURL.path }
+        let bytes = resolved.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+        return String(decoding: bytes, as: UTF8.self)
+    }
+
     /// Allocated size of a file, or of a folder's recursive contents. Unreadable entries are
     /// skipped, so the result is a floor, never an overcount. Symlinks are never followed, so a
     /// link into an ancestor cannot create a counting cycle.

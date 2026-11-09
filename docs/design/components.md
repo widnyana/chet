@@ -415,3 +415,29 @@ Search inside caches and build folders. Off by default.
 - Native `Form` with `.grouped` style.
 - The caption explains the consequence and the default.
 - No extra sections.
+
+## PreferenceRow
+
+The one row in a preference list. Used by Tweaks.
+
+```
+Show the path bar                                        [switch]  (i)
+Show the folder path at the bottom of every Finder window.
+On · Finder windows   Restart Finder
+```
+
+- Geometry lives in the component: 8 pt of vertical padding, a 150 pt control
+  column, the info button after it, and a 2 pt gap inside the label block.
+- `notes` carries at most a risk and a restart status. A low risk is not repeated;
+  it is the baseline for a reversible preference write.
+- The accessory is a parameter, so a switch, a pop-up, and a folder picker use the
+  same row without a second row type. `isEnabled` is the global gate: the control
+  stays visible and inert and the text stays readable.
+- The details action is an `IconActionButton` labelled `Details for <name>`, never
+  a clickable row.
+
+## DefinitionRow
+
+`label` on the left in a 110 pt column, value on the right, selectable, tabular
+digits for numbers. Used by the tweak details sheet. The component owns its
+padding, so a sheet never sets row geometry at the call site.

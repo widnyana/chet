@@ -29,6 +29,9 @@ struct SidebarView: View {
                     ForEach(reviewRows) { category in categoryRow(category) }
                 }
             }
+            Section("Configure") {
+                row("tweaks", "Tweaks", symbol: "slider.horizontal.3", emphasis: true)
+            }
             Section("Tools") {
                 row("applications", "Apps", symbol: "app.dashed", emphasis: true)
                 row("disk-map", "Storage", symbol: "internaldrive", emphasis: true)

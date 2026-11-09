@@ -324,12 +324,11 @@ struct AppUninstallerTests {
 
     @Test func protectsSystemAndPrivatePaths() throws {
         let home = try TempDir()
-        #expect(AppUninstaller.isProtected(URL(fileURLWithPath: "/System/Library"), home: home.url))
-        #expect(AppUninstaller.isProtected(URL(fileURLWithPath: "/private/etc/hosts"), home: home.url))
-        #expect(AppUninstaller.isProtected(home.url.appendingPathComponent("Library/Keychains/x"), home: home.url))
-        #expect(
-            !AppUninstaller.isProtected(
-                home.url.appendingPathComponent("Library/Caches/com.test.foo"), home: home.url))
+        let policy = SafetyPolicy(home: home.url)
+        #expect(policy.isProtectedPath(URL(fileURLWithPath: "/System/Library")))
+        #expect(policy.isProtectedPath(URL(fileURLWithPath: "/private/etc/hosts")))
+        #expect(policy.isProtectedPath(home.url.appendingPathComponent("Library/Keychains/x")))
+        #expect(!policy.isProtectedPath(home.url.appendingPathComponent("Library/Caches/com.test.foo")))
     }
 
     @Test func dryRunNeverCallsTrash() async throws {

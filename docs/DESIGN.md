@@ -34,6 +34,8 @@ NavigationSplitView
       Duplicate files
       Large files
       ...
+    Configure
+      Tweaks
     Tools
       Apps
       Storage
@@ -43,8 +45,9 @@ NavigationSplitView
 
 - The sidebar is the route. The detail pane shows one destination.
 - Apps uses its own `NavigationStack` for the inventory and one app.
-- The toolbar carries Scan / Stop on every destination except Apps.
-- Apps owns Search, Layout, and Reload.
+- The toolbar carries Scan / Stop on every destination except Apps and Tweaks.
+- Apps owns Search, Layout, and Reload. Tweaks owns Search and Read again.
+- Tools has two destinations, Apps and Storage. Configure has one, Tweaks.
 - There are no mode tabs. Apps is a destination, not a mode.
 - About is not a destination. `Chet > About Chet` opens one fixed window,
   separate from the main window.
@@ -188,6 +191,28 @@ Rules:
   language. It exists because the operation is a foreground, destructive task.
 - No per-item animation. The linear bars and the current path update in place.
 
+### Tweaks
+
+A preference list, not a card grid. The page answers what a setting does, what it
+is now, and how to put it back.
+
+1. Page header: `Tweaks`, one sentence, no metric.
+2. Filter row: `All` / `Changed`, the visible count, `Read again`.
+3. Gate: a set `DRY_RUN` shows `Preview only. No tweak is changed.` and disables
+   every control. The states stay readable.
+4. Sections by part of macOS: Finder, Dock, Keyboard, Screenshots, Appearance,
+   Windows. The section header carries the row count.
+5. A row is `PreferenceRow`: name, one-line explanation, current value and impact,
+   notes (`Restart Finder`), the control, and an info button. Hairlines, not cards.
+6. The details sheet shows the explanation, current state, impact, risk, when it
+   applies, the preference key, the last recorded change, and `Reset to Default`,
+   `Revert last change`, a restart when pending, and `Turn On` / `Turn Off`.
+
+The catalog is plain data in `TweakCatalog`; every entry is one preference key or
+one file flag. `TweakEngine` reads, writes, verifies by reading back, restores on a
+failed verification, and records to `~/Library/Application Support/Chet/tweaks.log`.
+An unknown value is shown with its reason and is never drawn as Off.
+
 ### Apps
 
 A searchable inventory: list first, grid second. Every row and cell has a mark
@@ -218,7 +243,7 @@ macOS reports the size only when the snapshot is deleted.
 A settings window in the macOS preference shape: a pane switcher with an icon and a word per
 pane, then grouped panels on `paperRaised` with the label on the left and its control on the
 right. The switcher is a component, not a system `TabView`: every segment takes an equal
-share of the width, so the three headings line up instead of sizing to their own text. The
+share of the width, so the headings line up instead of sizing to their own text. The
 words are for someone who has never opened a terminal: no cache jargon, no "duplicate scope".
 
 - `What to find` tab: panel `What to look for` with the note `Chet always checks the usual
@@ -231,6 +256,10 @@ words are for someone who has never opened a terminal: no cache jargon, no "dupl
   `Folders you want checked` with `Add a Folder…` and a per-folder `Keep…` button that marks
   items the scan must never remove (shown as `Keeping N items`), panel `Other disks`. Empty
   states `No folders are skipped.` and `No folders added yet.`
+- `Tweaks` tab: panel `Changes Chet made` with the count of preferences that differ from the
+  macOS default and the change record path with `Show`; panel `Reset` with `Reset All…`, which
+  asks once and puts every changed tweak back. The pane reads the same `TweaksModel` as the
+  Tweaks page, so the count cannot disagree.
 - A set `DRY_RUN` shows one amber label above the panes: `Preview only. Nothing will be
   removed.`
 
@@ -290,6 +319,8 @@ Rules:
 - `AboutInfoRow` and `AboutPathRow`: label, value or selectable path, optional
   status icon, detail, and secondary action.
 - `SettingsPaneSwitcher`: equal-width pane segments, icon over word, one selected state.
+- `PreferenceRow` and `DefinitionRow`: the preference list row and the detail sheet's
+  label/value row. Geometry lives in the component.
 - `SettingsPanel`, `SettingsRow`, `SettingsActionRow`, `SettingsNote`,
   `SettingsDivider`: the settings pattern. `SettingsGrid` owns the row height and the row
   padding, and each panel's `Grid` sizes the control column. No pane styles a row.
@@ -309,7 +340,8 @@ or claims. Empty and error states name the cause and the next action.
 
 Each noun has one source in code: `CategoryCopy` for category names and
 reasons, `ScanStepCopy` for scan steps, `AppCopy` for app parts, ownership, and
-skip reasons. A view shows those strings; it does not retype them.
+skip reasons, `TweakCopy` for tweak state, risk, restart, and history words.
+A view shows those strings; it does not retype them.
 
 Full copy is in [design/copy.md](design/copy.md).
 
@@ -318,7 +350,7 @@ Full copy is in [design/copy.md](design/copy.md).
 - No em dash in app copy or new design documents.
 - No sparkle, star, magic, or orb icon.
 - No gradient, glow, glass, or shadow as a default.
-- No card grid, no bento, no chart that repeats the ledger.
+- No card grid, no bento, no card per preference, no chart that repeats the ledger.
 - No pill for every small fact.
 - No decorative dot and no endless pulse.
 - No invented data.

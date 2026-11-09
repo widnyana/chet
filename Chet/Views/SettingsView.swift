@@ -2,13 +2,16 @@ import AppKit
 import ChetCore
 import SwiftUI
 
-/// Settings page (Cmd+,). Three panes, the macOS preference arrangement: a toolbar pane
+/// Settings page (Cmd+,). Four panes, the macOS preference arrangement: a toolbar pane
 /// switcher, then grouped panels with the label on the left and its control on the right.
 /// The words are for someone who has never opened a terminal. Every value applies to the
 /// next scan. The parts live in `SettingsComponents.swift`; this file only composes them.
 struct SettingsView: View {
     @Environment(ScanModel.self) private var model
+    @Environment(TweaksModel.self) private var tweaks
     @State private var pane: SettingsPane = .whatToFind
+    @State private var confirmingReset = false
+    @State private var resetting = false
 
     private let optionalSteps: [ScanStep] = [.largeFiles, .duplicates, .leftovers, .photos, .videos, .snapshots]
 
@@ -27,6 +30,7 @@ struct SettingsView: View {
                 case .whatToFind: scanPane
                 case .limits: sizesPane
                 case .folders: foldersPane
+                case .tweaks: tweaksPane
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -35,6 +39,20 @@ struct SettingsView: View {
         .tint(Theme.accent)
         .frame(width: 560, height: 560)
         .background(SettingsWindowChrome())
+        .confirmationDialog(
+            "Reset every tweak?", isPresented: $confirmingReset, titleVisibility: .visible
+        ) {
+            Button("Reset All", role: .destructive) {
+                Task {
+                    resetting = true
+                    await tweaks.resetEverything()
+                    resetting = false
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Every tweak goes back to the macOS default. Files, apps, and caches are not touched.")
+        }
     }
 
     // MARK: - Scan
@@ -56,10 +74,12 @@ struct SettingsView: View {
             }
             SettingsPanel(title: "Speed") {
                 SettingsRow(label: "Threads", detail: "Auto uses one thread per core.") {
-                    Picker("Threads", selection: Binding(
-                        get: { model.scanThreads },
-                        set: { model.scanThreads = $0 }))
-                    {
+                    Picker(
+                        "Threads",
+                        selection: Binding(
+                            get: { model.scanThreads },
+                            set: { model.scanThreads = $0 })
+                    ) {
                         Text("Auto").tag(0)
                         Text("1").tag(1)
                         Text("2").tag(2)
@@ -197,6 +217,80 @@ struct SettingsView: View {
                         get: { model.scanOutsideHome },
                         set: { model.scanOutsideHome = $0 }))
             }
+        }
+    }
+
+    // MARK: - Tweaks
+
+    private var tweaksPane: some View {
+        SettingsPaneView(note: "Changes apply as soon as each value is written.") {
+            SettingsPanel(title: "Changes Chet made") {
+                SettingsNote(
+                    "Each change is checked by reading the value back. A failed change restores the earlier value.")
+                SettingsDivider()
+                SettingsRow(label: "Changed from the macOS default", detail: changedDetail) {
+                    Text("\(tweaks.customizedCount)")
+                        .font(Typography.row)
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.ink)
+                }
+                SettingsDivider()
+                SettingsRow(label: "Change record", detail: recordPath) {
+                    SecondaryActionButton(
+                        title: "Show",
+                        isEnabled: FileManager.default.fileExists(atPath: tweaks.historyURL.path),
+                        help: "Show the tweak record in Finder"
+                    ) {
+                        revealRecord()
+                    }
+                }
+            }
+            SettingsPanel(title: "Reset") {
+                SettingsNote(
+                    "Reset puts every changed tweak back to the macOS default. It does not touch files, caches, or apps."
+                )
+                if tweaks.isGated {
+                    SettingsNote("Preview only. No tweak is changed.")
+                }
+                if let message = tweaks.errorMessage {
+                    SettingsNote(message)
+                }
+                SettingsDivider()
+                SettingsActionRow {
+                    SecondaryActionButton(
+                        title: resetting ? "Resetting…" : "Reset All…",
+                        isEnabled: resetEnabled,
+                        help: "Put every changed tweak back to its macOS default"
+                    ) {
+                        confirmingReset = true
+                    }
+                }
+            }
+        }
+        .task { await tweaks.ensureLoaded() }
+    }
+
+    private var changedDetail: String {
+        let count = tweaks.customizedCount
+        return count == 1 ? "1 tweak differs." : "\(count) tweaks differ."
+    }
+
+    private var resetEnabled: Bool {
+        tweaks.customizedCount > 0 && !tweaks.isGated && !resetting
+    }
+
+    private var recordPath: String {
+        let path = tweaks.historyURL.path
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
+    }
+
+    private func revealRecord() {
+        let url = tweaks.historyURL
+        if FileManager.default.fileExists(atPath: url.path) {
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        } else {
+            NSWorkspace.shared.open(url.deletingLastPathComponent())
         }
     }
 
