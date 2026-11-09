@@ -191,11 +191,11 @@ Top to bottom:
 3. `Sizes and ages`: sliders `Duplicate size`, `Large file size`, `Old file age`, then the
    switch `Search caches and build folders`.
 4. `Excluded folders`: rows with a text `Remove`, empty state `No folders are excluded.`,
-   and `Choose Folder…` opening the native picker.
-5. `Your rules`: one row per added folder with a text `Remove`, empty state
-   `No rules of your own yet.`, and `Add Rule…` opening the native picker.
+   and `Exclude Folder…` opening the native picker.
+5. `Your rules`: one caption on the effect, one row per added folder with a text `Remove`,
+   empty state `No folder rules yet.`, and `Add Folder Rule…` opening the native picker.
 6. `Outside your home folder`: one switch, `Read folders outside your home folder`.
-7. Footer: `Threads`, segmented picker, caption `Auto uses one thread per core.`
+7. Footer: `Threads`, pop-up menu, caption `Auto uses one thread per core.`
 
 A set `DRY_RUN` adds one amber status label under the header.
 

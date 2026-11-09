@@ -95,7 +95,12 @@ final class ScanModel {
     {
         didSet {
             guard oldValue != userRules else { return }
-            UserDefaults.standard.set(try? JSONEncoder().encode(userRules), forKey: ScanModel.userRulesKey)
+            if userRules.isEmpty {
+                UserDefaults.standard.removeObject(forKey: ScanModel.userRulesKey)
+            } else {
+                UserDefaults.standard.set(
+                    try? JSONEncoder().encode(userRules), forKey: ScanModel.userRulesKey)
+            }
         }
     }
     nonisolated static let userRulesKey = "userRules"

@@ -220,12 +220,15 @@ results are not repeated here; the Overview already reports them.
   duplicate scope switch `Search caches and build folders`. Labels are nouns; no `at least`
   and no threshold arithmetic in prose.
 - Excluded folders: the list with a text `Remove`, the empty state `No folders are excluded.`,
-  and `Choose Folder…`, which opens the native folder picker. Paths are never typed.
-- Your rules: folders the user adds with `Add Rule…`. Each picked folder becomes one rule
-  whose direct children a scan may reclaim, shown in the sidebar as `Your folders`, risk
-  Review, mode Trash. The list removes a rule with a text `Remove`.
+  and `Exclude Folder…`, which opens the native folder picker. Paths are never typed.
+- Your rules: one caption stating the effect, `Children of an added folder are listed as
+  Your folders, reviewed, and moved to Trash.` The list removes a rule with a text `Remove`;
+  the empty state is `No folder rules yet.`; `Add Folder Rule…` opens the native picker.
+  Buttons are named after what they do, because a picked folder means the opposite in the
+  section above.
 - Outside your home folder: one switch with its consequence.
-- Footer: `Threads`, a segmented picker, caption `Auto uses one thread per core.`
+- Footer: `Threads`, a pop-up menu, caption `Auto uses one thread per core.` Five numeric
+  options are a list, not a segmented strip.
 
 A set `DRY_RUN` shows one amber status label under the header. Radius 0, hairlines under
 section headers, no cards, and the accent tints controls only.

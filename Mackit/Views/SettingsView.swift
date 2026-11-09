@@ -43,9 +43,9 @@ struct SettingsView: View {
                 outsideSection
                 threadsFooter
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, Metrics.pageMargin)
             .padding(.vertical, Metrics.pageMargin)
-            .frame(maxWidth: 452, alignment: .leading)
         }
         .background(Theme.paper)
         .tint(Theme.accent)
@@ -144,7 +144,7 @@ struct SettingsView: View {
                     }
                 }
             }
-            Button("Choose Folder…") { chooseExcludedFolders() }
+            Button("Exclude Folder…") { chooseExcludedFolders() }
                 .accessibilityLabel("Choose folder to exclude")
         }
     }
@@ -167,8 +167,11 @@ struct SettingsView: View {
     private var rulesSection: some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
             SectionHeader(title: "Your rules")
+            Text("Children of an added folder are listed as Your folders, reviewed, and moved to Trash.")
+                .font(Typography.caption)
+                .foregroundStyle(Theme.inkSecondary)
             if model.userRules.isEmpty {
-                Text("No rules of your own yet.")
+                Text("No folder rules yet.")
                     .font(Typography.body)
                     .foregroundStyle(Theme.inkSecondary)
             } else {
@@ -191,7 +194,7 @@ struct SettingsView: View {
                     }
                 }
             }
-            Button("Add Rule…") { chooseRuleFolders() }
+            Button("Add Folder Rule…") { chooseRuleFolders() }
                 .accessibilityLabel("Add a rule for a folder")
         }
     }
@@ -235,8 +238,8 @@ struct SettingsView: View {
             Hairline()
             HStack(alignment: .firstTextBaseline, spacing: Spacing.s3) {
                 Text("Threads")
-                    .font(Typography.row)
-                    .foregroundStyle(Theme.inkSecondary)
+                    .font(Typography.body)
+                    .foregroundStyle(Theme.ink)
                 Spacer(minLength: Spacing.s3)
                 Picker("Threads", selection: Binding(
                     get: { model.scanThreads },
@@ -249,8 +252,8 @@ struct SettingsView: View {
                     Text("8").tag(8)
                 }
                 .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(width: 200)
+                .pickerStyle(.menu)
+                .fixedSize()
             }
             Text("Auto uses one thread per core.")
                 .font(Typography.caption)
