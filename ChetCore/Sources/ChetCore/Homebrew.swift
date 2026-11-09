@@ -1,39 +1,39 @@
 import Foundation
 
 /// A formula or cask installed through Homebrew.
-struct BrewPackage: Identifiable, Hashable, Sendable {
-    enum Kind: String, Sendable { case formula, cask }
+public struct BrewPackage: Identifiable, Hashable, Sendable {
+    public enum Kind: String, Sendable { case formula, cask }
 
-    let kind: Kind
-    let name: String
-    let title: String
-    let desc: String
-    let homepage: String
-    let version: String
-    let latest: String
-    let outdated: Bool
-    let pinned: Bool
-    let onRequest: Bool
-    let deps: [String]
-    var usedBy: [String] = []
-    var size: Int64 = 0
-    var oldVersionsSize: Int64 = 0
-    var paths: [String] = []
+    public let kind: Kind
+    public let name: String
+    public let title: String
+    public let desc: String
+    public let homepage: String
+    public let version: String
+    public let latest: String
+    public let outdated: Bool
+    public let pinned: Bool
+    public let onRequest: Bool
+    public let deps: [String]
+    public var usedBy: [String] = []
+    public var size: Int64 = 0
+    public var oldVersionsSize: Int64 = 0
+    public var paths: [String] = []
 
-    var id: String { "\(kind.rawValue):\(name)" }
-    var kindLabel: String { kind == .cask ? "Cask" : "Formula" }
-    var appPath: String? { paths.first { $0.hasSuffix(".app") } }
-    var isUnusedDependency: Bool { kind == .formula && !onRequest && usedBy.isEmpty }
+    public var id: String { "\(kind.rawValue):\(name)" }
+    public var kindLabel: String { kind == .cask ? "Cask" : "Formula" }
+    public var appPath: String? { paths.first { $0.hasSuffix(".app") } }
+    public var isUnusedDependency: Bool { kind == .formula && !onRequest && usedBy.isEmpty }
 }
 
-struct BrewError: Error { let message: String }
+public struct BrewError: Error, Sendable { public let message: String }
 
-enum Homebrew {
-    static let executable: String? = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"]
+public enum Homebrew {
+    public static let executable: String? = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"]
         .first { FileManager.default.isExecutableFile(atPath: $0) }
 
     /// /opt/homebrew on Apple Silicon, /usr/local on Intel.
-    static var prefix: String? {
+    public static var prefix: String? {
         executable.map {
             (($0 as NSString).deletingLastPathComponent as NSString).deletingLastPathComponent
         }
@@ -62,7 +62,7 @@ enum Homebrew {
 
     /// Everything Homebrew has installed, with sizes measured on disk. Throws when `brew` fails
     /// or its output cannot be read.
-    static func installed() throws -> [BrewPackage] {
+    public static func installed() throws -> [BrewPackage] {
         let result = run(["info", "--json=v2", "--installed"])
         guard result.ok else { throw BrewError(message: result.message) }
         return sized(try parse(result.out))
@@ -70,7 +70,7 @@ enum Homebrew {
 
     /// Pure parse of `brew info --json=v2` output plus the reverse-dependency pass. No IO, so it
     /// is unit tested from a fixture.
-    static func parse(_ output: String) throws -> [BrewPackage] {
+    public static func parse(_ output: String) throws -> [BrewPackage] {
         guard let json = try? JSONSerialization.jsonObject(with: Data(output.utf8)) as? [String: Any]
         else {
             throw BrewError(message: "Couldn't read Homebrew's output.")
@@ -184,7 +184,7 @@ enum Homebrew {
 
     /// `brew uninstall` for the given packages. `zap` also removes a cask's app data. A dry run
     /// reports the would-run lines and spawns no process.
-    static func uninstall(_ packages: [BrewPackage], zap: Bool, dryRun: Bool) -> Subprocess.Result {
+    public static func uninstall(_ packages: [BrewPackage], zap: Bool, dryRun: Bool) -> Subprocess.Result {
         let formulae = packages.filter { $0.kind == .formula }.map(\.name)
         let casks = packages.filter { $0.kind == .cask }.map(\.name)
         if dryRun {
@@ -213,7 +213,7 @@ enum Homebrew {
 
     /// `brew cleanup`: removes old versions and the download cache. Returns the "freed
     /// approximately X" amount when brew reports one. A dry run runs no `brew` call.
-    static func cleanup(dryRun: Bool) -> (result: Subprocess.Result, freed: String?) {
+    public static func cleanup(dryRun: Bool) -> (result: Subprocess.Result, freed: String?) {
         guard !dryRun else {
             return (Subprocess.Result(status: 0, out: "Would run: brew cleanup", err: ""), nil)
         }

@@ -1,14 +1,14 @@
 import Foundation
 
 /// Runs short-lived command-line tools (diskutil, tmutil, brew) with a wall-clock timeout.
-enum Subprocess {
-    struct Result {
-        let status: Int32
-        let out: String
-        let err: String
-        var ok: Bool { status == 0 }
+public enum Subprocess {
+    public struct Result: Sendable {
+        public let status: Int32
+        public let out: String
+        public let err: String
+        public var ok: Bool { status == 0 }
         /// Error lines when the command failed, else stdout, for surfacing a failure to the user.
-        var message: String {
+        public var message: String {
             let trimmed = err.trimmingCharacters(in: .whitespacesAndNewlines)
             return trimmed.isEmpty ? out.trimmingCharacters(in: .whitespacesAndNewlines) : trimmed
         }
@@ -16,7 +16,7 @@ enum Subprocess {
 
     /// Runs `tool` with `args`, draining both pipes concurrently so a full stderr buffer cannot
     /// stall the child. Terminates the child past `timeout`, which reports as a non-zero status.
-    static func run(
+    public static func run(
         _ tool: String, _ args: [String], env: [String: String]? = nil, timeout: TimeInterval = 20
     ) -> Result {
         let process = Process()
