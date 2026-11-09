@@ -17,12 +17,13 @@ public enum Treemap {
         var result: [TreemapRect] = []
         var free = bounds
         var row: [(index: Int, area: Double)] = []
+        // Areas arrive sorted descending, so a row's largest is its first item and its smallest its last.
+        var rowSum = 0.0
+        var rowLargest = 0.0
+        var rowSmallest = 0.0
 
-        func worst(_ row: [(index: Int, area: Double)], _ side: Double) -> Double {
-            let sum = row.reduce(0) { $0 + $1.area }
-            guard let largest = row.map(\.area).max(), let smallest = row.map(\.area).min(), sum > 0 else {
-                return .infinity
-            }
+        func worst(sum: Double, largest: Double, smallest: Double, _ side: Double) -> Double {
+            guard sum > 0 else { return .infinity }
             return max(side * side * largest / (sum * sum), sum * sum / (side * side * smallest))
         }
 
@@ -53,11 +54,20 @@ public enum Treemap {
 
         for item in areas {
             let side = Double(min(free.width, free.height))
-            if row.isEmpty || worst(row + [item], side) <= worst(row, side) {
+            if row.isEmpty
+                || worst(sum: rowSum + item.area, largest: rowLargest, smallest: item.area, side)
+                    <= worst(sum: rowSum, largest: rowLargest, smallest: rowSmallest, side)
+            {
+                if row.isEmpty { rowLargest = item.area }
                 row.append(item)
+                rowSum += item.area
+                rowSmallest = item.area
             } else {
                 place(row)
                 row = [item]
+                rowSum = item.area
+                rowLargest = item.area
+                rowSmallest = item.area
             }
         }
         if !row.isEmpty { place(row) }
