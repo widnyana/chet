@@ -549,11 +549,14 @@ ScrollView
 ```
 
 - `Theme.paperRaised`, radius `Metrics.controlRadius` 6, horizontal `Spacing.s3`.
-- `frame(maxHeight: 220)` keeps a long ledger from pushing the actions off the
-  sheet.
-- The byte column is `SheetLedgerBox.byteColumn` (88 pt). A row never writes
+- Two forms: `SheetLedgerBox { }` scrolls and caps at 220 pt for a long ledger;
+  `SheetLedgerBox(maxHeight: nil) { }` draws a short list with the same padding and
+  surface, no scroll wrapper and no cap.
+- The byte column is `Metrics.byteColumnWidth` (88 pt). A row never writes
   its own 88, 84, or 80.
 - The box owns the scroll and the surface. A call site adds rows, never padding.
+- Six sites adopt it: `ConfirmSheet`, both app-uninstall confirm sheets,
+  `HomebrewUninstallSheet`, `HomebrewCleanupSheet`, and `StorageTrashSheet`.
 
 ## SummarySheet
 

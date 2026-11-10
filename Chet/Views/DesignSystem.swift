@@ -870,20 +870,24 @@ struct ColumnTable<Item: Identifiable, Header: View, Row: View>: View {
 }
 
 /// The one ledger recipe: a raised, radius-6 box that scrolls and caps its height. A ledger
-/// row takes its byte column from here so every sheet measures the same width.
+/// row takes `Metrics.byteColumnWidth` so every sheet measures the same width.
 struct SheetLedgerBox<Content: View>: View {
-    static var byteColumn: CGFloat { Metrics.byteColumnWidth }
-
-    var maxHeight: CGFloat = 220
+    var maxHeight: CGFloat? = 220
     @ViewBuilder var content: () -> Content
 
     var body: some View {
-        ScrollView {
-            content()
+        Group {
+            if let maxHeight {
+                ScrollView {
+                    content()
+                }
+                .frame(maxHeight: maxHeight)
+            } else {
+                content()
+            }
         }
         .padding(.horizontal, Spacing.s3)
         .background(Theme.paperRaised, in: .rect(corners: .fixed(Metrics.controlRadius)))
-        .frame(maxHeight: maxHeight)
     }
 }
 

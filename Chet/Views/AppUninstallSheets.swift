@@ -29,7 +29,7 @@ struct AppUninstallConfirmSheet: View {
                     .monospacedDigit()
                     .foregroundStyle(Theme.inkSecondary)
                 }
-                ScrollView {
+                SheetLedgerBox {
                     VStack(spacing: 0) {
                         if model.appSelected, let app {
                             confirmRow(
@@ -45,11 +45,8 @@ struct AppUninstallConfirmSheet: View {
                             if row.kind != rows.last?.kind { Hairline() }
                         }
                     }
-                    .padding(.horizontal, Spacing.s3)
                     .padding(.vertical, Spacing.s2)
                 }
-                .frame(maxHeight: 220)
-                .background(Theme.paperRaised, in: .rect(corners: .fixed(6)))
                 VStack(alignment: .leading, spacing: Spacing.s2) {
                     labeled("The app and the files you chose move to the Trash.", icon: "trash")
                     labeled("You can restore them from the Trash.", icon: "arrow.uturn.backward")
@@ -118,7 +115,7 @@ struct AppUninstallConfirmSheet: View {
                 .font(Typography.row)
                 .monospacedDigit()
                 .foregroundStyle(Theme.inkSecondary)
-                .frame(width: 88, alignment: .trailing)
+                .frame(width: Metrics.byteColumnWidth, alignment: .trailing)
         }
         .padding(.vertical, Spacing.s1)
     }
@@ -235,7 +232,7 @@ struct BulkUninstallConfirmSheet: View {
                         .monospacedDigit()
                         .foregroundStyle(Theme.inkSecondary)
                 }
-                ScrollView {
+                SheetLedgerBox {
                     VStack(spacing: 0) {
                         ForEach(apps) { app in
                             HStack(spacing: Spacing.s2) {
@@ -259,17 +256,14 @@ struct BulkUninstallConfirmSheet: View {
                                 .font(Typography.row)
                                 .monospacedDigit()
                                 .foregroundStyle(Theme.inkSecondary)
-                                .frame(width: 84, alignment: .trailing)
+                                .frame(width: Metrics.byteColumnWidth, alignment: .trailing)
                             }
                             .padding(.vertical, Spacing.s1)
                             if app.id != apps.last?.id { Hairline() }
                         }
                     }
-                    .padding(.horizontal, Spacing.s3)
                     .padding(.vertical, Spacing.s2)
                 }
-                .frame(maxHeight: 220)
-                .background(Theme.paperRaised, in: .rect(corners: .fixed(6)))
                 VStack(alignment: .leading, spacing: Spacing.s2) {
                     labeled("The apps and the files you chose move to the Trash.", icon: "trash")
                     labeled("You can restore them from the Trash.", icon: "arrow.uturn.backward")

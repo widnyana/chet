@@ -31,42 +31,42 @@ struct StorageTrashSheet: View {
                 Text("Moved items stay in the Trash until you empty it.")
                     .font(Typography.body)
                     .foregroundStyle(Theme.inkSecondary)
-                VStack(spacing: 0) {
-                    ForEach(shown) { entry in
-                        HStack(spacing: Spacing.s3) {
-                            Text(entry.name)
-                                .font(Typography.row)
-                                .foregroundStyle(Theme.ink)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                            Spacer(minLength: Spacing.s3)
-                            Text(entry.bytes.formatted(.byteCount(style: .file)))
-                                .font(Typography.row)
-                                .monospacedDigit()
-                                .foregroundStyle(Theme.inkSecondary)
+                SheetLedgerBox(maxHeight: nil) {
+                    VStack(spacing: 0) {
+                        ForEach(shown) { entry in
+                            HStack(spacing: Spacing.s3) {
+                                Text(entry.name)
+                                    .font(Typography.row)
+                                    .foregroundStyle(Theme.ink)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                Spacer(minLength: Spacing.s3)
+                                Text(entry.bytes.formatted(.byteCount(style: .file)))
+                                    .font(Typography.row)
+                                    .monospacedDigit()
+                                    .foregroundStyle(Theme.inkSecondary)
+                            }
+                            .frame(height: 28)
+                            if entry.id != shown.last?.id {
+                                Hairline()
+                            }
                         }
-                        .frame(height: 28)
-                        if entry.id != shown.last?.id {
-                            Hairline()
+                        if entries.count > shown.count {
+                            HStack {
+                                Text("and \(entries.count - shown.count) more")
+                                    .font(Typography.caption)
+                                    .foregroundStyle(Theme.inkSecondary)
+                                Spacer()
+                                Text(bytes.formatted(.byteCount(style: .file)))
+                                    .font(Typography.caption)
+                                    .monospacedDigit()
+                                    .foregroundStyle(Theme.inkSecondary)
+                            }
+                            .frame(height: 28)
                         }
                     }
-                    if entries.count > shown.count {
-                        HStack {
-                            Text("and \(entries.count - shown.count) more")
-                                .font(Typography.caption)
-                                .foregroundStyle(Theme.inkSecondary)
-                            Spacer()
-                            Text(bytes.formatted(.byteCount(style: .file)))
-                                .font(Typography.caption)
-                                .monospacedDigit()
-                                .foregroundStyle(Theme.inkSecondary)
-                        }
-                        .frame(height: 28)
-                    }
+                    .padding(.vertical, Spacing.s1)
                 }
-                .padding(.horizontal, Spacing.s3)
-                .padding(.vertical, Spacing.s1)
-                .background(Theme.paperRaised, in: .rect(corners: .fixed(Metrics.controlRadius)))
                 .overlay {
                     RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous)
                         .strokeBorder(Theme.hairline, lineWidth: 1)

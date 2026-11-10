@@ -32,7 +32,7 @@ struct ConfirmSheet: View {
                         .foregroundStyle(Theme.inkSecondary)
                         .monospacedDigit()
                 }
-                ScrollView {
+                SheetLedgerBox {
                     VStack(spacing: 0) {
                         ForEach(rows) { row in
                             HStack(spacing: Spacing.s2) {
@@ -66,11 +66,8 @@ struct ConfirmSheet: View {
                             .padding(.vertical, Spacing.s1)
                         }
                     }
-                    .padding(.horizontal, Spacing.s3)
                     .padding(.vertical, Spacing.s2)
                 }
-                .frame(maxHeight: 220)
-                .background(Theme.paperRaised, in: .rect(corners: .fixed(6)))
                 VStack(alignment: .leading, spacing: Spacing.s2) {
                     if permanent > 0 {
                         HStack(spacing: Spacing.s2) {

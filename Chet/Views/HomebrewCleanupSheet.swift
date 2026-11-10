@@ -18,14 +18,14 @@ struct HomebrewCleanupSheet: View {
                         .font(Typography.body)
                         .foregroundStyle(Theme.inkSecondary)
                 }
-                VStack(spacing: 0) {
-                    row("Old package versions", detail: "Superseded by the installed version")
-                    Hairline()
-                    row("Download cache", detail: "Archives Homebrew downloaded")
+                SheetLedgerBox(maxHeight: nil) {
+                    VStack(spacing: 0) {
+                        row("Old package versions", detail: "Superseded by the installed version")
+                        Hairline()
+                        row("Download cache", detail: "Archives Homebrew downloaded")
+                    }
+                    .padding(.vertical, Spacing.s2)
                 }
-                .padding(.horizontal, Spacing.s3)
-                .padding(.vertical, Spacing.s2)
-                .background(Theme.paperRaised, in: .rect(corners: .fixed(6)))
                 Text("Current versions stay installed.")
                     .font(Typography.caption)
                     .foregroundStyle(Theme.inkSecondary)

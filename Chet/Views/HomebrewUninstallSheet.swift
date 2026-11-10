@@ -34,7 +34,7 @@ struct HomebrewUninstallSheet: View {
                     .foregroundStyle(Theme.inkSecondary)
                 }
 
-                ScrollView {
+                SheetLedgerBox {
                     VStack(spacing: 0) {
                         ForEach(packages) { package in
                             HStack(spacing: Spacing.s2) {
@@ -51,17 +51,14 @@ struct HomebrewUninstallSheet: View {
                                     .font(Typography.row)
                                     .monospacedDigit()
                                     .foregroundStyle(Theme.inkSecondary)
-                                    .frame(width: 80, alignment: .trailing)
+                                    .frame(width: Metrics.byteColumnWidth, alignment: .trailing)
                             }
                             .padding(.vertical, Spacing.s1)
                             if package.id != packages.last?.id { Hairline() }
                         }
                     }
-                    .padding(.horizontal, Spacing.s3)
                     .padding(.vertical, Spacing.s2)
                 }
-                .frame(maxHeight: 220)
-                .background(Theme.paperRaised, in: .rect(corners: .fixed(6)))
 
                 if hasCask {
                     VStack(alignment: .leading, spacing: Spacing.s1) {
