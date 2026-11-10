@@ -263,3 +263,61 @@ A new component, a moved notice, or a changed bar means an edit in
 [design/components.md](design/components.md) and the table in
 [design/composition.md](design/composition.md). This repo had docs describing
 a page scaffold that did not exist; that is how it starts.
+
+## Debugging a report you cannot reproduce
+
+A report said a list was missing while its count and size were visible. Four
+hours went into chasing data paths that were correct the whole time.
+
+### Read the container frame, not the text
+
+The accessibility tree lists children that are clipped. `texts` printed every
+row of the hidden tweak list, so "the items are in the tree" proves nothing.
+The decisive number is the container frame: `frame=450,372,710,0`.
+
+- Height 0 with rows inside means the body is clipped. Fix the frame.
+- Normal height with no rows means nothing was built. Fix the data.
+
+Take the frame first, then a screenshot. `EmptyStateView` also carries
+`maxHeight: .infinity`, so a collapsed page can look like a designed state.
+
+### Prove the binary before proving the code
+
+A stale copy is the cheapest explanation and the easiest to rule out.
+
+```sh
+ps -o command= -p <pid>                       # which path is running
+sha256sum .build/xc/Build/Products/Debug/chet.app/Contents/MacOS/chet
+```
+
+A rebuilt app also loses its Full Disk Access grant, so a launch that drops to
+the onboarding gate is the rebuild talking, not a regression. `open -n` leaves
+the old instance running; `pkill -x chet` first.
+
+### Check who else is writing the tree
+
+Another session committed to `DesignSystem.swift` between two of my builds.
+The build then contained work I had not read, and its commit was invisible in
+`git log -1` unless asked for.
+
+- `git log --oneline -3` before the build and after it.
+- `git status --short` tells you what is in flight; leave those paths alone.
+- A commit you did not make is input to review, not something to revert.
+
+### Look in the directory before naming the file
+
+`.harness/impl/.15.impl` existed before I wrote it. `ls -1a .harness/impl`
+costs one command; guessing the next number costs a correction from the owner.
+
+### An empty view is not the same as no view
+
+Two fixes came out of this: `safeAreaBar` with an `EmptyView` claims the whole
+page, and a `@ViewBuilder` `if` still produces a bar type. Both are the same
+mistake at different levels, so the rule belongs in the frame and at the call
+site, not in one patch per page.
+
+### Do not refactor on a hunch
+
+I removed `safeAreaBar`, added frames, and rewrote a page before measuring.
+Each attempt was reversible, but none was evidence. One measurement of the
+container frame ended the hunt.
