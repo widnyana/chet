@@ -74,7 +74,9 @@ Selectors are ANDed `key=value` terms (`id=`, `role=`, `desc=`, `enabled=`). A b
 substring match. A selector must match exactly one element; several matches exit 6.
 Identifiers are `screen.element` (`.accessibilityIdentifier` next to `.accessibilityLabel`).
 List them with `dump`; `python3 scripts/ui_selectors.py --pid <pid> --screen <name>` saves a map
-to `docs/ui-selectors.json` (generated, gitignored, do not hand-edit).
+to `docs/ui-selectors.json` (generated, gitignored, do not hand-edit). A tweak row puts
+`tweak.details.<tweak id>` on the details control; the `info.circle` description match is
+retired there.
 
 What costs time:
 

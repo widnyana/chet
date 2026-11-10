@@ -658,6 +658,16 @@ Checking for access...                             (caption + spinner)
 - The page uses the paper background, a 48 pt inset, and max width 520. The 48
   pt is the gate's deliberate inset, not a page margin.
 
+## Settings frame and columns
+
+- One page margin, owned by `SettingsPaneView`; a pane does not pad its own content.
+- The control column is `Metrics.controlColumn` (150), shared by `SettingsGrid.slider`
+  and `PreferenceRow.controlWidth`.
+- The readout column is `SettingsGrid.valueColumn` (56), monospaced digits, right
+  aligned.
+- Control sizes: a primary action is `.large`; destructive and secondary actions are
+  `.regular`; a settings slider is `.small`.
+
 ## SettingsRow
 
 Settings is a panel list, not a `Form`.

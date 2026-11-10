@@ -26,15 +26,17 @@ struct PreferenceRow<Accessory: View>: View {
     let detail: String
     let state: String
     var notes: [PreferenceNote] = []
-    var controlWidth: CGFloat = 150
+    var controlWidth = Metrics.controlColumn
     /// False while a global gate such as DRY_RUN is on: the control stays visible and inert.
     var isEnabled = true
     let accessory: Accessory
+    var detailsIdentifier: String?
     let onDetails: () -> Void
 
     init(
         title: String, detail: String, state: String, notes: [PreferenceNote] = [],
-        controlWidth: CGFloat = 150, isEnabled: Bool = true,
+        controlWidth: CGFloat = Metrics.controlColumn, isEnabled: Bool = true,
+        detailsIdentifier: String? = nil,
         onDetails: @escaping () -> Void, @ViewBuilder accessory: () -> Accessory
     ) {
         self.title = title
@@ -43,6 +45,7 @@ struct PreferenceRow<Accessory: View>: View {
         self.notes = notes
         self.controlWidth = controlWidth
         self.isEnabled = isEnabled
+        self.detailsIdentifier = detailsIdentifier
         self.onDetails = onDetails
         self.accessory = accessory()
     }
@@ -73,7 +76,9 @@ struct PreferenceRow<Accessory: View>: View {
                 .frame(width: controlWidth, alignment: .trailing)
                 .disabled(!isEnabled)
             IconActionButton(
-                systemImage: "info.circle", label: "Details for \(title)", action: onDetails)
+                systemImage: "info.circle", label: "Details for \(title)", action: onDetails
+            )
+            .modifier(OptionalAccessibilityIdentifier(identifier: detailsIdentifier))
         }
         .padding(.vertical, Spacing.s2)
     }

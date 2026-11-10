@@ -164,6 +164,7 @@ private struct TweakRow: View {
             state: stateLine,
             notes: notes,
             isEnabled: !model.isGated,
+            detailsIdentifier: "tweak.details.\(reading.id)",
             onDetails: onDetails
         ) {
             control
@@ -344,7 +345,7 @@ private struct TweakRangeControl: View {
                 .font(Typography.caption)
                 .monospacedDigit()
                 .foregroundStyle(Theme.inkSecondary)
-                .frame(width: 58, alignment: .trailing)
+                .frame(width: SettingsGrid.valueColumn, alignment: .trailing)
         }
         .onAppear { value = current }
         .onChange(of: reading.current) { _, _ in value = current }

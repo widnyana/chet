@@ -94,7 +94,7 @@ struct SettingsPanel<Content: View>: View {
 enum SettingsGrid {
     static let row = Metrics.rowHeight
     static let rowPadding = Spacing.s2
-    static let slider: CGFloat = 150
+    static let slider = Metrics.controlColumn
     static let valueColumn: CGFloat = 56
 }
 
