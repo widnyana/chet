@@ -122,3 +122,104 @@ six times and produced zero crash reports, because the kills were external.
 Slots carry what the frame says they carry, builders are not layouts, docs
 change with the list they describe, and in a shared tree you launch by path,
 kill by pid, and stage by hunk.
+
+## Working rules from the component session
+
+Added after the page-frame and row-parts commits. These are the checks that
+would have caught the two regressions before the user did.
+
+### A page frame pins its header, and the body must be able to shrink
+
+`PageScreen` needed three things to stop the title sliding under the titlebar:
+
+```swift
+header
+    .fixedSize(horizontal: false, vertical: true)
+    .layoutPriority(1)
+// later in the same VStack:
+content
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    .clipped()
+```
+
+A flexible body that carries a hard `minHeight` (the treemap had 320) can
+refuse to shrink, and then the whole stack overflows upward. Remove the
+minimum or make the body scroll. Do not fix the result with padding.
+
+A header whose height depends on data (a metric that is nil before the first
+scan) moves every row when the data arrives. Reserve the slot: render the
+same text layout with `.clear` ink when there is no number.
+
+### Smoke checklist for a layout change, about two minutes
+
+```sh
+xcodebuild -project chet.xcodeproj -scheme chet -configuration Debug \
+  -destination 'platform=macOS' -derivedDataPath .build/xc build
+mise run lint
+mise run test
+```
+
+Then assert a number, not an impression:
+
+```sh
+pkill -x chet; DRY_RUN=1 open -n .build/xc/Build/Products/Debug/chet.app
+P=$(pgrep -f 'chet.app/Contents/MacOS/chet$' | head -1)
+/tmp/axdrv --pid $P press id=gate.continue
+/tmp/axdrv --pid $P dump id=home.header
+/tmp/axdrv --pid $P dump id=storage.header
+```
+
+`home.header`, `apps.header` and `storage.header` must report the same `frame`
+x and y. That equality is the contract of the shared frame. State checks read
+the same way: `desc=Scanning enabled=false` proves a disabled control, "looks
+disabled" does not.
+
+### Driving the app, cheaply
+
+- Home has no toolbar scan button: `toolbar.scan` exists only on non-overview
+  destinations. Start the scan with `home.scan` (or `home.rescan`).
+- A full scan runs about two minutes. Start it, then do other work. Sleeping
+  in a poll loop wastes whole turns.
+- AX walking a long `List` costs 300 to 450 nodes and can stall `dump --all`.
+  One identifier, or one exact string, per call.
+- `screencapture -l <windowid>` fails with "could not create image from
+  window" when the window is behind or on another Space. `screencapture -x`
+  of the full screen works, and the app must be frontmost to appear in it.
+- `open -n` accumulates instances. `pkill -x chet` first, pick the pid
+  explicitly, and `pgrep -x chet` must print nothing when the work is done.
+
+### Extraction rules
+
+Extraction is not free. A wrapper with one caller is cost without benefit.
+
+- Extract at the second real call site, or when copies have already drifted.
+  The five hand-written row buttons had drifted (one had no focus ring, one no
+  label); the app grid tile had one caller, so it stayed a cell.
+- Extract behaviour, not layout. `RowActionButton` owns focus ring, hit shape,
+  help and label; the label content stays at the call site. `TableRow` owns
+  height, inset, wash and the open gesture. `RowCheckbox` owns the label,
+  width and disabled rule.
+- A variant is a parameter when two call sites need two values
+  (`SizeColumn.foreground`), never a flag only one caller sets.
+- A view that already has the right shape but a different container (a row
+  inside a `List`) can use the primitives without adopting the shell. No
+  layout change, no new risk.
+- When a component moves a control's accessibility wiring, re-read its
+  description in the running app. `RowCheckbox` read as "Remove, Select X to
+  remove" until its `Toggle` title was emptied; selectors match on that text.
+
+### The formatter is a reviewer
+
+- `swift format` rejects a call that passes both a closure argument and a
+  trailing closure. Name it: `content: { ... }`, `label: { ... }`.
+- Long-line failures surface leftovers: a lint run found
+  `NSLog("TMAP open push=...")` from an earlier session.
+- Run `swift format --in-place` on the files you touched before lint. It
+  cannot fix a missing brace, so fix structure first.
+
+### Docs are part of the change
+
+A new component, a moved notice, or a changed bar means an edit in
+[design/components.md](design/components.md) and the table in
+[design/composition.md](design/composition.md). This repo had docs describing
+a page scaffold that did not exist; that is how it starts.

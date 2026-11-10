@@ -622,7 +622,7 @@ struct RowCheckbox: View {
     var identifier: String?
 
     var body: some View {
-        Toggle("Remove", isOn: $isOn)
+        Toggle("", isOn: $isOn)
             .toggleStyle(.checkbox)
             .labelsHidden()
             .disabled(!isEnabled)

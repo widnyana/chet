@@ -204,10 +204,9 @@ struct MediaCard: View {
                 .clipShape(.rect(corners: .fixed(8)))
             HStack(spacing: Spacing.s2) {
                 if let isOn {
-                    Toggle("Remove", isOn: isOn)
-                        .toggleStyle(.checkbox)
-                        .labelsHidden()
-                        .accessibilityLabel("Remove \(url.lastPathComponent)")
+                    RowCheckbox(
+                        isOn: isOn,
+                        label: "Remove \(url.lastPathComponent)")
                 } else {
                     StatusLabel(text: "Keep", systemImage: "checkmark", tone: .neutral)
                 }

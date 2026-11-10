@@ -200,13 +200,10 @@ private struct OwnershipRow: View {
     var body: some View {
         let selected = model.selectedComponents.contains(component.url)
         HStack(spacing: Spacing.s2) {
-            Toggle(
-                "Remove", isOn: Binding(get: { selected }, set: { model.setComponent(component, $0) })
-            )
-            .toggleStyle(.checkbox)
-            .labelsHidden()
-            .disabled(!model.canSelect(component))
-            .accessibilityLabel("Remove \(component.url.lastPathComponent)")
+            RowCheckbox(
+                isOn: Binding(get: { selected }, set: { model.setComponent(component, $0) }),
+                label: "Remove \(component.url.lastPathComponent)",
+                isEnabled: model.canSelect(component))
             Image(nsImage: IconCache.icon(for: component.url))
                 .resizable()
                 .frame(width: 22, height: 22)
@@ -225,10 +222,7 @@ private struct OwnershipRow: View {
                 }
             }
             Spacer(minLength: Spacing.s2)
-            Text(component.bytes.formatted(.byteCount(style: .file)))
-                .font(Typography.row)
-                .monospacedDigit()
-                .foregroundStyle(Theme.inkSecondary)
+            SizeColumn(bytes: component.bytes, foreground: Theme.inkSecondary)
         }
         .contextMenu {
             Button("Reveal in Finder") {
