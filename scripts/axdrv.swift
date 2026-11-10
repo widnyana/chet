@@ -652,7 +652,10 @@ func sampledColors(in image: NSBitmapImageRep, rect: CGRect) -> [SampledColor] {
     var buckets: [Int: (red: Double, green: Double, blue: Double, count: Int)] = [:]
     for y in minY...maxY {
         for x in minX...maxX {
-            guard let color = image.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { continue }
+            // Read the stored components as they are. `screencapture` writes the
+            // composited values into a Display P3 file, and converting to sRGB shifts
+            // them: the paper token came back 2 levels light and the ink 9.
+            guard let color = image.colorAt(x: x, y: y) else { continue }
             let red = color.redComponent
             let green = color.greenComponent
             let blue = color.blueComponent
