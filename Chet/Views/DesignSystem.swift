@@ -1038,7 +1038,7 @@ struct CapacityBarView: View {
                 }
             }
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(
             "\(volumeName). Used \(used.formatted(.byteCount(style: .file))), can be reclaimed \(reclaimable.formatted(.byteCount(style: .file))), free \(free.formatted(.byteCount(style: .file)))"
         )
