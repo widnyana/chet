@@ -2,6 +2,16 @@ import AppKit
 import ChetCore
 import SwiftUI
 
+private func consequenceRow(_ text: String, icon: String) -> some View {
+    HStack(spacing: Spacing.s2) {
+        Image(systemName: icon)
+            .foregroundStyle(Theme.inkSecondary)
+        Text(text)
+            .font(Typography.body)
+            .foregroundStyle(Theme.ink)
+    }
+}
+
 struct AppUninstallConfirmSheet: View {
     @Environment(AppCleanerModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -48,18 +58,18 @@ struct AppUninstallConfirmSheet: View {
                     .padding(.vertical, Spacing.s2)
                 }
                 VStack(alignment: .leading, spacing: Spacing.s2) {
-                    labeled("The app and the files you chose move to the Trash.", icon: "trash")
-                    labeled("You can restore them from the Trash.", icon: "arrow.uturn.backward")
-                    labeled("Chet checks each item again before it moves.", icon: "checkmark.shield")
+                    consequenceRow("The app and the files you chose move to the Trash.", icon: "trash")
+                    consequenceRow("You can restore them from the Trash.", icon: "arrow.uturn.backward")
+                    consequenceRow("Chet checks each item again before it moves.", icon: "checkmark.shield")
                     if !DryRun.enabled,
                         model.selectedComponentList.contains(where: { $0.requiresAdmin })
                     {
-                        labeled(
+                        consequenceRow(
                             "Items that need an administrator are removed permanently, not moved to the Trash.",
                             icon: "lock.open")
                     }
                     if let app, !model.appSelected, app.isWritable, !model.isRunning {
-                        labeled("The app stays installed.", icon: "app.dashed")
+                        consequenceRow("The app stays installed.", icon: "app.dashed")
                     }
                 }
                 if model.isRunning {
@@ -117,15 +127,6 @@ struct AppUninstallConfirmSheet: View {
         .padding(.vertical, Spacing.s1)
     }
 
-    private func labeled(_ text: String, icon: String) -> some View {
-        HStack(spacing: Spacing.s2) {
-            Image(systemName: icon)
-                .foregroundStyle(Theme.inkSecondary)
-            Text(text)
-                .font(Typography.body)
-                .foregroundStyle(Theme.ink)
-        }
-    }
 }
 
 struct UninstallSummaryView: View {
@@ -262,9 +263,9 @@ struct BulkUninstallConfirmSheet: View {
                     .padding(.vertical, Spacing.s2)
                 }
                 VStack(alignment: .leading, spacing: Spacing.s2) {
-                    labeled("The apps and the files you chose move to the Trash.", icon: "trash")
-                    labeled("You can restore them from the Trash.", icon: "arrow.uturn.backward")
-                    labeled("Chet checks each item again before it moves.", icon: "checkmark.shield")
+                    consequenceRow("The apps and the files you chose move to the Trash.", icon: "trash")
+                    consequenceRow("You can restore them from the Trash.", icon: "arrow.uturn.backward")
+                    consequenceRow("Chet checks each item again before it moves.", icon: "checkmark.shield")
                     if model.markedRunningCount > 0 {
                         StatusLabel(
                             text: "Running apps are skipped.",
@@ -293,15 +294,6 @@ struct BulkUninstallConfirmSheet: View {
         }
     }
 
-    private func labeled(_ text: String, icon: String) -> some View {
-        HStack(spacing: Spacing.s2) {
-            Image(systemName: icon)
-                .foregroundStyle(Theme.inkSecondary)
-            Text(text)
-                .font(Typography.body)
-                .foregroundStyle(Theme.ink)
-        }
-    }
 }
 
 struct BulkUninstallSummaryView: View {

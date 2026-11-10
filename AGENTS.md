@@ -337,7 +337,7 @@ identifiers of the controls inside it. Put the identifier on the control you wil
 | `home.*` | The Home family: `home.stop`, `home.pause`, `home.resume`, `home.empty`, `home.scan`, `home.rescan`; the enumerated pairs above name which id shows in which state |
 | `apps.header` | Apps |
 | `homebrew.header` | Homebrew page header |
-| `homebrew.sort.<col>`, `homebrew.select.<id>`, `homebrew.search.field`, `homebrew.tap.field`, `homebrew.installer.status`, `homebrew.install`, `homebrew.install.<id>` | Homebrew table and installer sheet |
+| `homebrew.sort.<col>`, `homebrew.select.<id>`, `homebrew.search.field`, `homebrew.tap.field`, `homebrew.installer.status`, `homebrew.install`, `homebrew.install.<id>` | Homebrew table and installer sheet; `homebrew.install.<id>` lands on the installer row checkbox control |
 | `storage.header`, `storage.pause`, `storage.resume` | Storage |
 | `storage.crumb.current`, `storage.crumb.<n>`, `storage.volume` | Storage location bar |
 | `storage.metric.free`, `storage.metric.cleanable`, `storage.metric.largeFiles` | Storage metric actions |

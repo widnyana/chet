@@ -323,6 +323,9 @@ action.
   the adopted form. The identifier lands on the `Toggle` itself, never on a
   wrapper.
 - The memberwise form stays available for a row that carries no identifier.
+- Adoption sites, measured in code: eight files call it — `CategoryDetailView`,
+  `AppBrowserView`, `AppCleanerDetailView`, `GroupedItemsView`, `HomebrewView`,
+  `SnapshotsView`, `StorageComponents`, and `HomebrewInstallerSheet`.
 
 ## ColumnRegistry
 
@@ -567,6 +570,12 @@ The sheet shell every sheet renders through. Measured: 13 call sites in
   `Metrics.detailSheetWidth` 540 pt. 480 pt is not used.
 - 24 pt padding, an optional fixed height, and the paper body.
 - The system draws the sheet window; the frame supplies the body.
+
+## AppUninstallSheets
+
+- Confirm and summary sheets for one app and for a bulk selection.
+- The consequence rows share one file-private `consequenceRow(_:icon:)`. Both
+  confirm sheets call it; neither holds its own copy.
 
 ## SummarySheet
 

@@ -110,17 +110,13 @@ struct HomebrewInstallerSheet: View {
     private func resultRow(_ result: Homebrew.SearchResult) -> some View {
         let installed = model.isInstalled(result)
         return HStack(spacing: Spacing.s3) {
-            Toggle(
-                "",
+            RowCheckbox(
+                identifier: "homebrew.install.\(result.id)",
                 isOn: Binding(
                     get: { model.selectedToInstall.contains(result.id) },
-                    set: { model.setInstallMark(result, on: $0) })
-            )
-            .labelsHidden()
-            .toggleStyle(.checkbox)
-            .disabled(installed)
-            .accessibilityLabel(installed ? "\(result.name) is installed" : "Install \(result.name)")
-            .accessibilityIdentifier("homebrew.install.\(result.id)")
+                    set: { model.setInstallMark(result, on: $0) }),
+                label: installed ? "\(result.name) is installed" : "Install \(result.name)",
+                isEnabled: !installed)
             Text(result.name).font(Typography.row).foregroundStyle(Theme.ink).lineLimit(1)
             Text(result.isCask ? "Cask" : "Formula")
                 .font(Typography.caption).foregroundStyle(Theme.inkSecondary)
