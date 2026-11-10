@@ -57,7 +57,9 @@ The frame owns:
 - `PageHeader` keeps the metric slot at full height when the number is missing,
   so a finished scan does not move the rows below it.
 - One scroll rhythm: `Spacing.s6` between content sections, `Spacing.s6` bottom.
-- The bottom bar through `safeAreaBar`, or the same inset when there is none.
+- The bottom bar through `safeAreaBar` when a page supplies one, and the reserved
+  inset when it does not. An empty bar is not the same as no bar: it keeps the whole
+  page height and clips the content away.
 - `Preview only. Nothing is changed.` once, at the foot of the frame, in tertiary
   ink. Not a strip, not a per-page label.
 

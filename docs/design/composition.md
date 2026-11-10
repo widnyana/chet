@@ -51,6 +51,8 @@ The order is fixed:
 3. State: content, or exactly one of loading, empty, error, filtered empty.
 4. Inventory or content block.
 5. `PageScreen` bar slot: `CommandBar` through `safeAreaBar` when the page can act.
+   A page that cannot act passes no bar, and the frame installs none. An empty bar keeps
+   its safe area and leaves the page no height.
 6. Sheets attach to the page that owns the action.
 
 Do not add a second header, a card wrapper around a table, or page-level

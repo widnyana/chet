@@ -363,7 +363,22 @@ struct PageScreen<Header: View, SubHeader: View, Content: View, Bar: View>: View
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Theme.paper)
         .backgroundExtensionEffect()
-        .safeAreaBar(edge: .bottom) { bar }
+        .modifier(PageCommandBar(bar: bar))
+    }
+}
+
+/// An empty bar is not the same as no bar: `safeAreaBar` with an `EmptyView` claims the
+/// whole content height, and the page below it is clipped to nothing. A page without
+/// commands therefore installs no bar at all.
+private struct PageCommandBar<Bar: View>: ViewModifier {
+    let bar: Bar
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if Bar.self == EmptyView.self {
+            content
+        } else {
+            content.safeAreaBar(edge: .bottom) { bar }
+        }
     }
 }
 

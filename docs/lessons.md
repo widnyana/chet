@@ -150,6 +150,31 @@ A header whose height depends on data (a metric that is nil before the first
 scan) moves every row when the data arrives. Reserve the slot: render the
 same text layout with `.clear` ink when there is no number.
 
+### An empty bar is not the same as no bar
+
+`PageScreen` applied `.safeAreaBar(edge: .bottom) { bar }` unconditionally.
+Tweaks is the only destination that passes no command bar, so its bar was an
+`EmptyView` — and an empty bar still claims the whole content height: the
+scroll area measured `450,372,710,0` and the entire list was clipped away.
+Header, gate notice, and page summary stayed visible, which reads as "the
+tweaks list is missing" rather than "the page has no room".
+
+Rule: a view that only decorates the bottom of a page is applied only when it
+exists.
+
+```swift
+@ViewBuilder func body(content: Content) -> some View {
+    if Bar.self == EmptyView.self {
+        content
+    } else {
+        content.safeAreaBar(edge: .bottom) { bar }
+    }
+}
+```
+
+The tell: a page that renders its header and nothing else. Axis-dump the page
+and read the container frame, do not trust the screenshot alone.
+
 ### Smoke checklist for a layout change, about two minutes
 
 ```sh
