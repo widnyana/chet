@@ -52,7 +52,8 @@ struct HomebrewView: View {
         } message: {
             Text(
                 DryRun.enabled
-                    ? "Preview only. Nothing will be removed. Homebrew would replace the selected packages with the latest versions."
+                    ? PreviewCopy.removals
+                        + " Homebrew would replace the selected packages with the latest versions."
                     : "Homebrew replaces the selected packages with the latest versions.")
         }
         .toolbar {
@@ -195,16 +196,16 @@ struct HomebrewView: View {
 
     private var header: some View {
         VStack(spacing: 0) {
-            HStack(spacing: HomebrewColumns.spacing) {
-                Color.clear.frame(width: HomebrewColumns.mark)
-                Color.clear.frame(width: HomebrewColumns.icon)
+            HStack(spacing: ColumnRegistry.spacing) {
+                Color.clear.frame(width: ColumnRegistry.spec(.mark).width)
+                Color.clear.frame(width: ColumnRegistry.spec(.icon).width)
                 sortButton("Name", .name).frame(maxWidth: .infinity, alignment: .leading)
-                sortButton("Kind", .kind).frame(width: HomebrewColumns.kind, alignment: .leading)
+                sortButton("Kind", .kind).frame(width: ColumnRegistry.spec(.kind).width, alignment: .leading)
                 sortButton("Version", .version)
-                    .frame(width: HomebrewColumns.version, alignment: .leading)
-                sortButton("Size", .size).frame(width: HomebrewColumns.size, alignment: .trailing)
+                    .frame(width: ColumnRegistry.spec(.version).width, alignment: .leading)
+                sortButton("Size", .size).frame(width: ColumnRegistry.spec(.size).width, alignment: .trailing)
                 sortButton("Status", .status)
-                    .frame(width: HomebrewColumns.status, alignment: .leading)
+                    .frame(width: ColumnRegistry.spec(.status).width, alignment: .leading)
             }
             .pageHorizontalPadding()
             .padding(.vertical, Spacing.s2)
@@ -224,17 +225,6 @@ struct HomebrewView: View {
     }
 }
 
-/// Stable column metrics shared by the Homebrew header and its rows.
-private enum HomebrewColumns {
-    static let mark: CGFloat = 20
-    static let icon: CGFloat = 22
-    static let kind: CGFloat = 140
-    static let version: CGFloat = 80
-    static let size: CGFloat = 82
-    static let status: CGFloat = 118
-    static let spacing: CGFloat = Spacing.s3
-}
-
 private struct HomebrewRow: View {
     @Environment(HomebrewModel.self) private var model
     let package: BrewPackage
@@ -243,18 +233,18 @@ private struct HomebrewRow: View {
         TableRow(
             isHighlighted: model.marked.contains(package.id),
             content: {
-                HStack(spacing: HomebrewColumns.spacing) {
+                HStack(spacing: ColumnRegistry.spacing) {
                     RowCheckbox(
                         isOn: Binding(
                             get: { model.marked.contains(package.id) },
                             set: { model.setMark(package, on: $0) }),
                         label: "Select \(package.title) to uninstall",
-                        width: HomebrewColumns.mark,
+                        width: ColumnRegistry.spec(.mark).width,
                         identifier: "homebrew.select.\(package.id)")
                     Image(systemName: package.kind == .cask ? "shippingbox.fill" : "shippingbox")
                         .font(Typography.iconRow)
                         .foregroundStyle(Theme.inkSecondary)
-                        .frame(width: HomebrewColumns.icon)
+                        .frame(width: ColumnRegistry.spec(.icon).width)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(package.title).font(Typography.row).foregroundStyle(Theme.ink).lineLimit(1)
@@ -266,12 +256,12 @@ private struct HomebrewRow: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     Text(package.kindLabel)
                         .font(Typography.caption).foregroundStyle(Theme.inkSecondary)
-                        .frame(width: HomebrewColumns.kind, alignment: .leading)
+                        .frame(width: ColumnRegistry.spec(.kind).width, alignment: .leading)
                     Text(package.version)
                         .font(Typography.caption).monospacedDigit().foregroundStyle(Theme.inkSecondary)
-                        .lineLimit(1).frame(width: HomebrewColumns.version, alignment: .leading)
-                    SizeColumn(bytes: package.size, width: HomebrewColumns.size)
-                    statusLabel.frame(width: HomebrewColumns.status, alignment: .leading)
+                        .lineLimit(1).frame(width: ColumnRegistry.spec(.version).width, alignment: .leading)
+                    SizeColumn(bytes: package.size, width: ColumnRegistry.spec(.size).width)
+                    statusLabel.frame(width: ColumnRegistry.spec(.status).width, alignment: .leading)
                 }
             })
     }

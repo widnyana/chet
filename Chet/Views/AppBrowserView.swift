@@ -266,17 +266,6 @@ private enum AppSort {
     case name, location, version, size, status
 }
 
-/// Stable column metrics shared by the header and the rows.
-private enum AppColumns {
-    static let mark: CGFloat = 20
-    static let icon: CGFloat = 22
-    static let location: CGFloat = 140
-    static let version: CGFloat = 80
-    static let size: CGFloat = 82
-    static let status: CGFloat = 118
-    static let spacing: CGFloat = Spacing.s3
-}
-
 private struct AppListHeader: View {
     let sort: AppSort
     let ascending: Bool
@@ -284,19 +273,19 @@ private struct AppListHeader: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: AppColumns.spacing) {
-                Color.clear.frame(width: AppColumns.mark)
-                Color.clear.frame(width: AppColumns.icon)
+            HStack(spacing: ColumnRegistry.spacing) {
+                Color.clear.frame(width: ColumnRegistry.spec(.mark).width)
+                Color.clear.frame(width: ColumnRegistry.spec(.icon).width)
                 sortButton("Name", .name)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 sortButton("Location", .location)
-                    .frame(width: AppColumns.location, alignment: .leading)
+                    .frame(width: ColumnRegistry.spec(.location).width, alignment: .leading)
                 sortButton("Version", .version)
-                    .frame(width: AppColumns.version, alignment: .leading)
+                    .frame(width: ColumnRegistry.spec(.version).width, alignment: .leading)
                 sortButton("Size", .size)
-                    .frame(width: AppColumns.size, alignment: .trailing)
+                    .frame(width: ColumnRegistry.spec(.size).width, alignment: .trailing)
                 sortButton("Status", .status)
-                    .frame(width: AppColumns.status, alignment: .leading)
+                    .frame(width: ColumnRegistry.spec(.status).width, alignment: .leading)
             }
             .font(Typography.caption)
             .pageHorizontalPadding()
@@ -325,16 +314,16 @@ private struct AppRow: View {
             isHighlighted: model.markedApps.contains(app.url),
             onOpen: { model.select(app) },
             content: {
-                HStack(spacing: AppColumns.spacing) {
+                HStack(spacing: ColumnRegistry.spacing) {
                     RowCheckbox(
                         isOn: Binding(
                             get: { model.markedApps.contains(app.url) },
                             set: { _ in model.toggleMark(app) }),
                         label: "Select \(app.name) to remove",
-                        width: AppColumns.mark)
+                        width: ColumnRegistry.spec(.mark).width)
                     Image(nsImage: IconCache.icon(for: app.url))
                         .resizable()
-                        .frame(width: AppColumns.icon, height: AppColumns.icon)
+                        .frame(width: ColumnRegistry.spec(.icon).width, height: ColumnRegistry.spec(.icon).width)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(app.name)
                             .font(Typography.row)
@@ -351,25 +340,25 @@ private struct AppRow: View {
                         .font(Typography.caption)
                         .foregroundStyle(Theme.inkSecondary)
                         .lineLimit(1)
-                        .frame(width: AppColumns.location, alignment: .leading)
+                        .frame(width: ColumnRegistry.spec(.location).width, alignment: .leading)
                     Text(app.version ?? "Unknown")
                         .font(Typography.caption)
                         .monospacedDigit()
                         .foregroundStyle(Theme.inkSecondary)
                         .lineLimit(1)
-                        .frame(width: AppColumns.version, alignment: .leading)
+                        .frame(width: ColumnRegistry.spec(.version).width, alignment: .leading)
                     if let bytes = model.appSizes[app.url] {
-                        SizeColumn(bytes: bytes, width: AppColumns.size)
+                        SizeColumn(bytes: bytes, width: ColumnRegistry.spec(.size).width)
                     } else {
                         Text("Unknown")
                             .font(Typography.row)
                             .monospacedDigit()
                             .foregroundStyle(Theme.ink)
                             .lineLimit(1)
-                            .frame(width: AppColumns.size, alignment: .trailing)
+                            .frame(width: ColumnRegistry.spec(.size).width, alignment: .trailing)
                     }
                     status
-                        .frame(width: AppColumns.status, alignment: .leading)
+                        .frame(width: ColumnRegistry.spec(.status).width, alignment: .leading)
                 }
                 .contextMenu { appContextMenu(for: app, model: model) }
             })

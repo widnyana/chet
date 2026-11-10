@@ -69,13 +69,16 @@ struct SnapshotsView: View {
     private var header: some View {
         VStack(spacing: 0) {
             HStack(spacing: Spacing.s3) {
-                Color.clear.frame(width: SnapshotColumns.mark)
+                Color.clear.frame(width: ColumnRegistry.spec(.mark).width)
                 Text("Date")
                     .frame(maxWidth: .infinity, alignment: .leading)
-                Text("Age")
-                    .frame(width: SnapshotColumns.age, alignment: .trailing)
+                SortColumnButton(
+                    title: "Age", isActive: true, ascending: !newestFirst,
+                    action: { newestFirst.toggle() }
+                )
+                .frame(width: ColumnRegistry.spec(.age).width, alignment: .trailing)
                 Text("Local")
-                    .frame(width: SnapshotColumns.local, alignment: .trailing)
+                    .frame(width: ColumnRegistry.spec(.local).width, alignment: .trailing)
             }
             .font(Typography.caption)
             .pageHorizontalPadding()
@@ -93,7 +96,7 @@ struct SnapshotsView: View {
                     RowCheckbox(
                         isOn: model.isSelected(snapshot),
                         label: "Remove the snapshot from \(Self.label(snapshot.date))",
-                        width: SnapshotColumns.mark)
+                        width: ColumnRegistry.spec(.mark).width)
                     Text(Self.label(snapshot.date))
                         .font(Typography.row)
                         .monospacedDigit()
@@ -101,11 +104,11 @@ struct SnapshotsView: View {
                         .lineLimit(1)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     ageCell(snapshot)
-                        .frame(width: SnapshotColumns.age, alignment: .trailing)
+                        .frame(width: ColumnRegistry.spec(.age).width, alignment: .trailing)
                     Text("Local")
                         .font(Typography.caption)
                         .foregroundStyle(Theme.inkSecondary)
-                        .frame(width: SnapshotColumns.local, alignment: .trailing)
+                        .frame(width: ColumnRegistry.spec(.local).width, alignment: .trailing)
                 }
             })
     }
@@ -191,10 +194,4 @@ struct SnapshotsView: View {
             Hairline()
         }
     }
-}
-
-private enum SnapshotColumns {
-    static let mark: CGFloat = 20
-    static let age: CGFloat = 140
-    static let local: CGFloat = 110
 }

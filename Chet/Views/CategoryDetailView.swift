@@ -129,15 +129,15 @@ struct CategoryDetailView: View {
     private var header: some View {
         VStack(spacing: 0) {
             HStack(spacing: Spacing.s3) {
-                Color.clear.frame(width: CategoryColumns.mark)
+                Color.clear.frame(width: ColumnRegistry.spec(.mark).width)
                 sortButton("Name", .name)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 sortButton("Size", .size)
-                    .frame(width: CategoryColumns.size, alignment: .trailing)
+                    .frame(width: ColumnRegistry.spec(.size).width, alignment: .trailing)
                 sortButton("Modified", .modified)
-                    .frame(width: CategoryColumns.modified, alignment: .trailing)
+                    .frame(width: ColumnRegistry.spec(.modified).width, alignment: .trailing)
                 Text("Risk")
-                    .frame(width: CategoryColumns.risk, alignment: .trailing)
+                    .frame(width: ColumnRegistry.spec(.risk).width, alignment: .trailing)
             }
             .font(Typography.caption)
             .pageHorizontalPadding()
@@ -169,12 +169,12 @@ struct CategoryDetailView: View {
             content: {
                 HStack(spacing: Spacing.s3) {
                     if item.risk == .informational {
-                        Color.clear.frame(width: CategoryColumns.mark)
+                        Color.clear.frame(width: ColumnRegistry.spec(.mark).width)
                     } else {
                         RowCheckbox(
                             isOn: model.isSelected(item.url),
                             label: "Remove \(item.url.lastPathComponent)",
-                            width: CategoryColumns.mark,
+                            width: ColumnRegistry.spec(.mark).width,
                             isEnabled: model.canSelect(item),
                             help: model.canSelect(item)
                                 ? "Remove"
@@ -182,15 +182,15 @@ struct CategoryDetailView: View {
                     }
                     ItemNameCell(item: item)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    SizeColumn(bytes: item.reclaimableBytes, width: CategoryColumns.size)
+                    SizeColumn(bytes: item.reclaimableBytes, width: ColumnRegistry.spec(.size).width)
                     Text(item.stamp.modified, format: .relative(presentation: .named))
                         .font(Typography.row)
                         .foregroundStyle(Theme.inkSecondary)
                         .lineLimit(1)
                         .help(item.stamp.modified.formatted(date: .long, time: .shortened))
-                        .frame(width: CategoryColumns.modified, alignment: .trailing)
+                        .frame(width: ColumnRegistry.spec(.modified).width, alignment: .trailing)
                     riskLabel(item)
-                        .frame(width: CategoryColumns.risk, alignment: .trailing)
+                        .frame(width: ColumnRegistry.spec(.risk).width, alignment: .trailing)
                 }
                 .contextMenu {
                     Button("Reveal in Finder") {
@@ -224,11 +224,4 @@ struct CategoryDetailView: View {
 
 private enum CategorySort {
     case name, size, modified
-}
-
-private enum CategoryColumns {
-    static let mark: CGFloat = 20
-    static let size: CGFloat = 90
-    static let modified: CGFloat = 140
-    static let risk: CGFloat = 110
 }
