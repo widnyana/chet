@@ -78,7 +78,7 @@ A ledger row size is `row`, in `ink`.
 
 Base unit: 4 pt.
 
-Layout spacing uses 4, 8, 12, 16, 24, 32, 40, 48. Inside one component, 0, 1,
+Layout spacing uses 4, 8, 12, 16, 24, 32, 48. Inside one component, 0, 1,
 and 2 are allowed for hairline alignment and optical pairs. They are never page
 rhythm and never separate sections.
 
@@ -90,7 +90,6 @@ rhythm and never separate sections.
 | `space4` | 16 | Card-less section padding |
 | `space6` | 24 | Stack spacing and panel padding inside a page |
 | `space8` | 32 | Between major page blocks |
-| `space10` | 40 | Between the capacity hero and the ledger |
 | `space12` | 48 | Onboarding page padding |
 
 Page content width: 880 pt maximum, centered above 1100 pt. Not implemented: the code
@@ -101,14 +100,13 @@ sets no content-width cap. At the minimum window of 960 x 632, the page margin i
 
 | Token | Value | Use |
 |---|---|---|
-| `radiusNone` | 0 | Pages, sections, command bars, tables |
-| `radiusControl` | 6 | Buttons, fields, checkboxes (native) |
-| `radiusMedia` | 8 | Photo and video thumbnails, Settings panels |
-| `radiusSheet` | 0 | Sheets use the system shape |
+| `controlRadius` | 6 | Buttons, fields, checkboxes, ledger boxes |
+| `panelRadius` | 8 | Photo and video thumbnails, Settings panels |
 
 No pill shapes. A capsule is reserved for a macOS system control that already
 ships as a capsule (for example the search field), not for app-created badges.
-No radius outside 0, 6, and 8. A 1 or 3 pt radius is a drift, not a style.
+No radius outside 0, 6, and 8. A flat surface uses 0 directly: pages, sections,
+command bars, tables, and sheets. A 1 or 3 pt radius is a drift, not a style.
 
 ## Elevation
 
@@ -121,7 +119,8 @@ No custom shadows. The only glass is the system Liquid Glass on window chrome.
 Content never gets glass. The sidebar and sheet surfaces use the native material.
 The command bar is a custom bar registered with `safeAreaBar`, so it gets the
 system scroll edge effect instead of a painted background. The app icon is the
-only place with a gradient.
+only place with a gradient. `pageSurface()` resolves to the page surface,
+`Theme.paper`; the page frame or the sheet body applies it.
 
 ## Motion
 

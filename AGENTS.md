@@ -22,7 +22,7 @@ Trash, or restarts an app. Build the gate into the test, not around it:
 
 - Launch the test copy with `open -n --env DRY_RUN=1 <app>`. Do not rely on the repo `.env`:
   a copied app outside the repo does not walk up to it.
-- Expect `Preview only. Nothing will be removed.` on Home and
+- Expect `Preview only. Nothing is changed.` on Home and
   `Preview only. No tweak is changed.` on Tweaks.
 - Every tweak control must report `enabled: false`. A press on a disabled control is a no-op;
   verify the underlying key did not change.

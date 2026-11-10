@@ -305,6 +305,43 @@ action.
 - The component absorbs the five inline gate rows, or `StatusStrip` replaces it
   at those sites. A page-level gate lives in the top strip, not in an inline row.
 
+## PreviewCopy
+
+- Five verbs, one owner each: `statement` (`Preview only. Nothing is changed.`),
+  `removals` (`Preview only. Nothing will be removed.`), `moves` (`Preview only.
+  Nothing will be moved.`), `installs` (`Preview only. Nothing will be
+  installed.`), and `tweaks`, consumed from `TweakError.gatedCopy`.
+- A view prints the verb for its surface; it never retypes the sentence.
+- The tweak sentence stays owned by ChetCore because the engine, not the view,
+  decides gating.
+
+## RowCheckbox
+
+- One checkbox: `isOn`, `label`, optional `width`, `isEnabled`, `help`, and
+  `identifier`.
+- `init(identifier:isOn:label:)` makes the identifier a required argument of
+  the adopted form. The identifier lands on the `Toggle` itself, never on a
+  wrapper.
+- The memberwise form stays available for a row that carries no identifier.
+
+## ColumnRegistry
+
+- Roles: `mark`, `icon`, `name`, `location`, `version`, `size`, `status`, `age`,
+  `local`, `kind`, `modified`, `risk`.
+- Widths: shared roles take the widest current definition (`mark` 20, `icon` 22,
+  `name` flex at 0, `location` 140, `version` 80, `size` 90, `status` 118).
+  Table-only roles keep their own value (`age` 140, `local` 110, `kind` 140,
+  `modified` 140, `risk` 110).
+- Widest-wins for a shared role; a table does not override a width.
+- `spacing` is `Spacing.s3`; `headerHeight` is `Metrics.tableHeaderHeight`.
+
+## SortColumnButton
+
+- One sortable label: caption text plus a chevron at `Metrics.chevronIconSize`
+  (8), hidden when the column is inactive.
+- The whole label takes the focus ring and hit shape; the arrow is not a second
+  control.
+
 ## Toolbar scan control
 
 Shown on category, Snapshots, and Storage. Home owns scan in its command bar;

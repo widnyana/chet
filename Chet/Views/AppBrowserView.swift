@@ -447,9 +447,9 @@ private struct AppCell: View {
                 })
         }
         .padding(Spacing.s3)
-        .background(Theme.paperRaised, in: .rect(corners: .fixed(Metrics.innerRadius)))
+        .background(Theme.paperRaised, in: .rect(corners: .fixed(Metrics.controlRadius)))
         .overlay {
-            RoundedRectangle(cornerRadius: Metrics.innerRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous)
                 .strokeBorder(
                     marked ? Theme.accent : (hovering ? Theme.inkTertiary : Theme.hairline),
                     lineWidth: marked ? 2 : 1)

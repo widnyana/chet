@@ -7,6 +7,10 @@ import SwiftUI
 /// Mode copy. One sentence, read by the page frame, so no screen writes its own variant.
 enum PreviewCopy {
     static let statement = "Preview only. Nothing is changed."
+    static let removals = "Preview only. Nothing will be removed."
+    static let moves = "Preview only. Nothing will be moved."
+    static let installs = "Preview only. Nothing will be installed."
+    static let tweaks = TweakError.gatedCopy
 }
 
 enum Typography {
@@ -33,7 +37,6 @@ enum Spacing {
     static let s4: CGFloat = 16
     static let s6: CGFloat = 24
     static let s8: CGFloat = 32
-    static let s10: CGFloat = 40
     static let s12: CGFloat = 48
 }
 
@@ -47,7 +50,6 @@ enum Metrics {
     /// Controls use one radius and one height so every primary action matches.
     static let controlRadius: CGFloat = 6
     static let panelRadius: CGFloat = 8
-    static let innerRadius: CGFloat = 6
     static let controlMinWidth: CGFloat = 96
     static let statusStripHeight: CGFloat = 48
     static let capacityBarHeight: CGFloat = 10
@@ -540,7 +542,7 @@ struct IconActionButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(Typography.row)
+                .font(Typography.iconAction)
                 .foregroundStyle(isEnabled ? Theme.inkSecondary : Theme.inkTertiary)
         }
         .buttonStyle(.plain)
@@ -665,6 +667,27 @@ struct RowCheckbox: View {
     var help: String?
     var identifier: String?
 
+    init(
+        isOn: Binding<Bool>, label: String, width: CGFloat? = nil,
+        isEnabled: Bool = true, help: String? = nil, identifier: String? = nil
+    ) {
+        _isOn = isOn
+        self.label = label
+        self.width = width
+        self.isEnabled = isEnabled
+        self.help = help
+        self.identifier = identifier
+    }
+
+    init(
+        identifier: String, isOn: Binding<Bool>, label: String,
+        width: CGFloat? = nil, isEnabled: Bool = true, help: String? = nil
+    ) {
+        self.init(
+            isOn: isOn, label: label, width: width,
+            isEnabled: isEnabled, help: help, identifier: identifier)
+    }
+
     var body: some View {
         Toggle("", isOn: $isOn)
             .toggleStyle(.checkbox)
@@ -785,6 +808,41 @@ struct LoadingStateView: View {
 /// scroll view, so the first row sits directly under it instead of a dead band, and the header
 /// stays visible while the list scrolls. The header and each row own their horizontal margin,
 /// which keeps a column label over its cells.
+enum ColumnRole {
+    case mark, icon, name, location, version, size, status, age, local, kind, modified, risk
+}
+
+struct ColumnSpec {
+    let width: CGFloat
+    let alignment: HorizontalAlignment
+}
+
+enum ColumnRegistry {
+    static let spacing = Spacing.s3
+    static let headerHeight = Metrics.tableHeaderHeight
+
+    static func spec(_ role: ColumnRole) -> ColumnSpec {
+        switch role {
+        case .mark: ColumnSpec(width: 20, alignment: .leading)
+        case .icon: ColumnSpec(width: 22, alignment: .leading)
+        case .name: ColumnSpec(width: 0, alignment: .leading)
+        case .location: ColumnSpec(width: 140, alignment: .leading)
+        case .version: ColumnSpec(width: 80, alignment: .leading)
+        case .size: ColumnSpec(width: 90, alignment: .trailing)
+        case .status: ColumnSpec(width: 118, alignment: .leading)
+        case .age: ColumnSpec(width: 140, alignment: .trailing)
+        case .local: ColumnSpec(width: 110, alignment: .leading)
+        case .kind: ColumnSpec(width: 140, alignment: .leading)
+        case .modified: ColumnSpec(width: 140, alignment: .leading)
+        case .risk: ColumnSpec(width: 110, alignment: .leading)
+        }
+    }
+}
+
+/// One scrolling table: a pinned column header over the rows. The header lives inside the
+/// scroll view, so the first row sits directly under it instead of a dead band, and the header
+/// stays visible while the list scrolls. The header and each row own their horizontal margin,
+/// which keeps a column label over its cells.
 struct ColumnTable<Item: Identifiable, Header: View, Row: View>: View {
     let items: [Item]
     @ViewBuilder let header: Header
@@ -801,7 +859,9 @@ struct ColumnTable<Item: Identifiable, Header: View, Row: View>: View {
                         }
                     }
                 } header: {
-                    header.background(Theme.paperRaised)
+                    header
+                        .frame(height: ColumnRegistry.headerHeight)
+                        .background(Theme.paperRaised)
                 }
             }
         }
@@ -1013,9 +1073,5 @@ extension View {
 
     func focusRing() -> some View {
         modifier(FocusRing())
-    }
-
-    func sheetSurface() -> some View {
-        background(Theme.paper)
     }
 }

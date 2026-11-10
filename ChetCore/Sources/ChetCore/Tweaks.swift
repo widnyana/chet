@@ -375,6 +375,8 @@ public enum TweakError: Error, Equatable {
 }
 
 extension TweakError {
+    public static let gatedCopy = "Preview only. No tweak is changed."
+
     public var message: String {
         switch self {
         case .unsupported(let text): text
@@ -382,7 +384,7 @@ extension TweakError {
         case .confirmationRequired(let text): text
         case .commandFailed(let text): text
         case .verificationFailed(let text): text
-        case .gated: "Preview only. No tweak is changed."
+        case .gated: Self.gatedCopy
         case .inspectionOnly: "This is a read-only check. Open System Settings to change it."
         }
     }

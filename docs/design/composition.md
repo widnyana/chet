@@ -164,16 +164,17 @@ Use these before writing a view:
 | Table surface | `ColumnTable` |
 | Sortable column label | `SortColumnButton` |
 | Bottom action bar | `CommandBar` + `safeAreaBar` |
-| Dry-run gate | `PageScreen` prints `Preview only. Nothing is changed.` once, at the foot of every page. Settings keeps `PreviewNotice` |
+| Dry-run gate | `PreviewCopy` supplies the verb for its surface; `PreviewNotice` renders an inline row. A page-level gate lives in `TopStatusStrip` |
 | Short status | `StatusLabel` |
 | Empty, loading, error | `EmptyStateView`, `LoadingStateView`, `ErrorStateView` |
 | Primary, secondary, destructive action | `PrimaryActionButton`, `SecondaryActionButton`, `DestructiveActionButton` |
 | Icon action | `IconActionButton` |
 | Clickable row, tile, glyph, or crumb | `RowActionButton` |
 | Table row shell: height, inset, wash, open gesture | `TableRow` |
-| Row remove checkbox | `RowCheckbox` |
+| Column widths and alignment | `ColumnRegistry` |
+| Row remove checkbox | `RowCheckbox`, identifier on the control |
 | Size column | `SizeColumn` |
-| Sheet shell | `SheetFrame` |
+| Sheet shell | `SheetFrame`; `SheetLedgerBox` for the ledger body |
 | Capacity bar | `CapacityBarView` |
 | Page margin | `pageHorizontalPadding()` |
 | Focus ring | `focusRing()` |
