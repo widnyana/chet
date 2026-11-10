@@ -62,6 +62,7 @@ The frame owns:
   ink. Not a strip, not a per-page label.
 
 Tables, empty, loading and error states use the same margin as the content.
+The app detail composes `PageScreen(scrolls: false)`; it never hand-builds its frame.
 Settings and About are separate windows; they keep their own fixed margins.
 
 ## Table row
@@ -481,6 +482,8 @@ Grid cell:
 - The running state is a text label `Running`, not a dot.
 - The admin state is a `lock.fill` icon with a help tooltip.
 - Clicking the cell opens the detail. The checkbox marks for bulk removal.
+- Selection is a `RowCheckbox`; `apps.select.<id>` lands on the control. `<id>` is
+  the bundle identifier, else the app file name, lowercase.
 
 ## AppRow
 

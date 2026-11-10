@@ -386,18 +386,17 @@ private struct AppCell: View {
 
     private var marked: Bool { model.markedApps.contains(app.url) }
 
+    private var identity: String {
+        (app.bundleID ?? app.url.deletingPathExtension().lastPathComponent).lowercased()
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             HStack(spacing: Spacing.s2) {
-                Toggle(
-                    "Select to remove",
-                    isOn: Binding(
-                        get: { marked },
-                        set: { _ in model.toggleMark(app) })
-                )
-                .toggleStyle(.checkbox)
-                .labelsHidden()
-                .accessibilityLabel("Select \(app.name) to remove")
+                RowCheckbox(
+                    identifier: "apps.select.\(identity)",
+                    isOn: Binding(get: { marked }, set: { _ in model.toggleMark(app) }),
+                    label: "Select \(app.name) to remove")
                 Spacer()
                 if model.isAppRunning(app) {
                     StatusLabel(text: "Running", systemImage: "bolt.fill", tone: .amber)

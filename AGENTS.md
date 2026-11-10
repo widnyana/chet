@@ -76,7 +76,8 @@ Identifiers are `screen.element` (`.accessibilityIdentifier` next to `.accessibi
 List them with `dump`; `python3 scripts/ui_selectors.py --pid <pid> --screen <name>` saves a map
 to `docs/ui-selectors.json` (generated, gitignored, do not hand-edit). A tweak row puts
 `tweak.details.<tweak id>` on the details control; the `info.circle` description match is
-retired there.
+retired there. An app cell puts `apps.select.<id>` on its checkbox; `<id>` is the bundle
+identifier, else the app file name, lowercase.
 
 What costs time:
 

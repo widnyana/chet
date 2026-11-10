@@ -10,43 +10,45 @@ struct AppCleanerDetailView: View {
 
     var body: some View {
         @Bindable var model = model
-        VStack(spacing: 0) {
-            PageHeader(
-                title: app.name,
-                subtitle: subtitle,
-                metric: model.appBytes.formatted(.byteCount(style: .file)),
-                metricLabel: "app size",
-                icon: IconCache.icon(for: app.url)
-            )
-            .pageHorizontalPadding()
-            .padding(.top, Spacing.s6)
-            .padding(.bottom, Spacing.s3)
-            details
-            if model.isRunning {
-                warningRow("Running. Quit it before removing.", icon: "bolt.fill", tone: .amber)
-            }
-            if !app.isWritable {
-                warningRow(
-                    "Needs administrator. Chet cannot move this app.", icon: "lock.fill", tone: .amber)
-            }
-            appBundleRow(selected: $model.appSelected)
-            if model.isLoadingDetail {
-                LoadingStateView(message: "Looking for related files")
-                    .pageHorizontalPadding()
-                Spacer()
-            } else if model.components.isEmpty {
-                EmptyStateView(
-                    title: "No related files",
-                    message: "The app bundle can still be removed."
+        PageScreen(
+            scrolls: false,
+            header: {
+                PageHeader(
+                    title: app.name,
+                    subtitle: subtitle,
+                    metric: model.appBytes.formatted(.byteCount(style: .file)),
+                    metricLabel: "app size",
+                    icon: IconCache.icon(for: app.url)
                 )
-                .pageHorizontalPadding()
-            } else {
-                relatedFiles
-            }
-        }
-        .background(Theme.paper)
-        .backgroundExtensionEffect()
-        .safeAreaBar(edge: .bottom) { commandBar }
+            },
+            subHeader: { EmptyView() },
+            content: {
+                details
+                if model.isRunning {
+                    warningRow("Running. Quit it before removing.", icon: "bolt.fill", tone: .amber)
+                }
+                if !app.isWritable {
+                    warningRow(
+                        "Needs administrator. Chet cannot move this app.", icon: "lock.fill",
+                        tone: .amber)
+                }
+                appBundleRow(selected: $model.appSelected)
+                if model.isLoadingDetail {
+                    LoadingStateView(message: "Looking for related files")
+                        .pageHorizontalPadding()
+                    Spacer()
+                } else if model.components.isEmpty {
+                    EmptyStateView(
+                        title: "No related files",
+                        message: "The app bundle can still be removed."
+                    )
+                    .pageHorizontalPadding()
+                } else {
+                    relatedFiles
+                }
+            },
+            bar: { commandBar }
+        )
         .sheet(
             isPresented: Binding(
                 get: { model.showConfirm && model.selectedApp != nil },
