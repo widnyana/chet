@@ -49,29 +49,35 @@ struct DiskMapView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            pageHeader
-            StorageLocationBar(
-                pathNodes: pathNodes,
-                volume: volume,
-                sizeBasis: model.treeSizeBasis,
-                onSelect: { index in
-                    // `pathNodes` is the root plus one node per stack entry: crumb `index`
-                    // means the stack keeps exactly its first `index` entries.
-                    stack = StoragePath.trimmed(stack, to: index)
-                    hovered = nil
-                })
-            metricsRow
-            bodyContent
-            if model.isScanning {
-                progressPanel
+        PageScreen(
+            scrolls: false,
+            header: { pageHeader },
+            subHeader: {
+                StorageLocationBar(
+                    pathNodes: pathNodes,
+                    volume: volume,
+                    sizeBasis: model.treeSizeBasis,
+                    onSelect: { index in
+                        // `pathNodes` is the root plus one node per stack entry: crumb `index`
+                        // means the stack keeps exactly its first `index` entries.
+                        stack = StoragePath.trimmed(stack, to: index)
+                        hovered = nil
+                    })
+                metricsRow
+            },
+            content: { bodyContent },
+            bar: {
+                VStack(spacing: 0) {
+                    if let trashReport, !trashReport.moved.isEmpty || !trashReport.failed.isEmpty {
+                        trashNotice(trashReport)
+                    }
+                    if model.isScanning {
+                        progressPanel
+                    }
+                    commandBar
+                }
             }
-            if let trashReport, !trashReport.moved.isEmpty || !trashReport.failed.isEmpty {
-                trashNotice(trashReport)
-            }
-        }
-        .background(Theme.paper)
-        .safeAreaBar(edge: .bottom) { commandBar }
+        )
         .sheet(item: $trashRequest) { request in
             StorageTrashSheet(entries: request.entries, onConfirm: performTrash)
         }
@@ -120,9 +126,6 @@ struct DiskMapView: View {
             metricLabel: current == nil ? nil : "in this folder"
         )
         .accessibilityIdentifier("storage.header")
-        .pageHorizontalPadding()
-        .padding(.top, Spacing.s6)
-        .padding(.bottom, Spacing.s3)
     }
 
     private var largeCategory: CategoryState? {
@@ -140,13 +143,13 @@ struct DiskMapView: View {
             largeFilesBytes: largeCategory?.bytes,
             largeFilesCount: largeCategory?.items.count,
             didFinishScan: model.didFinishScan,
+            isScanning: model.isScanning,
             onScan: { model.scan() },
             onOpenFindings: { destination = "overview" },
             onOpenLargeFiles: {
                 if largeCategory != nil { destination = "large-files" }
             }
         )
-        .padding(.bottom, Spacing.s4)
     }
 
     // MARK: - Body
@@ -232,7 +235,6 @@ struct DiskMapView: View {
         .accessibilityHint("Click a block to open that folder. Check a row to collect it.")
         .clipShape(.rect(corners: .fixed(Metrics.panelRadius)))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .frame(minHeight: 320)
         .overlay(alignment: .bottomLeading) {
             if let hovered {
                 HStack(spacing: Spacing.s2) {
@@ -382,59 +384,55 @@ struct DiskMapView: View {
     /// Bottom section: everything the scan is doing right now, in one strip. Text-only,
     /// so its per-tick updates never relayout the Metal canvas above.
     private var progressPanel: some View {
-        VStack(spacing: 0) {
-            Hairline()
-            VStack(alignment: .leading, spacing: Spacing.s2) {
-                HStack(spacing: Spacing.s2) {
-                    if let activity = model.activity {
-                        Text(headline(activity))
-                            .font(Typography.section)
-                            .monospacedDigit()
-                            .foregroundStyle(Theme.ink)
-                            .lineLimit(1)
-                        Spacer()
-                        if let snap = model.rootsProgress {
-                            Text("\(snap.files) files · \(snap.bytes.formatted(.byteCount(style: .file)))")
-                                .font(Typography.caption)
-                                .monospacedDigit()
-                                .foregroundStyle(Theme.inkSecondary)
-                        }
-                    } else {
-                        ActivitySpinner()
-                        Text(model.currentStep.map { ScanStepCopy.title($0) } ?? "Starting scan")
-                            .font(Typography.section)
-                            .foregroundStyle(Theme.ink)
-                    }
-                }
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            HStack(spacing: Spacing.s2) {
                 if let activity = model.activity {
-                    Group {
-                        if activity.total > activity.done, activity.total > 0 {
-                            ProgressView(value: Double(activity.done), total: Double(activity.total))
-                        } else {
-                            ProgressView()
-                        }
-                    }
-                    .progressViewStyle(.linear)
-                    .tint(Theme.accent)
-                }
-                HStack(spacing: Spacing.s2) {
+                    Text(headline(activity))
+                        .font(Typography.section)
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.ink)
+                        .lineLimit(1)
                     Spacer()
-                    SecondaryActionButton(
-                        title: "Pause", isEnabled: !model.isPaused,
-                        action: { model.togglePause() }
-                    )
-                    .accessibilityIdentifier("storage.pause")
-                    SecondaryActionButton(
-                        title: "Resume", isEnabled: model.isPaused,
-                        action: { model.togglePause() }
-                    )
-                    .accessibilityIdentifier("storage.resume")
+                    if let snap = model.rootsProgress {
+                        Text("\(snap.files) files · \(snap.bytes.formatted(.byteCount(style: .file)))")
+                            .font(Typography.caption)
+                            .monospacedDigit()
+                            .foregroundStyle(Theme.inkSecondary)
+                    }
+                } else {
+                    ActivitySpinner()
+                    Text(model.currentStep.map { ScanStepCopy.title($0) } ?? "Starting scan")
+                        .font(Typography.section)
+                        .foregroundStyle(Theme.ink)
                 }
             }
-            .pageHorizontalPadding()
-            .padding(.vertical, Spacing.s2)
-            .background(Theme.paper)
+            if let activity = model.activity {
+                Group {
+                    if activity.total > activity.done, activity.total > 0 {
+                        ProgressView(value: Double(activity.done), total: Double(activity.total))
+                    } else {
+                        ProgressView()
+                    }
+                }
+                .progressViewStyle(.linear)
+                .tint(Theme.accent)
+            }
+            HStack(spacing: Spacing.s2) {
+                Spacer()
+                SecondaryActionButton(
+                    title: "Pause", isEnabled: !model.isPaused,
+                    action: { model.togglePause() }
+                )
+                .accessibilityIdentifier("storage.pause")
+                SecondaryActionButton(
+                    title: "Resume", isEnabled: model.isPaused,
+                    action: { model.togglePause() }
+                )
+                .accessibilityIdentifier("storage.resume")
+            }
         }
+        .pageHorizontalPadding()
+        .padding(.vertical, Spacing.s2)
     }
 
     /// "<phase title>" plus its fraction when the phase knows one.

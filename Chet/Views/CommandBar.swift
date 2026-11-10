@@ -23,44 +23,41 @@ struct CommandBar: View {
     let action: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
-            Hairline()
-            HStack(spacing: Spacing.s4) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(metric)
-                        .font(Typography.metric)
-                        .monospacedDigit()
-                        .foregroundStyle(Theme.ink)
-                        .lineLimit(1)
-                    Text(detail)
-                        .font(Typography.caption)
-                        .foregroundStyle(Theme.inkSecondary)
-                        .lineLimit(1)
-                }
-                Spacer(minLength: Spacing.s3)
-                if !isEnabled || isWorking, let disabledReason {
-                    Text(disabledReason)
-                        .font(Typography.caption)
-                        .foregroundStyle(Theme.inkSecondary)
-                        .lineLimit(1)
-                }
-                if isWorking {
-                    ActivitySpinner()
-                }
-                if let secondaryTitle, let secondaryAction {
-                    SecondaryActionButton(
-                        title: secondaryTitle, isEnabled: isSecondaryEnabled,
-                        action: secondaryAction
-                    )
-                    .modifier(OptionalAccessibilityIdentifier(identifier: secondaryIdentifier))
-                }
-                primaryButton
-                    .modifier(OptionalAccessibilityIdentifier(identifier: primaryIdentifier))
+        HStack(spacing: Spacing.s4) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(metric)
+                    .font(Typography.metric)
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.ink)
+                    .lineLimit(1)
+                Text(detail)
+                    .font(Typography.caption)
+                    .foregroundStyle(Theme.inkSecondary)
+                    .lineLimit(1)
             }
-            .pageHorizontalPadding()
-            .padding(.vertical, Spacing.s3)
-            .frame(minHeight: Metrics.commandBarMinHeight)
+            Spacer(minLength: Spacing.s3)
+            if !isEnabled || isWorking, let disabledReason {
+                Text(disabledReason)
+                    .font(Typography.caption)
+                    .foregroundStyle(Theme.inkSecondary)
+                    .lineLimit(1)
+            }
+            if isWorking {
+                ActivitySpinner()
+            }
+            if let secondaryTitle, let secondaryAction {
+                SecondaryActionButton(
+                    title: secondaryTitle, isEnabled: isSecondaryEnabled,
+                    action: secondaryAction
+                )
+                .modifier(OptionalAccessibilityIdentifier(identifier: secondaryIdentifier))
+            }
+            primaryButton
+                .modifier(OptionalAccessibilityIdentifier(identifier: primaryIdentifier))
         }
+        .pageHorizontalPadding()
+        .padding(.vertical, Spacing.s3)
+        .frame(minHeight: Metrics.commandBarMinHeight)
     }
 
     @ViewBuilder private var primaryButton: some View {

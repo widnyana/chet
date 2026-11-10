@@ -1,7 +1,13 @@
 import AppKit
+import ChetCore
 import SwiftUI
 
 // MARK: - Tokens
+
+/// Mode copy. One sentence, read by the page frame, so no screen writes its own variant.
+enum PreviewCopy {
+    static let statement = "Preview only. Nothing is changed."
+}
 
 enum Typography {
     static let display = Font.system(size: 34, weight: .semibold)
@@ -34,7 +40,6 @@ enum Spacing {
 enum Metrics {
     static let pageMargin: CGFloat = 24
     static let widePageMargin: CGFloat = 32
-    static let contentMaxWidth: CGFloat = 880
     static let gridCellMinWidth: CGFloat = 164
     static let rowHeight: CGFloat = 40
     static let commandBarMinHeight: CGFloat = 56
@@ -162,29 +167,24 @@ struct StatusStrip: View {
     var tone: StatusTone = .neutral
     var action: Action? = nil
     var dismiss: Dismiss? = nil
-    var showsHairline = true
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: Spacing.s3) {
-                StatusLabel(text: text, systemImage: systemImage, tone: tone)
-                Spacer(minLength: Spacing.s3)
-                if let action {
-                    SecondaryActionButton(
-                        title: action.title,
-                        accessibilityLabel: action.accessibilityLabel,
-                        action: action.perform)
-                }
-                if let dismiss {
-                    IconActionButton(systemImage: "xmark", label: dismiss.label, action: dismiss.perform)
-                }
+        HStack(spacing: Spacing.s3) {
+            StatusLabel(text: text, systemImage: systemImage, tone: tone)
+            Spacer(minLength: Spacing.s3)
+            if let action {
+                SecondaryActionButton(
+                    title: action.title,
+                    accessibilityLabel: action.accessibilityLabel,
+                    action: action.perform)
             }
-            .pageHorizontalPadding()
-            .padding(.vertical, Spacing.s3)
-            .frame(minHeight: 48)
-            .background(.bar)
-            if showsHairline { Hairline() }
+            if let dismiss {
+                IconActionButton(systemImage: "xmark", label: dismiss.label, action: dismiss.perform)
+            }
         }
+        .pageHorizontalPadding()
+        .padding(.vertical, Spacing.s3)
+        .frame(minHeight: 48)
     }
 }
 
@@ -216,23 +216,141 @@ struct PageHeader: View {
                     }
                 }
                 Spacer(minLength: Spacing.s3)
-                if let metric {
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text(metric)
-                            .font(Typography.display)
-                            .monospacedDigit()
-                            .foregroundStyle(Theme.ink)
-                            .lineLimit(1)
-                        if let metricLabel {
-                            Text(metricLabel)
-                                .font(Typography.caption)
-                                .foregroundStyle(Theme.inkSecondary)
-                        }
-                    }
+                // Always laid out, even without a number: a header that grows when a scan
+                // finishes moves every row below it, and the eye has to find the page again.
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(metric ?? " ")
+                        .font(Typography.display)
+                        .monospacedDigit()
+                        .foregroundStyle(metric == nil ? .clear : Theme.ink)
+                        .lineLimit(1)
+                    Text(metricLabel ?? " ")
+                        .font(Typography.caption)
+                        .foregroundStyle(metric == nil ? .clear : Theme.inkSecondary)
+                        .lineLimit(1)
                 }
+                .accessibilityHidden(metric == nil)
             }
             Hairline()
         }
+    }
+}
+
+/// One page frame for every destination. It owns the margin, the header position, the
+/// measure, the gap under the header, and the bottom inset; a screen supplies its slots
+/// and nothing else. Two screens therefore cannot drift apart, and a new screen cannot
+/// invent its own chrome.
+///
+/// The header is laid out at its natural height and never compressed, so an oversized
+/// body shrinks or clips instead of pushing the title under the titlebar.
+struct PageScreen<Header: View, SubHeader: View, Content: View, Bar: View>: View {
+    var scrolls: Bool
+    let header: Header
+    let subHeader: SubHeader
+    let content: Content
+    let bar: Bar
+
+    init(
+        scrolls: Bool = true,
+        @ViewBuilder header: () -> Header,
+        @ViewBuilder subHeader: () -> SubHeader,
+        @ViewBuilder content: () -> Content,
+        @ViewBuilder bar: () -> Bar
+    ) {
+        self.scrolls = scrolls
+        self.header = header()
+        self.subHeader = subHeader()
+        self.content = content()
+        self.bar = bar()
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: Spacing.s3) {
+                header
+                    .pageHorizontalPadding()
+                // A sub-header lays out full width: its own rows (breadcrumb, metrics)
+                // carry the page margin so they can also draw dividers edge to edge.
+                subHeader
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .layoutPriority(1)
+            .padding(.top, Spacing.s6)
+            .padding(.bottom, Spacing.s3)
+
+            if scrolls {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Spacing.s6) {
+                        content
+                    }
+                    .pageHorizontalPadding()
+                    .padding(.bottom, Spacing.s6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } else {
+                content
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .clipped()
+            }
+
+            // The frame states the app's mode once, for every destination. No screen repeats
+            // it, and no screen has to make room for a strip that pushes the page down.
+            if DryRun.enabled {
+                Text(PreviewCopy.statement)
+                    .font(Typography.caption)
+                    .foregroundStyle(Theme.inkTertiary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .pageHorizontalPadding()
+                    .padding(.top, Spacing.s1)
+            }
+
+            // A page without commands keeps the same usable height as one with them.
+            if Bar.self == EmptyView.self {
+                Color.clear.frame(height: Metrics.commandBarMinHeight)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(Theme.paper)
+        .backgroundExtensionEffect()
+        .safeAreaBar(edge: .bottom) { bar }
+    }
+}
+
+extension PageScreen where SubHeader == EmptyView, Bar == EmptyView {
+    init(
+        scrolls: Bool = true,
+        @ViewBuilder header: () -> Header,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.init(
+            scrolls: scrolls, header: header, subHeader: { EmptyView() },
+            content: content, bar: { EmptyView() })
+    }
+}
+
+extension PageScreen where SubHeader == EmptyView {
+    init(
+        scrolls: Bool = true,
+        @ViewBuilder header: () -> Header,
+        @ViewBuilder content: () -> Content,
+        @ViewBuilder bar: () -> Bar
+    ) {
+        self.init(
+            scrolls: scrolls, header: header, subHeader: { EmptyView() },
+            content: content, bar: bar)
+    }
+}
+
+extension PageScreen where Bar == EmptyView {
+    init(
+        scrolls: Bool = true,
+        @ViewBuilder header: () -> Header,
+        @ViewBuilder subHeader: () -> SubHeader,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.init(
+            scrolls: scrolls, header: header, subHeader: subHeader,
+            content: content, bar: { EmptyView() })
     }
 }
 

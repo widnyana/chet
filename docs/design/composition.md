@@ -46,10 +46,11 @@ Every content destination uses the page scaffold in
 The order is fixed:
 
 1. Toolbar items: native `ToolbarItem` only. No toolbar background.
-2. `PageHeader`: title, one-sentence subtitle, optional metric, hairline.
+2. `PageScreen` header slot: `PageHeader` with title, one-sentence subtitle,
+   optional metric, hairline.
 3. State: content, or exactly one of loading, empty, error, filtered empty.
 4. Inventory or content block.
-5. `CommandBar` through `safeAreaBar` when the page can act.
+5. `PageScreen` bar slot: `CommandBar` through `safeAreaBar` when the page can act.
 6. Sheets attach to the page that owns the action.
 
 Do not add a second header, a card wrapper around a table, or page-level
@@ -158,11 +159,12 @@ Use these before writing a view:
 
 | Need | Component |
 |---|---|
+| Page frame: margin, header position, scroll rhythm, bottom bar | `PageScreen` |
 | Page title and metric | `PageHeader` |
 | Table surface | `ColumnTable` |
 | Sortable column label | `SortColumnButton` |
 | Bottom action bar | `CommandBar` + `safeAreaBar` |
-| Dry-run gate | `PreviewNotice`, inside `TopStatusStrip` on a page or as one amber label in Settings |
+| Dry-run gate | `PageScreen` prints `Preview only. Nothing is changed.` once, at the foot of every page. Settings keeps `PreviewNotice` |
 | Short status | `StatusLabel` |
 | Empty, loading, error | `EmptyStateView`, `LoadingStateView`, `ErrorStateView` |
 | Primary, secondary, destructive action | `PrimaryActionButton`, `SecondaryActionButton`, `DestructiveActionButton` |

@@ -3,24 +3,18 @@ import ChetCore
 import SwiftUI
 @preconcurrency import UserNotifications
 
-/// One full-width strip under the toolbar for global states: dry run, limited
-/// access, and the scan result. It pushes content down; it never floats over it.
+/// One full-width strip under the toolbar for states the results depend on: limited
+/// access, and the scan result. Dry run lives in the toolbar, because it is a mode rather
+/// than a message. The strip pushes content down; it never floats over it.
 struct TopStatusStrip: View {
     @Environment(ScanModel.self) private var model
-    /// The page's dry-run gate sentence. Cleaning pages use the default.
-    var gateText = "Preview only. Nothing will be removed."
     /// Apps and Homebrew are not scan surfaces, so the finished-scan result never shows there.
     var showsScanResult = true
     @State private var finishedText: String?
 
     var body: some View {
         Group {
-            if DryRun.enabled {
-                StatusStrip(
-                    text: gateText,
-                    systemImage: "exclamationmark.triangle",
-                    tone: .amber)
-            } else if model.showsAccessBanner {
+            if model.showsAccessBanner {
                 accessStrip
             } else if let finishedText, showsScanResult {
                 StatusStrip(
@@ -29,6 +23,8 @@ struct TopStatusStrip: View {
                     dismiss: .init(label: "Dismiss", perform: { self.finishedText = nil }))
             }
         }
+        .background(Theme.paper)
+        .overlay(alignment: .bottom) { Hairline() }
         .modifier(ScanFinishedObserver(text: $finishedText))
     }
 
@@ -46,8 +42,7 @@ struct TopStatusStrip: View {
                     }),
                 dismiss: .init(
                     label: "Hide until the next launch",
-                    perform: { model.bannerDismissed = true }),
-                showsHairline: false)
+                    perform: { model.bannerDismissed = true }))
             if model.grantAttempts >= 2 {
                 Text("Chet may be listed twice in Full Disk Access. Remove the old entry.")
                     .font(Typography.caption)
@@ -56,7 +51,6 @@ struct TopStatusStrip: View {
                     .pageHorizontalPadding()
                     .padding(.vertical, Spacing.s2)
             }
-            Hairline()
         }
         .task {
             while !Task.isCancelled && model.showsAccessBanner {

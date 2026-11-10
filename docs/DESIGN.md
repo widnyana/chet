@@ -364,10 +364,12 @@ Rules:
 - `SectionHeader`: sentence-case title, optional text action, hairline.
 - `CapacityBar`: used, reclaimable, free, text legend.
 - `LedgerTable`: checkbox, name and location, size, modified, risk.
-- `CommandBar`: full width, top hairline, selection summary, one primary action.
+- `CommandBar`: full width, native glass bar, selection summary, one primary action.
 - `StatusLabel`: icon plus text, semantic color, no pill.
 - `EmptyState`: title, cause, next action.
-- `TopStatusStrip`: access, scan result, dry run. In flow, below the toolbar.
+- `PageScreen`: one page frame. Margin, header position, scroll rhythm, bottom bar.
+- `TopStatusStrip`: access and scan result. In flow, below the toolbar. Dry run is
+  one line at the foot of the page frame, not a strip.
 - `AppCell` and `AppRow`: flat surface, hairline, text statuses.
 - `OwnershipRow`: checkbox, name, location, plain ownership label.
 - `ConfirmationSheet` and `SummarySheet`: ledger sheets, no celebration.

@@ -19,7 +19,7 @@ struct ContentView: View {
             } else {
                 NavigationSplitView {
                     SidebarView(selection: $selection)
-                        .safeAreaInset(edge: .bottom, spacing: 0) {
+                        .safeAreaBar(edge: .bottom, spacing: 0) {
                             SidebarFooter()
                         }
                 } detail: {
@@ -28,9 +28,6 @@ struct ContentView: View {
                             // Tweaks owns its own gate and disables the cleaning strip.
                             if selection != "tweaks" {
                                 TopStatusStrip(
-                                    gateText: selection == "applications"
-                                        ? "Preview only. Nothing will be moved."
-                                        : "Preview only. Nothing will be removed.",
                                     showsScanResult: !["applications", "homebrew"].contains(selection ?? ""))
                             }
                         }

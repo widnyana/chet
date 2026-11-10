@@ -269,6 +269,9 @@ final class ScanModel {
     var bannerDismissed = false
 
     func scan() {
+        // A second trigger while the scan is running would restart it and throw away the
+        // progress the user is watching, so a running scan is never replaced.
+        guard !isScanning else { return }
         scanTask?.cancel()
         generation += 1
         let gen = generation

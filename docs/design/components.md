@@ -34,17 +34,35 @@ States:
 
 ## Page scaffold
 
-Every content destination uses the same scaffold.
+Every content destination wraps in `PageScreen`. A page supplies slots; it never
+places the chrome. That is the whole point: two screens cannot drift apart, and
+a new screen cannot invent its own margin.
 
-- Header: page margin, 24 pt from the top, 12 pt below the hairline.
-- Content: the same page margin. No fixed 24/32 literals at a call site; use
-  `pageHorizontalPadding()`.
-- Table: 32 pt header, 40 pt rows, one hairline under the header, row rules on
-  the same margin.
-- Empty, loading, and error states use the same margin as the content.
-- Bottom bars are custom bars via `safeAreaBar`, not `safeAreaInset` with a
-  painted fill.
-- Settings and About are separate windows; they keep their own fixed margins.
+```swift
+PageScreen(
+    scrolls: true,            // false for a table or a split surface
+    header: { PageHeader(…) },
+    subHeader: { … },         // optional: breadcrumb, metric row
+    content: { … },
+    bar: { CommandBar(…) }    // omit: the frame reserves the same bottom height
+)
+```
+
+The frame owns:
+
+- The page margin. No fixed 24/32 literals at a call site.
+- 24 pt from the top, then the header, 12 pt below the header block.
+- The header is laid out at its natural height and never compressed. An
+  oversized body shrinks or clips; it never pushes the title under the titlebar.
+- `PageHeader` keeps the metric slot at full height when the number is missing,
+  so a finished scan does not move the rows below it.
+- One scroll rhythm: `Spacing.s6` between content sections, `Spacing.s6` bottom.
+- The bottom bar through `safeAreaBar`, or the same inset when there is none.
+- `Preview only. Nothing is changed.` once, at the foot of the frame, in tertiary
+  ink. Not a strip, not a per-page label.
+
+Tables, empty, loading and error states use the same margin as the content.
+Settings and About are separate windows; they keep their own fixed margins.
 
 ## SectionHeader
 

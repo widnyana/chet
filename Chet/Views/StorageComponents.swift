@@ -87,6 +87,9 @@ struct StorageMetricsRow: View {
     let largeFilesBytes: Int64?
     let largeFilesCount: Int?
     let didFinishScan: Bool
+    /// Both unmeasured metrics offer the same command. While the scan runs, neither can
+    /// fire it again: the label states the state and the control is disabled.
+    var isScanning = false
     let onScan: () -> Void
     let onOpenFindings: () -> Void
     let onOpenLargeFiles: () -> Void
@@ -106,7 +109,10 @@ struct StorageMetricsRow: View {
             StorageMetric(
                 title: "Cleanable",
                 value: cleanable.map { $0.formatted(.byteCount(style: .file)) } ?? "-",
-                actionTitle: cleanable == nil ? "Scan for junk" : "View findings",
+                actionTitle: isScanning
+                    ? "Scanning"
+                    : (cleanable == nil ? "Scan for junk" : "View findings"),
+                isEnabled: !isScanning,
                 action: cleanable == nil ? onScan : onOpenFindings,
                 identifier: "storage.metric.cleanable"
             )
@@ -116,8 +122,11 @@ struct StorageMetricsRow: View {
                 title: "Large files",
                 value: largeFilesBytes.map { $0.formatted(.byteCount(style: .file)) } ?? "-",
                 detail: largeFilesCount.map { "\($0) files" },
-                actionTitle: largeFilesBytes == nil
-                    ? (didFinishScan ? nil : "Scan to measure") : "View list",
+                actionTitle: isScanning
+                    ? "Scanning"
+                    : (largeFilesBytes == nil
+                        ? (didFinishScan ? nil : "Scan to measure") : "View list"),
+                isEnabled: !isScanning,
                 action: largeFilesBytes == nil
                     ? (didFinishScan ? nil : onScan) : onOpenLargeFiles,
                 identifier: "storage.metric.largeFiles"
@@ -140,6 +149,7 @@ struct StorageMetric: View {
     let value: String
     var detail: String?
     var actionTitle: String?
+    var isEnabled = true
     var action: (() -> Void)?
     /// Lands on the control (the action button, or the value when there is no action),
     /// never on the container, so selectors stay unambiguous.
@@ -168,8 +178,10 @@ struct StorageMetric: View {
                         .lineLimit(1)
                 }
                 if let actionTitle, let action {
-                    QuietActionButton(title: actionTitle, action: action)
-                        .modifier(OptionalAccessibilityIdentifier(identifier: identifier))
+                    QuietActionButton(
+                        title: actionTitle, isEnabled: isEnabled, action: action
+                    )
+                    .modifier(OptionalAccessibilityIdentifier(identifier: identifier))
                 }
             }
         }

@@ -12,49 +12,50 @@ struct SnapshotsView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            PageHeader(
-                title: "Local snapshots",
-                subtitle: "macOS reports size only when deleted.",
-                metric: "\(model.snapshots.count)",
-                metricLabel: model.snapshots.count == 1 ? "snapshot" : "snapshots"
-            )
-            .pageHorizontalPadding()
-            .padding(.top, Spacing.s6)
-            .padding(.bottom, Spacing.s3)
-            if !model.snapshotErrors.isEmpty {
-                errorState
-            }
-            if model.snapshots.isEmpty {
-                if model.isScanning {
-                    LoadingStateView(message: "Checking snapshots")
-                        .pageHorizontalPadding()
-                } else {
-                    EmptyStateView(
-                        title: "No local snapshots",
-                        message: "Time Machine keeps them only while it has room.")
+        PageScreen(
+            scrolls: false,
+            header: {
+                PageHeader(
+                    title: "Local snapshots",
+                    subtitle: "macOS reports size only when deleted.",
+                    metric: "\(model.snapshots.count)",
+                    metricLabel: model.snapshots.count == 1 ? "snapshot" : "snapshots"
+                )
+            },
+            content: {
+                if !model.snapshotErrors.isEmpty {
+                    errorState
                 }
-            } else {
-                sectionHeader
-                table
+                if model.snapshots.isEmpty {
+                    if model.isScanning {
+                        LoadingStateView(message: "Checking snapshots")
+                            .pageHorizontalPadding()
+                    } else {
+                        EmptyStateView(
+                            title: "No local snapshots",
+                            message: "Time Machine keeps them only while it has room.")
+                    }
+                } else {
+                    sectionHeader
+                    table
+                }
+            },
+            bar: {
+                CommandBar(
+                    metric: "\(model.selectedSnapshots.count)",
+                    detail: model.selectedSnapshots.count == 1
+                        ? "1 snapshot selected"
+                        : "\(model.selectedSnapshots.count) snapshots selected",
+                    actionTitle: "Clean selected",
+                    actionSystemImage: "trash",
+                    isEnabled: !model.selectedSnapshots.isEmpty && !model.isCleaning,
+                    help: "Review and clean the selected snapshots",
+                    accessibilityLabel:
+                        "Clean selected, \(model.selectedSnapshots.count) snapshots",
+                    disabledReason: "Select a snapshot to clean.",
+                    action: onClean)
             }
-        }
-        .background(Theme.paper)
-        .backgroundExtensionEffect()
-        .safeAreaBar(edge: .bottom) {
-            CommandBar(
-                metric: "\(model.selectedSnapshots.count)",
-                detail: model.selectedSnapshots.count == 1
-                    ? "1 snapshot selected" : "\(model.selectedSnapshots.count) snapshots selected",
-                actionTitle: "Clean selected",
-                actionSystemImage: "trash",
-                isEnabled: !model.selectedSnapshots.isEmpty && !model.isCleaning,
-                help: "Review and clean the selected snapshots",
-                accessibilityLabel:
-                    "Clean selected, \(model.selectedSnapshots.count) snapshots",
-                disabledReason: "Select a snapshot to clean.",
-                action: onClean)
-        }
+        )
     }
 
     private var table: some View {

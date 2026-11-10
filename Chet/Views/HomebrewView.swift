@@ -10,23 +10,20 @@ struct HomebrewView: View {
 
     var body: some View {
         @Bindable var model = model
-        VStack(spacing: 0) {
-            PageHeader(
-                title: "Homebrew",
-                subtitle: subtitle
-            )
-            .accessibilityIdentifier("homebrew.header")
-            .pageHorizontalPadding()
-            .padding(.top, Spacing.s6)
-            .padding(.bottom, Spacing.s3)
-            content
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(Theme.paper)
-        .backgroundExtensionEffect()
+        PageScreen(
+            scrolls: false,
+            header: {
+                PageHeader(
+                    title: "Homebrew",
+                    subtitle: subtitle
+                )
+                .accessibilityIdentifier("homebrew.header")
+            },
+            content: { content },
+            bar: { commandBar }
+        )
         .onAppear { model.load() }
         .searchable(text: $query, placement: .toolbar, prompt: "Search packages")
-        .safeAreaBar(edge: .bottom) { commandBar }
         .sheet(isPresented: $model.showInstaller) {
             HomebrewInstallerSheet()
         }

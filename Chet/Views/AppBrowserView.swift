@@ -73,62 +73,60 @@ struct AppBrowserView: View {
 
     var body: some View {
         @Bindable var model = model
-        VStack(spacing: 0) {
-            PageHeader(
-                title: "Apps",
-                subtitle: subtitle,
-                metric: nil
-            )
-            .accessibilityIdentifier("apps.header")
-            .pageHorizontalPadding()
-            .padding(.top, Spacing.s6)
-            .padding(.bottom, Spacing.s3)
-            if model.isLoadingApps && model.apps.isEmpty {
-                LoadingStateView(message: "Reading applications")
-                    .pageHorizontalPadding()
-            } else if let error = model.loadError, model.apps.isEmpty {
-                ErrorStateView(
-                    title: "The applications folder could not be read.",
-                    message: "Check Full Disk Access, then reload.",
-                    actionTitle: "Reload",
-                    action: { model.load() }
+        PageScreen(
+            scrolls: false,
+            header: {
+                PageHeader(
+                    title: "Apps",
+                    subtitle: subtitle,
+                    metric: nil
                 )
-                .help(error)
-                .pageHorizontalPadding()
-            } else if model.apps.isEmpty {
-                noApps
+                .accessibilityIdentifier("apps.header")
+            },
+            content: {
+                if model.isLoadingApps && model.apps.isEmpty {
+                    LoadingStateView(message: "Reading applications")
+                        .pageHorizontalPadding()
+                } else if let error = model.loadError, model.apps.isEmpty {
+                    ErrorStateView(
+                        title: "The applications folder could not be read.",
+                        message: "Check Full Disk Access, then reload.",
+                        actionTitle: "Reload",
+                        action: { model.load() }
+                    )
+                    .help(error)
                     .pageHorizontalPadding()
-            } else if model.filteredApps.isEmpty {
-                EmptyStateView(
-                    title: "No application matches \"\(model.query)\"",
-                    message: "Clear the search to see all apps.",
-                    actionTitle: "Clear search",
-                    action: { model.query = "" }
-                )
-                .pageHorizontalPadding()
-            } else {
-                if let error = model.loadError {
-                    StatusLabel(
-                        text: "Some application folders could not be read.",
-                        systemImage: "exclamationmark.triangle",
-                        tone: .amber,
-                        help: error
+                } else if model.apps.isEmpty {
+                    noApps
+                        .pageHorizontalPadding()
+                } else if model.filteredApps.isEmpty {
+                    EmptyStateView(
+                        title: "No application matches \"\(model.query)\"",
+                        message: "Clear the search to see all apps.",
+                        actionTitle: "Clear search",
+                        action: { model.query = "" }
                     )
                     .pageHorizontalPadding()
-                    .padding(.bottom, Spacing.s2)
+                } else {
+                    if let error = model.loadError {
+                        StatusLabel(
+                            text: "Some application folders could not be read.",
+                            systemImage: "exclamationmark.triangle",
+                            tone: .amber,
+                            help: error
+                        )
+                        .pageHorizontalPadding()
+                        .padding(.bottom, Spacing.s2)
+                    }
+                    switch model.style {
+                    case .grid: grid
+                    case .list: list
+                    }
                 }
-                switch model.style {
-                case .grid: grid
-                case .list: list
-                }
-            }
-        }
-        .background(Theme.paper)
-        .backgroundExtensionEffect()
+            },
+            bar: { bulkBar }
+        )
         .searchable(text: $model.query, placement: .toolbar, prompt: "Search apps")
-        .safeAreaBar(edge: .bottom) {
-            bulkBar
-        }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Picker("Layout", selection: $model.style) {

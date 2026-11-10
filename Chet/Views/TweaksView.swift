@@ -11,26 +11,21 @@ struct TweaksView: View {
 
     var body: some View {
         @Bindable var model = model
-        ScrollView {
-            VStack(alignment: .leading, spacing: Spacing.s6) {
+        PageScreen(
+            header: {
                 PageHeader(
                     title: "Tweaks",
                     subtitle:
                         "Change how macOS behaves. Every change is recorded and can be reverted."
                 )
                 .accessibilityIdentifier("tweaks.header")
+            },
+            content: {
                 toolbar
                 notice
                 content
             }
-            .pageHorizontalPadding()
-            .padding(.top, Spacing.s6)
-            .padding(.bottom, Spacing.s6)
-            .frame(maxWidth: Metrics.contentMaxWidth, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .center)
-        }
-        .background(Theme.paper)
-        .backgroundExtensionEffect()
+        )
         .searchable(text: $model.query, placement: .toolbar, prompt: "Search tweaks")
         .task {
             if model.readings.isEmpty { await model.load() }

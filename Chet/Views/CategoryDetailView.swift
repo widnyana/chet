@@ -36,47 +36,48 @@ struct CategoryDetailView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            PageHeader(
-                title: CategoryCopy.title(category.id, fallback: category.title),
-                subtitle: riskSentence,
-                metric: category.bytes.formatted(.byteCount(style: .file)),
-                metricLabel: "can be reclaimed"
-            )
-            .pageHorizontalPadding()
-            .padding(.top, Spacing.s6)
-            .padding(.bottom, Spacing.s3)
-            if category.items.isEmpty {
-                EmptyStateView(
-                    title: "No entries in this category",
-                    message: "Scan again to look for new items.",
-                    actionIsPrimary: false,
-                    actionTitle: "Back to Home",
-                    action: onBack
+        PageScreen(
+            scrolls: false,
+            header: {
+                PageHeader(
+                    title: CategoryCopy.title(category.id, fallback: category.title),
+                    subtitle: riskSentence,
+                    metric: category.bytes.formatted(.byteCount(style: .file)),
+                    metricLabel: "can be reclaimed"
                 )
-                .pageHorizontalPadding()
-                Spacer()
-            } else {
-                if category.needsFullDiskAccess {
-                    StatusLabel(
-                        text: "Some folders need Full Disk Access",
-                        systemImage: "lock.fill",
-                        tone: .amber,
-                        help: "Chet could not read some folders in this category."
+            },
+            content: {
+                if category.items.isEmpty {
+                    EmptyStateView(
+                        title: "No entries in this category",
+                        message: "Scan again to look for new items.",
+                        actionIsPrimary: false,
+                        actionTitle: "Back to Home",
+                        action: onBack
                     )
                     .pageHorizontalPadding()
-                    .padding(.bottom, Spacing.s2)
-                }
-                ListHeaderBar(items: category.items)
-                if let groups = model.groups[category.id] {
-                    GroupedItemsView(groups: groups)
+                    Spacer()
                 } else {
-                    table
+                    if category.needsFullDiskAccess {
+                        StatusLabel(
+                            text: "Some folders need Full Disk Access",
+                            systemImage: "lock.fill",
+                            tone: .amber,
+                            help: "Chet could not read some folders in this category."
+                        )
+                        .pageHorizontalPadding()
+                        .padding(.bottom, Spacing.s2)
+                    }
+                    ListHeaderBar(items: category.items)
+                    if let groups = model.groups[category.id] {
+                        GroupedItemsView(groups: groups)
+                    } else {
+                        table
+                    }
                 }
-            }
-        }
-        .background(Theme.paper)
-        .backgroundExtensionEffect()
+            },
+            bar: { commandBar }
+        )
         .focusedValue(
             \.selectionActions,
             SelectionActions(
@@ -84,7 +85,6 @@ struct CategoryDetailView: View {
                 none: { model.setSelected(urls, false) },
                 invert: { model.invertSelection(urls) })
         )
-        .safeAreaBar(edge: .bottom) { commandBar }
     }
 
     private var riskSentence: String {

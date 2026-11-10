@@ -178,7 +178,7 @@ States:
   not installed"; that state names `brew` and opens Homebrew's site.
 - Error: the `brew` read failed. Name the failing command and offer `Reload`.
 - Outdated packages: a text label `Outdated`, never a colored pill.
-- Dry run: the top status strip shows `Preview only. Nothing will be removed.`
+- Dry run: the page frame prints `Preview only. Nothing is changed.` at its foot.
   The install sheet keeps `Preview only. Nothing will be installed.`
 
 ## App detail

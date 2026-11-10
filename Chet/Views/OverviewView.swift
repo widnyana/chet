@@ -9,21 +9,14 @@ struct OverviewView: View {
     let onClean: () -> Void
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Spacing.s6) {
-                pageHeader
+        PageScreen(
+            header: { pageHeader },
+            content: {
                 capacity
                 content
-            }
-            .pageHorizontalPadding()
-            .padding(.top, Spacing.s6)
-            .padding(.bottom, Spacing.s6)
-            .frame(maxWidth: Metrics.contentMaxWidth, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .center)
-        }
-        .background(Theme.paper)
-        .backgroundExtensionEffect()
-        .safeAreaBar(edge: .bottom) { commandBar }
+            },
+            bar: { commandBar }
+        )
     }
 
     private var pageHeader: some View {
