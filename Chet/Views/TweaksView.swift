@@ -36,7 +36,6 @@ struct TweaksView: View {
         .sheet(item: $model.pendingConfirmation) { pending in
             TweakConfirmView(pending: pending)
         }
-        .accessibilityIdentifier("tweaks.page")
     }
 
     private var toolbar: some View {
@@ -54,6 +53,7 @@ struct TweaksView: View {
                 .font(Typography.caption)
                 .monospacedDigit()
                 .foregroundStyle(Theme.inkSecondary)
+                .accessibilityIdentifier("tweaks.page")
             Spacer()
             QuietActionButton(
                 title: "Read again", help: "Read every value from macOS again"

@@ -274,10 +274,22 @@ struct PageHeader: View {
                         .foregroundStyle(metric == nil ? .clear : Theme.inkSecondary)
                         .lineLimit(1)
                 }
-                .accessibilityHidden(metric == nil)
             }
             Hairline()
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityText)
+        .accessibilityAddTraits(.isStaticText)
+    }
+
+    private var accessibilityText: String {
+        var parts = [title]
+        if let subtitle { parts.append(subtitle) }
+        if let metric {
+            parts.append(metric)
+            if let metricLabel { parts.append(metricLabel) }
+        }
+        return parts.joined(separator: ", ")
     }
 }
 
