@@ -102,6 +102,33 @@ bottom of **Folders** turns system cleanup on or off and sets how long each appr
 The **Storage** page shows which folders in your home folder take the most space. Click a
 folder to look inside. Pause and resume the scan from the page while it builds the map.
 
+## Go module cache
+
+The **Go** page shows the module cache that Go keeps for downloaded dependencies. The cache
+lives at the path Go reports for `GOMODCACHE`, usually `~/go/pkg/mod`. The page shows its
+location, size, module count, and the Go toolchain it found.
+
+**Remove module cache…** runs `go clean -modcache`. The next build downloads the modules
+again, so the first build after removal is slower and needs network access. Chet runs the Go
+command and never deletes cache files itself.
+
+With `DRY_RUN` set, the action is a preview. Chet reports the command it would run and removes
+nothing.
+
+## mise tools
+
+The **mise** page lists the tools declared in `~/.config/mise/config.toml`. Each row names a
+tool, the version the config requests, and whether that version is active, inactive, or not
+installed. A tool that mise has installed shows its install path. **Locations** shows the
+config file and mise's cache folder.
+
+The page only reads. Chet asks mise for its tool list and cache path, and never installs,
+removes, switches, or prunes a version. Nothing on the page changes your setup.
+
+Chet shows the page only when the config declares at least one tool and a mise binary is
+available at `~/.local/bin/mise` or on your `PATH`. Without both, the page stays out of the
+sidebar.
+
 ## Tweaks
 
 Tweaks changes macOS preferences that normally take a `defaults write` command or a hidden

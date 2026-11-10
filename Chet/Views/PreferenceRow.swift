@@ -91,6 +91,7 @@ struct DefinitionRow: View {
     let value: String
     var monospaced = false
     var labelWidth: CGFloat = 110
+    var identifier: String?
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: Spacing.s3) {
@@ -104,6 +105,7 @@ struct DefinitionRow: View {
                 .monospacedDigit()
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
+                .modifier(OptionalAccessibilityIdentifier(identifier: identifier))
             Spacer(minLength: 0)
         }
         .padding(.vertical, Spacing.s2)

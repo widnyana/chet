@@ -42,6 +42,8 @@ NavigationSplitView
       Apps
       Homebrew
       Storage
+      mise
+      Go
   Detail
     one destination at a time
 ```
@@ -49,10 +51,11 @@ NavigationSplitView
 - The sidebar is the route. The detail pane shows one destination.
 - Apps uses its own `NavigationStack` for the inventory and one app.
 - The toolbar carries Scan / Stop on every destination except Home, Apps,
-  Homebrew, and Tweaks.
+  Homebrew, mise, Go, and Tweaks.
 - Apps owns Search, Layout, and Reload. Homebrew owns Search and Reload.
-  Tweaks owns Search and Read again.
-- Tools has three destinations: Apps, Homebrew, and Storage. Configure has one,
+  mise and Tweaks own Read again.
+- Tools has five destinations: Apps, Homebrew, mise (only when its config
+  declares tools and the binary exists), Go, and Storage. Configure has one,
   Tweaks.
 - There are no mode tabs. Apps is a destination, not a mode.
 - About is not a destination. `Chet > About Chet` opens one fixed window,
@@ -248,6 +251,47 @@ error state with a retry, never an empty list. The dry-run gate on this page is
 `Preview only. Nothing will be removed.` The action menu's `Remove old versions…`
 opens a 520 pt sheet that lists `Old package versions` and `Download cache`, with
 Cancel as the default and a red `Remove`.
+
+### mise
+
+A read-only ledger for the tools declared in `~/.config/mise/config.toml`. The
+page and its sidebar row appear only when the config has a `[tools]` table with
+at least one tool and a mise binary resolves at `~/.local/bin/mise`, else the
+first executable `mise` on `PATH`. No scan control; the page owns `Read again`.
+
+The table is the config: `Tool`, `Requested`, `Status`, one row per declared
+version, sorted by name and then requested version. `Status` is `Active`,
+`Inactive`, or `Not installed` from `mise ls --json`. A resolved row shows its
+install path under the name; a declared tool with no resolved entry stays
+listed as `Not installed`.
+
+`Locations` holds the config path and the cache path from `mise cache path`.
+The cache row says `Unavailable` when that read fails. A failed `mise ls --json`
+is one amber status label above the table, and the declared rows stay.
+
+The page runs only `mise ls --json` and `mise cache path`. It never installs,
+uninstalls, switches, or prunes, so there is no confirmation and no dry-run
+gate.
+
+### Go
+
+A read-only ledger for the Go module cache. No scan control; the page owns
+Reload. Page header `Go`. The subtitle is `Measuring the module cache…` while it
+measures, `Go is not installed.` when no toolchain is found, `The module cache is
+empty.` when the cache holds nothing, and `Module cache · <size> · <n> modules`
+otherwise.
+
+Four rows: `Location`, `Size`, `Modules`, `Toolchain`. `Toolchain` shows the
+discovery source and the executable path. Two empty states: `Go is not installed`
+offers `Open go.dev`, and `The module cache is empty` offers `Reload`.
+
+The command bar reports the cache size and `Module cache`. It carries `Reload`
+and a red `Remove module cache…`, disabled until the cache holds bytes. The
+confirmation dialog names the size and says the next build downloads the modules
+again. The dry-run gate on this page is `Preview only. Nothing will be removed.`
+
+Removal runs `go clean -modcache` through the discovered binary. Chet never
+deletes cache files itself.
 
 ### App detail
 

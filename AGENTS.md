@@ -82,7 +82,20 @@ retired there. An app cell puts `apps.select.<id>` on its checkbox; `<id>` is th
 identifier, else the app file name, lowercase. Cleaner rows put `cleaner.select.<id>` on
 their checkbox and grouped rows and cards put `grouped.select.<id>`; `<id>` is the path
 relative to home, lowercase, with dots for `/`. The grouped list and card modes never
-render the same item at once.
+render the same item at once. `sidebar.go` selects Go; `go.header`, `go.reload`, `go.remove`,
+`go.confirm`, `go.cache-path`, `go.cache-size`, `go.module-count`, `go.toolchain` label header,
+reload, remove, confirm, location, size, modules, toolchain. The Go page never uses the root
+helper, and Go may come from Homebrew, mise, gvm, or a native install.
+`sidebar.mise` selects mise, and the row exists only when
+`~/.config/mise/config.toml` declares at least one tool in `[tools]` and a mise binary resolves.
+The config is checked first; then `~/.local/bin/mise` if it is an executable file, else the first
+executable `mise` on `PATH`. A missing config, a `[tools]` table with no tools, or a missing
+binary hides the row and the destination. `mise.header`, `mise.page`, `mise.refresh`,
+`mise.empty`, `mise.tool.<tool>.<version>`, `mise.config`, `mise.cache` label the header, the
+page root, `Read again`, the empty state, a tool row, the config path, and the cache path.
+`<tool>` and `<version>` are lowercased, and every character outside `[a-z0-9]` becomes `.`.
+The page is read-only: it runs `mise ls --json` and `mise cache path` only, so it needs no
+`DRY_RUN` gate.
 
 What costs time:
 

@@ -5,6 +5,7 @@ import SwiftUI
 /// the two tools. Apps is a destination, not a card on Home.
 struct SidebarView: View {
     @Environment(ScanModel.self) private var model
+    @Environment(MiseModel.self) private var mise
     @Binding var selection: String?
 
     var body: some View {
@@ -36,6 +37,10 @@ struct SidebarView: View {
                 row("applications", "Apps", symbol: "app.dashed")
                 row("disk-map", "Storage", symbol: "internaldrive")
                 row("homebrew", "Homebrew", symbol: "shippingbox")
+                if mise.isAvailable {
+                    row("mise", "mise", symbol: "shippingbox.and.arrow.backward")
+                }
+                row("go", "Go", symbol: "chevron.left.forwardslash.chevron.right")
             }
         }
         .listStyle(.sidebar)

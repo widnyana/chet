@@ -5,8 +5,10 @@ import SwiftUI
 struct ContentView: View {
     @Environment(ScanModel.self) private var model
     @Environment(TweaksModel.self) private var tweaks
+    @Environment(MiseModel.self) private var mise
     @State private var appCleaner = AppCleanerModel()
     @State private var homebrew = HomebrewModel()
+    @State private var goModules = GoModulesModel()
     @State private var selection: String? = "overview"
     @State private var confirming = false
     @State private var systemStatus = SystemStatusModel()
@@ -28,11 +30,11 @@ struct ContentView: View {
                             // Tweaks owns its own gate and disables the cleaning strip.
                             if selection != "tweaks" {
                                 TopStatusStrip(
-                                    showsScanResult: !["applications", "homebrew"].contains(selection ?? ""))
+                                    showsScanResult: !["applications", "homebrew", "go"].contains(selection ?? ""))
                             }
                         }
                         .toolbar {
-                            if !["applications", "tweaks", "homebrew"]
+                            if !["applications", "tweaks", "homebrew", "go"]
                                 .contains(selection ?? "")
                             {
                                 scanButton
@@ -52,6 +54,7 @@ struct ContentView: View {
         }
         .environment(appCleaner)
         .environment(homebrew)
+        .environment(goModules)
         .environment(systemStatus)
         .sheet(isPresented: $confirming) {
             CleanFlowSheet()
@@ -82,6 +85,10 @@ struct ContentView: View {
             })
         } else if selection == "homebrew" {
             HomebrewView()
+        } else if selection == "mise", mise.isAvailable {
+            MiseView()
+        } else if selection == "go" {
+            GoModulesView()
         } else if let id = selection, let category = model.categories.first(where: { $0.id == id }) {
             CategoryDetailView(category: category, onClean: { confirming = true }, onBack: { selection = "overview" })
         } else {
