@@ -64,6 +64,21 @@ The frame owns:
 Tables, empty, loading and error states use the same margin as the content.
 Settings and About are separate windows; they keep their own fixed margins.
 
+## RowActionButton
+
+A clickable row, card tile, glyph, or breadcrumb crumb.
+
+```
+label content (call site)
+plain button style, focusable, one focus ring on a 6 pt box
+contentShape(Rectangle()) so the whole label is the hit area
+help + accessibility label (defaults to help) + optional identifier
+```
+
+The label content stays at the call site, so a row reads as a row, a tile as a
+tile, a crumb as a crumb. The behaviour is never written twice: five call sites
+had already drifted apart on the focus ring and the accessibility label.
+
 ## SectionHeader
 
 ```

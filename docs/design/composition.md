@@ -169,6 +169,7 @@ Use these before writing a view:
 | Empty, loading, error | `EmptyStateView`, `LoadingStateView`, `ErrorStateView` |
 | Primary, secondary, destructive action | `PrimaryActionButton`, `SecondaryActionButton`, `DestructiveActionButton` |
 | Icon action | `IconActionButton` |
+| Clickable row, tile, glyph, or crumb | `RowActionButton` |
 | Sheet shell | `SheetFrame` |
 | Capacity bar | `CapacityBarView` |
 | Page margin | `pageHorizontalPadding()` |
