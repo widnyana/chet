@@ -26,6 +26,8 @@ struct Options {
     var maxNodes = 20000
     var command = ""
     var operands: [String] = []
+    /// Raw screen point for `color`; bypasses the selector.
+    var at: CGPoint?
 }
 
 func usage() -> Never {
@@ -37,6 +39,7 @@ func usage() -> Never {
         limits:
           --timeout <s>        per-call accessibility timeout, default 1.5
           --max-nodes <n>      stop walking after n nodes, default 20000
+          --at <x,y>           raw screen point for the color command
 
         target:
           --pid <pid>          drive this process
@@ -55,6 +58,15 @@ func usage() -> Never {
           frame <selector>                 print the frame of one match
           type <text>                      activate, then type text
           key <keycode> [cmd|shift|option|control...]  activate, then press a key
+          color [selector]                 sample the rendered pixels of one element
+
+        color:
+          The accessibility API has no color attribute, so this samples the window
+          capture instead. With a selector it reports the element's frame, its most
+          common pixel (the background), the strongest minority pixel (the ink), and
+          the WCAG contrast between them. With --at x,y it samples one screen point.
+          Needs Screen Recording permission for the terminal. Sampling a transient
+          state (a selection, a hover) is only valid while it is on screen.
 
         selector:
           key=value terms, ANDed. keys: id, role, desc, title, value, enabled.
@@ -105,6 +117,12 @@ func parseArguments() -> Options {
                 usage()
             }
             options.maxNodes = count
+        case "--at":
+            index += 1
+            guard index < arguments.count else { usage() }
+            let parts = arguments[index].split(separator: ",").compactMap { Double($0) }
+            guard parts.count == 2 else { usage() }
+            options.at = CGPoint(x: parts[0], y: parts[1])
         case "--help", "-h", "help":
             usage()
         default:
@@ -557,6 +575,179 @@ if options.command == "apps" {
 
 let target = resolveTarget(options)
 
+// MARK: - Pixels
+
+struct SampledColor {
+    let red: Double
+    let green: Double
+    let blue: Double
+    let count: Int
+
+    var hex: String {
+        String(
+            format: "#%02X%02X%02X",
+            Int((red * 255).rounded()), Int((green * 255).rounded()), Int((blue * 255).rounded()))
+    }
+
+    /// WCAG 2.1 relative luminance.
+    var luminance: Double {
+        func channel(_ value: Double) -> Double {
+            value <= 0.03928 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+        }
+        return 0.2126 * channel(red) + 0.7152 * channel(green) + 0.0722 * channel(blue)
+    }
+}
+
+func contrastRatio(_ left: SampledColor, _ right: SampledColor) -> Double {
+    let high = max(left.luminance, right.luminance)
+    let low = min(left.luminance, right.luminance)
+    return (high + 0.05) / (low + 0.05)
+}
+
+/// The on-screen window of this process whose bounds contain the point, with its bounds in
+/// screen points. AX frames use the same coordinate space, so no conversion is needed.
+func windowID(containing point: CGPoint, pid: pid_t) -> (id: Int, bounds: CGRect)? {
+    let list =
+        CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+        as? [[String: Any]] ?? []
+    for window in list {
+        guard (window[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == pid else { continue }
+        guard let raw = window[kCGWindowBounds as String] as? [String: Any],
+            let bounds = CGRect(dictionaryRepresentation: raw as CFDictionary)
+        else { continue }
+        if bounds.contains(point) {
+            return (window[kCGWindowNumber as String] as? Int ?? 0, bounds)
+        }
+    }
+    return nil
+}
+
+func captureWindow(_ id: Int) -> NSBitmapImageRep? {
+    let path = NSTemporaryDirectory() + "axdrv-\(getpid())-\(id).png"
+    let task = Process()
+    task.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+    task.arguments = ["-o", "-x", "-l", String(id), path]
+    do {
+        try task.run()
+    } catch {
+        return nil
+    }
+    task.waitUntilExit()
+    defer { try? FileManager.default.removeItem(atPath: path) }
+    guard task.terminationStatus == 0,
+        let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+        let image = NSBitmapImageRep(data: data), image.pixelsWide > 0
+    else { return nil }
+    return image
+}
+
+/// Pixel colors inside a rect of the capture, grouped by a 4-bit bucket per channel. The
+/// bucket average keeps antialiased edge pixels from dragging the reported color.
+func sampledColors(in image: NSBitmapImageRep, rect: CGRect) -> [SampledColor] {
+    let minX = max(0, Int(rect.minX.rounded(.down)))
+    let maxX = min(image.pixelsWide - 1, Int(rect.maxX.rounded(.up)))
+    let minY = max(0, Int(rect.minY.rounded(.down)))
+    let maxY = min(image.pixelsHigh - 1, Int(rect.maxY.rounded(.up)))
+    guard minX <= maxX, minY <= maxY else { return [] }
+    var buckets: [Int: (red: Double, green: Double, blue: Double, count: Int)] = [:]
+    for y in minY...maxY {
+        for x in minX...maxX {
+            guard let color = image.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { continue }
+            let red = color.redComponent
+            let green = color.greenComponent
+            let blue = color.blueComponent
+            let key =
+                (Int(red * 15) << 8) | (Int(green * 15) << 4) | Int(blue * 15)
+            let bucket = buckets[key] ?? (0, 0, 0, 0)
+            buckets[key] = (
+                bucket.red + red, bucket.green + green, bucket.blue + blue, bucket.count + 1
+            )
+        }
+    }
+    return buckets.values
+        .map {
+            SampledColor(
+                red: $0.red / Double($0.count), green: $0.green / Double($0.count),
+                blue: $0.blue / Double($0.count), count: $0.count)
+        }
+        .sorted { $0.count > $1.count }
+}
+
+func printColorReport(
+    label: String, frame: CGRect, colors: [SampledColor], windowBounds: CGRect, json: Bool
+) {
+    let total = max(colors.reduce(0) { $0 + $1.count }, 1)
+    func share(_ color: SampledColor?) -> Double {
+        guard let color else { return 0 }
+        return Double(color.count) / Double(total)
+    }
+    let background = colors.first
+    // The ink is the cluster that contrasts most with the background and still covers
+    // enough pixels to be text rather than an edge artifact.
+    let ink = colors.dropFirst().filter { share($0) >= 0.02 }
+        .max { left, right in
+            guard let background else { return false }
+            return contrastRatio(left, background) < contrastRatio(right, background)
+        }
+    // Antialiased glyph edges win on average for thin type, so report the glyph core
+    // separately: the smallest-luminance-distance-of-zero cluster that still exists.
+    let peak = colors.dropFirst().filter { share($0) >= 0.001 }
+        .max { left, right in
+            guard let background else { return false }
+            return contrastRatio(left, background) < contrastRatio(right, background)
+        }
+    func ratio(_ color: SampledColor?) -> Double {
+        guard let background, let color else { return 1 }
+        return contrastRatio(color, background)
+    }
+    // A point sample has one cluster. Reporting an ink share and a contrast there would be
+    // noise, so only the pixel is printed.
+    if colors.count <= 1 {
+        if json {
+            print(
+                #"{"label":"\#(escaped(label))","point":[\#(Int(frame.minX)),\#(Int(frame.minY))],"#
+                    + #""hex":"\#(background?.hex ?? "")"}"#)
+        } else {
+            print("\(Int(frame.minX)),\(Int(frame.minY))  \(background?.hex ?? "none")")
+        }
+        return
+    }
+    if json {
+        let rows = colors.prefix(6).map {
+            String(
+                format: #"{"hex":"%@","share":%.3f,"luminance":%.3f}"#, $0.hex, share($0),
+                $0.luminance)
+        }
+        print(
+            #"{"label":"\#(escaped(label))","frame":[\#(Int(frame.minX)),\#(Int(frame.minY)),"#
+                + #"\#(Int(frame.width)),\#(Int(frame.height))],"window":[\#(Int(windowBounds.minX)),"#
+                + #"\#(Int(windowBounds.minY)),\#(Int(windowBounds.width)),\#(Int(windowBounds.height))],"#
+                + #""background":"\#(background?.hex ?? "")","ink":"\#(ink?.hex ?? "")","#
+                + #""inkShare":\#(String(format: "%.3f", share(ink))),"contrast":\#(String(format: "%.2f", ratio(ink))),"#
+                + #""peak":"\#(peak?.hex ?? "")","peakShare":\#(String(format: "%.3f", share(peak))),"#
+                + #""peakContrast":\#(String(format: "%.2f", ratio(peak))),"#
+                + #""colors":[\#(rows.joined(separator: ","))]}"#)
+        return
+    }
+    print("label      \(label)")
+    print(
+        "frame      \(Int(frame.minX)),\(Int(frame.minY)) \(Int(frame.width))x\(Int(frame.height))"
+    )
+    print(
+        "background \(background?.hex ?? "none") \(String(format: "%.0f%%", share(background) * 100))"
+    )
+    print(
+        "ink        \(ink?.hex ?? "none") \(String(format: "%.0f%%", share(ink) * 100))"
+            + "  contrast \(String(format: "%.2f", ratio(ink))):1")
+    print(
+        "peak       \(peak?.hex ?? "none") \(String(format: "%.1f%%", share(peak) * 100))"
+            + "  contrast \(String(format: "%.2f", ratio(peak))):1")
+    let palette = colors.prefix(6).map {
+        String(format: "%@ %.0f%%", $0.hex, share($0) * 100)
+    }
+    print("colors     \(palette.joined(separator: "  "))")
+}
+
 guard AXIsProcessTrusted() else {
     FileHandle.standardError.write(Data("AX NOT TRUSTED\n".utf8))
     exit(3)
@@ -593,7 +784,7 @@ case "dump":
 
 case "texts":
     for node in nodes where node.role == "AXStaticText" {
-        if (selector.isEmpty || selector.matches(node)), !node.value.isEmpty {
+        if selector.isEmpty || selector.matches(node), !node.value.isEmpty {
             print(escaped(node.value))
         }
     }
@@ -647,6 +838,59 @@ case "key":
     }
     keyPress(code: CGKeyCode(code), flags: flags, pid: target.pid)
     print("sent key \(code) to \(target.name)")
+
+case "color":
+    if let point = options.at {
+        guard let window = windowID(containing: point, pid: target.pid) else {
+            FileHandle.standardError.write(Data("no window of this app contains the point\n".utf8))
+            exit(5)
+        }
+        guard let image = captureWindow(window.id) else {
+            FileHandle.standardError.write(Data("window capture failed. Grant Screen Recording.\n".utf8))
+            exit(4)
+        }
+        let scale = CGSize(
+            width: Double(image.pixelsWide) / Double(window.bounds.width),
+            height: Double(image.pixelsHigh) / Double(window.bounds.height))
+        let local = CGPoint(
+            x: (point.x - window.bounds.minX) * scale.width,
+            y: (point.y - window.bounds.minY) * scale.height)
+        let colors = sampledColors(
+            in: image, rect: CGRect(x: local.x - 1, y: local.y - 1, width: 3, height: 3))
+        printColorReport(
+            label: "point \(Int(point.x)),\(Int(point.y))", frame: CGRect(origin: point, size: .zero),
+            colors: colors, windowBounds: window.bounds, json: options.json)
+        exit(0)
+    }
+    guard !selector.isEmpty else { usage() }
+    let node = resolve(selector, in: nodes)
+    guard let frame = node.frame else {
+        FileHandle.standardError.write(Data("element has no frame\n".utf8))
+        exit(5)
+    }
+    let center = CGPoint(x: frame.midX, y: frame.midY)
+    guard let window = windowID(containing: center, pid: target.pid) else {
+        FileHandle.standardError.write(Data("no window of this app contains the element\n".utf8))
+        exit(5)
+    }
+    guard let image = captureWindow(window.id) else {
+        FileHandle.standardError.write(Data("window capture failed. Grant Screen Recording.\n".utf8))
+        exit(4)
+    }
+    // The capture is in pixels; AX reports points. The ratio is the Retina scale.
+    let scale = CGSize(
+        width: Double(image.pixelsWide) / Double(window.bounds.width),
+        height: Double(image.pixelsHigh) / Double(window.bounds.height))
+    let rect = CGRect(
+        x: (frame.minX - window.bounds.minX) * scale.width,
+        y: (frame.minY - window.bounds.minY) * scale.height,
+        width: frame.width * scale.width,
+        height: frame.height * scale.height
+    ).integral
+    printColorReport(
+        label: describe(node), frame: frame,
+        colors: sampledColors(in: image, rect: rect), windowBounds: window.bounds,
+        json: options.json)
 
 default:
     usage()

@@ -287,6 +287,8 @@ it is missing.
 | `/tmp/axdrv activate` | bring the target app forward |
 | `/tmp/axdrv type <text>` | activate, then type |
 | `/tmp/axdrv key <keycode> [cmd]` | activate, then press a key |
+| `/tmp/axdrv color <selector>` | sample one element's rendered pixels: background, ink, contrast |
+| `/tmp/axdrv color --at x,y` | sample one screen point |
 
 Target is `--pid`, `--app <bundle or name>`, `AXDRV_PID`, or the frontmost app. `apps` needs
 no target and no Accessibility trust.
@@ -381,6 +383,50 @@ scripts keep working.
 
 Treat `mise run dev` as destructive to other test runs: it starts with `pkill -x chet` and
 ends every instance. During a selector session, launch by path instead and kill only your pid.
+
+### Colors
+
+The accessibility API has no color attribute: there is no foreground or background
+value to read, and SwiftUI does not hand back a resolved attributed string. Contrast
+therefore comes from pixels, not from AX.
+
+`axdrv color <selector>` takes the element frame from the accessibility tree, captures
+the window that contains it, and clusters the pixels inside the frame:
+
+```sh
+/tmp/axdrv --pid <pid> color id=sidebar.homebrew
+label      AXStaticText id=sidebar.homebrew frame=299,371,94,22
+background #525459 62%
+ink        #FFFFFF 9%  contrast 7.61:1
+peak       #FFFFFF 9%  contrast 7.61:1
+colors     #525459 62%  #54565B 12%  #FFFFFF 9%  ...
+```
+
+- `background` is the most common pixel: what the label sits on.
+- `ink` is the cluster that contrasts most with the background and covers at least 2% of
+  the frame.
+- `peak` is the same over any cluster above 0.1%. At 12 to 13 pt the glyph stems are few,
+  so `peak` is a lower bound on the color the design intended, not the token value.
+- `--json` prints the same numbers plus the top six clusters.
+- The capture needs Screen Recording permission for the terminal. The command exits 4
+  when the capture is refused.
+
+Two rules make a reading trustworthy:
+
+1. Activate the target immediately before sampling, and confirm it is frontmost. A
+   background window draws inactive control colors: the same selected sidebar row
+   measured 3.23:1 while the terminal had focus and 7.61:1 after `axdrv activate`.
+2. Sample a state only while it is on screen. A selection, a hover, and a sheet are all
+   transient.
+
+To check the other appearance without changing the system setting, launch the debug copy
+with the per-app default, then remove it:
+
+```sh
+defaults write id.web.widnyana.chet NSRequiresAquaSystemAppearance -bool YES
+# relaunch, sample, then:
+defaults delete id.web.widnyana.chet NSRequiresAquaSystemAppearance
+```
 
 ### Pitfalls found the hard way
 
