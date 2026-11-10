@@ -11,18 +11,9 @@ struct ScanStatusView: View {
             Button {
                 model.cancel()
             } label: {
-                ZStack {
-                    ProgressView()
-                        .controlSize(.small)
-                        .accessibilityHidden(true)
-                    Image(systemName: "stop.circle")
-                        .font(Typography.iconAction)
-                }
-                .frame(width: 24, height: 24)
-                .frame(width: 40, height: 40)
-                .contentShape(Rectangle())
+                Label("Stop the scan", systemImage: "stop.fill")
+                    .symbolEffect(.pulse, isActive: !model.isPaused)
             }
-            .buttonStyle(.plain)
             .help("Stop the scan")
             .accessibilityLabel("Stop the scan")
             .accessibilityIdentifier("toolbar.scanStop")
@@ -30,7 +21,7 @@ struct ScanStatusView: View {
             Button {
                 model.scan()
             } label: {
-                Text(model.lastScan == nil ? "Scan" : "Scan again")
+                Label(model.lastScan == nil ? "Scan" : "Scan again", systemImage: "magnifyingglass")
             }
             .help("Scan for caches, logs, and large files (Command-R)")
             .accessibilityLabel("Scan for caches, logs, and large files")
