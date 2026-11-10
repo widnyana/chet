@@ -6,6 +6,7 @@ import SwiftUI
 struct SidebarView: View {
     @Environment(ScanModel.self) private var model
     @Environment(MiseModel.self) private var mise
+    @Environment(GoModulesModel.self) private var goModules
     @Binding var selection: String?
 
     var body: some View {
@@ -34,13 +35,9 @@ struct SidebarView: View {
                 row("tweaks", "Tweaks", symbol: "slider.horizontal.3")
             }
             Section("Tools") {
-                row("applications", "Apps", symbol: "app.dashed")
-                row("disk-map", "Storage", symbol: "internaldrive")
-                row("homebrew", "Homebrew", symbol: "shippingbox")
-                if mise.isAvailable {
-                    row("mise", "mise", symbol: "shippingbox.and.arrow.backward")
+                ForEach(toolRows) { tool in
+                    row(tool.id, tool.title, symbol: tool.symbol)
                 }
-                row("go", "Go", symbol: "chevron.left.forwardslash.chevron.right")
             }
         }
         .listStyle(.sidebar)
@@ -58,6 +55,21 @@ struct SidebarView: View {
 
     private var reviewRows: [CategoryState] {
         visibleCategories.filter { CategoryCopy.section($0.id, risk: $0.items.first?.risk) == .review }
+    }
+
+    private var toolRows: [ToolRow] {
+        var rows = [
+            ToolRow(id: "applications", title: "Apps", symbol: "app.dashed"),
+            ToolRow(id: "disk-map", title: "Storage", symbol: "internaldrive"),
+            ToolRow(id: "homebrew", title: "Homebrew", symbol: "shippingbox"),
+        ]
+        if mise.isAvailable {
+            rows.append(ToolRow(id: "mise", title: "mise", symbol: "shippingbox.and.arrow.backward"))
+        }
+        if goModules.isAvailable {
+            rows.append(ToolRow(id: "go", title: "Go", symbol: "curlybraces"))
+        }
+        return rows
     }
 
     private func categoryRow(_ category: CategoryState) -> some View {
@@ -112,6 +124,13 @@ struct SidebarView: View {
         .tag(id)
         .accessibilityIdentifier("sidebar.\(id)")
     }
+}
+
+/// One row in the Tools section, so every tool row is emitted by the same `ForEach`.
+private struct ToolRow: Identifiable {
+    let id: String
+    let title: String
+    let symbol: String
 }
 
 /// The sidebar is system chrome, so the selected row draws its own label color. An explicit

@@ -106,7 +106,8 @@ folder to look inside. Pause and resume the scan from the page while it builds t
 
 The **Go** page shows the module cache that Go keeps for downloaded dependencies. The cache
 lives at the path Go reports for `GOMODCACHE`, usually `~/go/pkg/mod`. The page shows its
-location, size, module count, and the Go toolchain it found.
+location, size, module count, and the Go toolchain it found. Chet hides the page when it cannot
+find Go.
 
 **Remove module cache…** runs `go clean -modcache`. The next build downloads the modules
 again, so the first build after removal is slower and needs network access. Chet runs the Go

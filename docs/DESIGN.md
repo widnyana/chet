@@ -55,7 +55,8 @@ NavigationSplitView
 - Apps owns Search, Layout, and Reload. Homebrew owns Search and Reload.
   mise and Tweaks own Read again.
 - Tools has five destinations: Apps, Homebrew, mise (only when its config
-  declares tools and the binary exists), Go, and Storage. Configure has one,
+  declares tools and the binary exists), Go, and Storage. mise reads the
+  declared tools and never installs, switches, or prunes. Configure has one,
   Tweaks.
 - There are no mode tabs. Apps is a destination, not a mode.
 - About is not a destination. `Chet > About Chet` opens one fixed window,
@@ -261,9 +262,9 @@ first executable `mise` on `PATH`. No scan control; the page owns `Read again`.
 
 The table is the config: `Tool`, `Requested`, `Status`, one row per declared
 version, sorted by name and then requested version. `Status` is `Active`,
-`Inactive`, or `Not installed` from `mise ls --json`. A resolved row shows its
-install path under the name; a declared tool with no resolved entry stays
-listed as `Not installed`.
+`Inactive`, or `Not installed` from `mise ls --json`. A row with a resolved
+install path shows it under the name; a declared tool with no resolved entry
+stays listed as `Not installed`.
 
 `Locations` holds the config path and the cache path from `mise cache path`.
 The cache row says `Unavailable` when that read fails. A failed `mise ls --json`
@@ -274,6 +275,9 @@ uninstalls, switches, or prunes, so there is no confirmation and no dry-run
 gate.
 
 ### Go
+
+The sidebar row and the page exist only when a Go binary resolves. Chet checks
+Homebrew, mise, gvm, and a native install.
 
 A read-only ledger for the Go module cache. No scan control; the page owns
 Reload. Page header `Go`. The subtitle is `Measuring the module cache…` while it

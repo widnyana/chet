@@ -15,6 +15,8 @@ final class GoModulesModel {
 
     var isAvailable: Bool { location != nil }
 
+    private var isDetecting = false
+
     var canRemove: Bool { !isLoading && !isWorking && (info?.bytes ?? 0) > 0 }
 
     var sizeText: String {
@@ -28,6 +30,18 @@ final class GoModulesModel {
         guard info.bytes > 0 else { return "The module cache is empty." }
         let count = info.moduleCount
         return "Module cache · \(sizeText) · \(count) \(count == 1 ? "module" : "modules")"
+    }
+
+    func detect() {
+        guard !isDetecting else { return }
+        isDetecting = true
+        Task {
+            let location = await Task.detached(priority: .utility) {
+                GoModules.locate()
+            }.value
+            self.location = location
+            self.isDetecting = false
+        }
     }
 
     func load() {

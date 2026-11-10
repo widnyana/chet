@@ -56,6 +56,11 @@ struct ContentView: View {
         .environment(homebrew)
         .environment(goModules)
         .environment(systemStatus)
+        .onAppear {
+            if !goModules.isAvailable {
+                goModules.detect()
+            }
+        }
         .sheet(isPresented: $confirming) {
             CleanFlowSheet()
         }
@@ -67,6 +72,9 @@ struct ContentView: View {
             }
             if selection == "tweaks" {
                 Task { await tweaks.reload() }
+            }
+            if !goModules.isAvailable {
+                goModules.detect()
             }
         }
     }
@@ -87,7 +95,7 @@ struct ContentView: View {
             HomebrewView()
         } else if selection == "mise", mise.isAvailable {
             MiseView()
-        } else if selection == "go" {
+        } else if selection == "go", goModules.isAvailable {
             GoModulesView()
         } else if let id = selection, let category = model.categories.first(where: { $0.id == id }) {
             CategoryDetailView(category: category, onClean: { confirming = true }, onBack: { selection = "overview" })
