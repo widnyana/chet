@@ -7,25 +7,53 @@ struct ScanStatusView: View {
     @Environment(ScanModel.self) private var model
 
     var body: some View {
-        if model.isScanning {
-            Button {
-                model.cancel()
-            } label: {
-                Label("Stop the scan", systemImage: "stop.fill")
-                    .symbolEffect(.pulse, isActive: !model.isPaused)
-            }
-            .help("Stop the scan")
-            .accessibilityLabel("Stop the scan")
-            .accessibilityIdentifier("toolbar.scanStop")
-        } else {
-            Button {
-                model.scan()
-            } label: {
+        // One button for both states, so the toolbar item keeps its identity. Swapping two
+        // different buttons rebuilds the toolbar item and can shift the page under it.
+        Button {
+            model.isScanning ? model.cancel() : model.scan()
+        } label: {
+            if model.isScanning {
+                ScanStopGlyph(isSpinning: !model.isPaused)
+            } else {
                 Label(model.lastScan == nil ? "Scan" : "Scan again", systemImage: "magnifyingglass")
             }
-            .help("Scan for caches, logs, and large files (Command-R)")
-            .accessibilityLabel("Scan for caches, logs, and large files")
-            .accessibilityIdentifier("toolbar.scan")
+        }
+        .help(model.isScanning ? "Stop the scan" : "Scan for caches, logs, and large files (Command-R)")
+        .accessibilityLabel(model.isScanning ? "Stop the scan" : "Scan for caches, logs, and large files")
+        .accessibilityIdentifier(model.isScanning ? "toolbar.scanStop" : "toolbar.scan")
+    }
+
+    /// Spinning ring around a stop square. Drawn in SwiftUI so it is always a circle:
+    /// an AppKit `ProgressView` stretches into an oval inside a toolbar button.
+    private struct ScanStopGlyph: View {
+        let isSpinning: Bool
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+        @State private var angle = 0.0
+
+        var body: some View {
+            ZStack {
+                Circle().stroke(Theme.inkSecondary.opacity(0.3), lineWidth: 2)
+                Circle()
+                    .trim(from: 0, to: 0.28)
+                    .stroke(Theme.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    .rotationEffect(.degrees(angle))
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(Theme.ink)
+                    .frame(width: 7, height: 7)
+            }
+            .frame(width: Spacing.s4, height: Spacing.s4)
+            .accessibilityLabel("Stop the scan")
+            .onAppear { spin() }
+            .onChange(of: isSpinning) { spin() }
+        }
+
+        private func spin() {
+            guard isSpinning, !reduceMotion else {
+                withAnimation(.linear(duration: 0)) { angle = 0 }
+                return
+            }
+            angle = 0
+            withAnimation(.linear(duration: 1).repeatForever(autoreverses: false)) { angle = 360 }
         }
     }
 
