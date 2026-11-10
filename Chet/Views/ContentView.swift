@@ -95,7 +95,7 @@ struct ContentView: View {
             HomebrewView()
         } else if selection == "mise", mise.isAvailable {
             MiseView()
-        } else if selection == "go", goModules.isAvailable {
+        } else if selection == "go" {
             GoModulesView()
         } else if let id = selection, let category = model.categories.first(where: { $0.id == id }) {
             CategoryDetailView(category: category, onClean: { confirming = true }, onBack: { selection = "overview" })

@@ -66,9 +66,7 @@ struct SidebarView: View {
         if mise.isAvailable {
             rows.append(ToolRow(id: "mise", title: "mise", symbol: "terminal"))
         }
-        if goModules.isAvailable {
-            rows.append(ToolRow(id: "go", title: "Go", symbol: "curlybraces"))
-        }
+        rows.append(ToolRow(id: "go", title: "Go", symbol: "curlybraces"))
         return rows
     }
 

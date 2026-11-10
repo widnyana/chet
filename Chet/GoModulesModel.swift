@@ -52,13 +52,13 @@ final class GoModulesModel {
             let location = await Task.detached(priority: .utility) {
                 GoModules.locate()
             }.value
+            if let location { self.location = location }
             var info: GoModules.Info?
             if let location {
                 info = await Task.detached(priority: .utility) {
                     GoModules.measure(location)
                 }.value
             }
-            self.location = location
             self.info = info
             if let info, info.version == "Go" {
                 self.loadError = "The Go toolchain did not report a version."
