@@ -56,10 +56,7 @@ struct HomebrewInstallerSheet: View {
                 }
 
                 if DryRun.enabled {
-                    StatusLabel(
-                        text: "Preview only. Nothing will be installed.",
-                        systemImage: "exclamationmark.triangle",
-                        tone: .amber)
+                    PreviewNotice(text: PreviewCopy.installs)
                 }
 
                 HStack {

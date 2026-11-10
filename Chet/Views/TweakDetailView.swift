@@ -25,7 +25,7 @@ struct TweakDetailView: View {
     }
 
     var body: some View {
-        SheetFrame(width: 540) {
+        SheetFrame(width: Metrics.detailSheetWidth) {
             VStack(alignment: .leading, spacing: Spacing.s4) {
                 header
                 Hairline()
@@ -34,9 +34,7 @@ struct TweakDetailView: View {
                     .foregroundStyle(Theme.inkSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                 if model.isGated {
-                    StatusLabel(
-                        text: "Preview only. No tweak is changed.", systemImage: "eye.slash",
-                        tone: .amber)
+                    PreviewNotice(text: PreviewCopy.tweaks, tone: .inert)
                 }
                 if !isSupported, let reading {
                     StatusLabel(

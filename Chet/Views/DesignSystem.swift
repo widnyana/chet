@@ -59,6 +59,7 @@ enum Metrics {
     static let detailSheetWidth: CGFloat = 540
     static let byteColumnWidth: CGFloat = 88
     static let chevronIconSize: CGFloat = 8
+    static let compactRowHeight: CGFloat = 28
 }
 
 // MARK: - Primitives

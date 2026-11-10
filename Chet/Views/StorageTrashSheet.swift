@@ -46,7 +46,7 @@ struct StorageTrashSheet: View {
                                     .monospacedDigit()
                                     .foregroundStyle(Theme.inkSecondary)
                             }
-                            .frame(height: 28)
+                            .frame(height: Metrics.compactRowHeight)
                             if entry.id != shown.last?.id {
                                 Hairline()
                             }
@@ -62,7 +62,7 @@ struct StorageTrashSheet: View {
                                     .monospacedDigit()
                                     .foregroundStyle(Theme.inkSecondary)
                             }
-                            .frame(height: 28)
+                            .frame(height: Metrics.compactRowHeight)
                         }
                     }
                     .padding(.vertical, Spacing.s1)
@@ -72,10 +72,7 @@ struct StorageTrashSheet: View {
                         .strokeBorder(Theme.hairline, lineWidth: 1)
                 }
                 if DryRun.enabled {
-                    StatusLabel(
-                        text: "Preview only. Nothing will be moved.",
-                        systemImage: "exclamationmark.triangle",
-                        tone: .amber)
+                    PreviewNotice(text: PreviewCopy.moves)
                 }
                 HStack(spacing: Spacing.s3) {
                     Spacer()

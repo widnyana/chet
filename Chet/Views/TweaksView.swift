@@ -71,8 +71,7 @@ struct TweaksView: View {
 
     @ViewBuilder private var notice: some View {
         if model.isGated {
-            StatusLabel(
-                text: "Preview only. No tweak is changed.", systemImage: "eye.slash", tone: .amber)
+            PreviewNotice(text: PreviewCopy.tweaks, tone: .inert)
         }
         if let message = model.errorMessage {
             HStack(spacing: Spacing.s3) {

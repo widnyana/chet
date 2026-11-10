@@ -21,7 +21,7 @@ struct SettingsView: View {
     var body: some View {
         VStack(spacing: 0) {
             if DryRun.enabled {
-                PreviewNotice(text: "Preview only. Nothing will be removed.")
+                PreviewNotice(text: PreviewCopy.removals)
                     .padding(.horizontal, Metrics.pageMargin)
                     .padding(.top, Spacing.s4)
             }
@@ -362,7 +362,7 @@ struct SettingsView: View {
                     "Reset puts every changed tweak back to the macOS default. It does not touch files, caches, or apps."
                 )
                 if tweaks.isGated {
-                    SettingsNote("Preview only. No tweak is changed.")
+                    SettingsNote(PreviewCopy.tweaks)
                 }
                 if let message = tweaks.errorMessage {
                     SettingsNote(message)

@@ -69,10 +69,7 @@ struct AppUninstallConfirmSheet: View {
                         tone: .amber)
                 }
                 if DryRun.enabled {
-                    StatusLabel(
-                        text: "Preview only. Nothing will be moved.",
-                        systemImage: "exclamationmark.triangle",
-                        tone: .amber)
+                    PreviewNotice(text: PreviewCopy.moves)
                 }
                 HStack {
                     Spacer()
@@ -276,10 +273,7 @@ struct BulkUninstallConfirmSheet: View {
                     }
                 }
                 if DryRun.enabled {
-                    StatusLabel(
-                        text: "Preview only. Nothing will be moved.",
-                        systemImage: "exclamationmark.triangle",
-                        tone: .amber)
+                    PreviewNotice(text: PreviewCopy.moves)
                 }
                 HStack {
                     Spacer()

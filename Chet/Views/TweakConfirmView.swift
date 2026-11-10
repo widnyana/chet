@@ -30,10 +30,7 @@ struct TweakConfirmView: View {
                     .foregroundStyle(Theme.inkSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                 if model.isGated {
-                    StatusLabel(
-                        text: "Preview only. No tweak is changed.",
-                        systemImage: "eye.slash",
-                        tone: .amber)
+                    PreviewNotice(text: PreviewCopy.tweaks, tone: .inert)
                 }
                 VStack(spacing: 0) {
                     DefinitionRow(label: "From", value: TweakCopy.value(current))

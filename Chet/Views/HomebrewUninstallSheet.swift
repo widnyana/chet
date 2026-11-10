@@ -71,10 +71,7 @@ struct HomebrewUninstallSheet: View {
                 }
 
                 if DryRun.enabled {
-                    StatusLabel(
-                        text: "Preview only. Nothing will be removed.",
-                        systemImage: "exclamationmark.triangle",
-                        tone: .amber)
+                    PreviewNotice(text: PreviewCopy.removals)
                 }
 
                 HStack {

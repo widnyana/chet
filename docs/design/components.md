@@ -558,6 +558,16 @@ ScrollView
 - Six sites adopt it: `ConfirmSheet`, both app-uninstall confirm sheets,
   `HomebrewUninstallSheet`, `HomebrewCleanupSheet`, and `StorageTrashSheet`.
 
+## SheetFrame
+
+The sheet shell every sheet renders through. Measured: 13 call sites in
+`Chet/Views`.
+
+- Width `Metrics.sheetWidth` 520 pt for a flow sheet; a detail sheet passes
+  `Metrics.detailSheetWidth` 540 pt. 480 pt is not used.
+- 24 pt padding, an optional fixed height, and the paper body.
+- The system draws the sheet window; the frame supplies the body.
+
 ## SummarySheet
 
 ```

@@ -169,6 +169,7 @@ role and a reason.
 | Detail sheet width | `Metrics.detailSheetWidth` 540 pt for a sheet whose ledger needs the room |
 | Ledger byte column | `Metrics.byteColumnWidth` 88 pt, one width so sheet ledgers align |
 | Icon gutter | `Metrics.iconGutter` 22 pt for the glyph column before a row label |
+| Compact row height | `Metrics.compactRowHeight` 28 pt for a short ledger row |
 | Settings control column | `Metrics.controlColumn` 150 pt, sized by the widest control in a panel |
 | Command bar height | 56 pt minimum plus safe-area bottom |
 | Command bar top rule | 1 px `hairline` |

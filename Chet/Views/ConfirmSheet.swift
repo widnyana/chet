@@ -38,7 +38,7 @@ struct ConfirmSheet: View {
                             HStack(spacing: Spacing.s2) {
                                 Image(systemName: CategoryStyle.of(row.id).symbol)
                                     .foregroundStyle(Theme.inkSecondary)
-                                    .frame(width: 22)
+                                    .frame(width: Metrics.iconGutter)
                                 Text(CategoryCopy.title(row.id, fallback: row.id))
                                     .font(Typography.row)
                                     .foregroundStyle(Theme.ink)
@@ -54,7 +54,7 @@ struct ConfirmSheet: View {
                             HStack(spacing: Spacing.s2) {
                                 Image(systemName: "clock.arrow.circlepath")
                                     .foregroundStyle(Theme.inkSecondary)
-                                    .frame(width: 22)
+                                    .frame(width: Metrics.iconGutter)
                                 Text(
                                     model.confirmSnapshots.count == 1
                                         ? "1 Time Machine local snapshot"
@@ -104,10 +104,7 @@ struct ConfirmSheet: View {
                 .font(Typography.caption)
                 .foregroundStyle(Theme.inkSecondary)
                 if DryRun.enabled {
-                    StatusLabel(
-                        text: "Preview only. Nothing will be removed.",
-                        systemImage: "exclamationmark.triangle",
-                        tone: .amber)
+                    PreviewNotice(text: PreviewCopy.removals)
                 }
                 HStack {
                     Spacer()

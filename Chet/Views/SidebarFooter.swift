@@ -29,7 +29,7 @@ struct SidebarFooter: View {
         } message: {
             Text(
                 DryRun.enabled
-                    ? "Preview only. Nothing will be removed." : "This permanently deletes everything in your Trash.")
+                    ? PreviewCopy.removals : "This permanently deletes everything in your Trash.")
         }
     }
 
