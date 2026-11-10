@@ -211,26 +211,55 @@ States:
 
 ## Storage
 
-Job: answer "where is the space?".
+Job: answer "which child of this folder is using the space, and what will I
+move?".
 
 Top to bottom:
 
 1. `PageHeader`: `Storage`, subtitle `Where your space goes.`, metric: the
-   current folder size when one is open.
-2. `DiskMapChrome`: breadcrumb and a neutral-ramp legend, hairline.
-3. Treemap canvas.
-4. `Largest folders`: the five largest children of the open folder, one 40 pt
-   row each.
+   current folder size with `in this folder` when one is open.
+2. `StorageLocationBar`: `Home` crumb, the path, the volume line
+   `Used 236 GB of 245 GB`, and `Size on disk` when the tree measured allocated
+   bytes. `Capacity unavailable` when the volume cannot be read.
+3. `StorageMetricsRow`: three flat blocks. `Free space` shows the free bytes and
+   `N% used`. `Cleanable` shows `model.totalBytes` after a scan and links to
+   Home; before a scan it shows `-` and `Scan for junk`. `Large files` shows the
+   large-files category bytes and count and links to that category; before a
+   scan it offers `Scan to measure`.
+4. Body: treemap canvas and `StorageLedger`.
 5. While scanning: the detailed scan strip: phase, linear progress, current
    folder, files and bytes, folder trail, Pause and Stop.
 6. Empty (never scanned): `The disk map appears after a scan.` with a primary
    scan action.
-7. Hover: a plain label with folder name and size.
-8. Click: zoom into a folder. Right-click: Reveal in Finder.
+7. Hover: a plain label with folder name and size, and the ledger row uses
+   `accentSoft`.
+8. Click a block: collect its top-level child. Double-click a folder: open it.
+   Right-click: Reveal in Finder.
+9. `CommandBar`: collected bytes, count and the hint, `Clear`, and
+   `Move to Trash...`.
+
+`StorageLedger` is 288 pt wide, with a header of folder name, size, path, and
+child count, then one row per child sorted largest first: checkbox, 10 x 10 ramp
+swatch, name, size. The swatch is `TreemapPalette.colorShare` with the same
+share the canvas lays out. Selected and hovered rows use `accentSoft`.
 
 The map uses one encoding: size share as a neutral ramp. Darker means a larger
 share in light mode; lighter means a larger share in dark mode. The labels use
 the ink that contrasts with the block. The map does not encode categories.
+Collected blocks carry the accent border; the hovered block carries the ink
+border.
+
+The collection is cleared by `Clear`, by a new scan, and after a trash pass. It
+survives drill-down and drill-out. While a scan runs the controls are disabled
+with the reason `Wait for the scan to finish.`
+
+The trash sheet lists up to six names and sizes, the total, and the sentence
+`Moved items stay in the Trash until you empty it.` Under `DRY_RUN` it shows
+the preview gate and the confirm button is disabled. After a pass, a notice says
+what moved, what failed, and offers `Scan again`.
+
+States: never scanned, scanning, finished, empty folder, read errors, volume
+unavailable, dry run, after trash.
 
 ## Tweaks
 

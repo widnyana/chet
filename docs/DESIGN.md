@@ -85,6 +85,9 @@ Rules:
 - No gradient in the content. The app icon is the only gradient asset.
 - No custom glass, no custom shadow, no glow.
 - The native sidebar material and system sheets are the only materials.
+- Every colour value lives in `Chet/Views/Palette.swift`: the `Theme` tokens,
+  the map label colours, and the treemap ramp. No other file builds a colour
+  from an `NSColor`, `Color`, or `SIMD4` literal.
 
 ## Type
 
@@ -255,9 +258,35 @@ count and bytes and opens the confirmation.
 
 ### Storage
 
-One encoding: size share as a neutral ramp. Plain breadcrumb, four-step legend,
-canvas, the five largest folders under the canvas, hover label. The detailed scan
-strip lives here and nowhere else. The map is readable in both modes.
+Job: read the folder map, collect what should go, and move it to the Trash.
+
+Top to bottom:
+
+1. Page header: `Storage`, `Where your space goes.`, the current folder size.
+2. Location bar: `Home` crumb, the path, the volume line `Used X of Y`, and
+   `Size on disk` when the tree measured allocated bytes.
+3. Metric row: three flat blocks separated by hairlines, `Free space`,
+   `Cleanable`, `Large files`. No card fills. `Cleanable` opens Home, `Large
+   files` opens that category, and before a scan each block offers the scan.
+4. Body: treemap canvas and a 288 pt child ledger.
+5. Command bar: collected bytes, the count and the gesture hint, `Clear`, and
+   `Move to Trash...`.
+
+One encoding: size share as a neutral ramp. The ledger swatch uses the same
+ramp value as its block, so chart and list read as one surface. A collected
+block carries the accent border; the hovered block carries an ink border. No
+category colours, in any state.
+
+Click a block to collect its top-level child; double-click a folder to open it.
+The same collection is the ledger checkboxes, and it survives drill-down. The
+map, the ledger, and the bar never disagree.
+
+Moving to the Trash is the only destructive action here. It confirms first, it
+re-checks every path through `SafetyPolicy` and the app-folder allow-list, and
+after the move the screen asks for a rescan instead of inventing new sizes.
+
+The detailed scan strip stays at the bottom of the page while a scan runs. The
+map is readable in both modes.
 
 ### Snapshots
 
@@ -440,11 +469,25 @@ Rules the script enforces:
       "verify": {"contains": ["struct ScanStatusView"]}
     },
     {
-      "id": "disk-map-chrome",
-      "file": "Chet/Views/DiskMapView.swift",
+      "id": "storage-location-bar",
+      "file": "Chet/Views/StorageComponents.swift",
       "mechanism": "in-flow-header",
-      "height": 44,
-      "verify": {"contains": ["DiskMapChrome"]}
+      "height": 32,
+      "verify": {"contains": ["StorageLocationBar"]}
+    },
+    {
+      "id": "storage-metrics-row",
+      "file": "Chet/Views/StorageComponents.swift",
+      "mechanism": "in-flow",
+      "height": 72,
+      "verify": {"contains": ["StorageMetricsRow"]}
+    },
+    {
+      "id": "storage-ledger",
+      "file": "Chet/Views/StorageComponents.swift",
+      "mechanism": "in-flow-side-pane",
+      "height": 0,
+      "verify": {"contains": ["StorageLedger"]}
     }
   ]
 }

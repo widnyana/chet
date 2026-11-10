@@ -335,6 +335,11 @@ identifiers of the controls inside it. Put the identifier on the control you wil
 | `home.header`, `home.empty`, `home.scan`, `home.rescan`, `home.pause`, `home.resume` | Home |
 | `apps.header` | Apps |
 | `storage.header`, `storage.pause`, `storage.resume` | Storage |
+| `storage.crumb.current`, `storage.crumb.<n>`, `storage.volume` | Storage location bar |
+| `storage.metric.free`, `storage.metric.cleanable`, `storage.metric.largeFiles` | Storage metric actions |
+| `storage.ledger.header`, `storage.row.<name>` | Storage ledger |
+| `storage.clear`, `storage.trash` | Storage command bar |
+| `storage.trashTitle`, `storage.trashCancel`, `storage.trashConfirm` | Storage trash sheet |
 | `list.selectAll` | category table select-all |
 | `tweaks.header`, `tweaks.page`, `tweaks.reload`, `tweaks.loading`, `tweaks.empty` | Tweaks page |
 | `tweak.toggle.<tweak id>`, `tweak.choice.<tweak id>`, `tweak.range.<tweak id>`, `tweak.text.<tweak id>`, `tweak.folder.<tweak id>`, `tweak.inspect.<tweak id>` | tweak controls |

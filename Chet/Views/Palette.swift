@@ -74,6 +74,16 @@ struct TreemapPalette {
 
     var border: SIMD4<Float> { background }
 
+    /// Border of a collected block. Matches `Theme.accent`.
+    var accentBorder: SIMD4<Float> {
+        isDark ? SIMD4(0.561, 0.659, 0.910, 1) : SIMD4(0.141, 0.298, 0.604, 1)
+    }
+
+    /// Border of the block under the pointer. Matches `Theme.inkSecondary`.
+    var hoverBorder: SIMD4<Float> {
+        isDark ? SIMD4(0.639, 0.631, 0.604, 1) : SIMD4(0.388, 0.388, 0.373, 1)
+    }
+
     func ramp(_ t: CGFloat) -> SIMD4<Float> {
         let t = Float(min(1, max(0, t)))
         let start: SIMD3<Float> = isDark ? SIMD3(0.165, 0.173, 0.192) : SIMD3(0.894, 0.878, 0.843)

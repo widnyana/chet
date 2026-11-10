@@ -12,6 +12,7 @@ struct CommandBar: View {
     var isWorking = false
     var secondaryTitle: String?
     var secondaryAction: (() -> Void)?
+    var isSecondaryEnabled = true
     var help: String?
     /// Names the action and its count for VoiceOver; nil falls back to the visible title.
     var accessibilityLabel: String?
@@ -48,8 +49,11 @@ struct CommandBar: View {
                         .controlSize(.small)
                 }
                 if let secondaryTitle, let secondaryAction {
-                    SecondaryActionButton(title: secondaryTitle, action: secondaryAction)
-                        .modifier(OptionalAccessibilityIdentifier(identifier: secondaryIdentifier))
+                    SecondaryActionButton(
+                        title: secondaryTitle, isEnabled: isSecondaryEnabled,
+                        action: secondaryAction
+                    )
+                    .modifier(OptionalAccessibilityIdentifier(identifier: secondaryIdentifier))
                 }
                 primaryButton
                     .modifier(OptionalAccessibilityIdentifier(identifier: primaryIdentifier))

@@ -280,21 +280,75 @@ Rules:
 - The result of the scan replaces this section with the ledger.
 - The detailed folder trail belongs to the disk map only.
 
-## DiskMapChrome
+## StorageLocationBar
 
 ```
-Home / Library / Caches                     Darker means a larger share
+Home > Library > Caches            Used 236.46 GB of 245.11 GB   Size on disk
 --------------------------------------------------------------------- hairline
 ```
 
 - Breadcrumb: plain text buttons, `inkSecondary` for ancestors, `ink` for the
   current folder. A chevron separates them. No pill.
-- Legend: four 10 x 10 swatches of the neutral ramp, with `Small` and `Large`
-  labels and a sentence. No category names.
-- Hover: a small plain label with the folder name and size. It uses
-  `paperRaised` and a hairline. It is content, not glass.
-- Detail labels on large blocks use the ink color that contrasts with the
-  block.
+- The volume line is caption, tabular. `Capacity unavailable` replaces it when
+  the volume cannot be read.
+- `Size on disk` is present only when the tree measured allocated bytes, and it
+  carries a help string. No legend: the ledger swatch is the legend.
+- Identifiers sit on the controls: `storage.crumb.<n>`,
+  `storage.crumb.current`, `storage.volume`.
+
+## StorageMetricsRow
+
+```
+Free space          | Cleanable            | Large files
+8.65 GB             | -                    | -
+96.5% used          | Scan for junk        | Scan to measure
+--------------------------------------------------------------------------
+```
+
+- Three equal columns, 72 pt high, 16 pt inner insets, one 1 px `hairline`
+  between columns. No fill, no radius, no card.
+- Label is caption `inkSecondary`; value is `metric`, tabular, `ink`; the third
+  line holds one fact and at most one text action.
+- The action is `QuietActionButton`. `Cleanable` links to Home, `Large files`
+  links to the category, and before a scan each offers the scan. When a scan ran
+  and the source is empty, the value is `-` and the action is absent.
+- Identifiers land on the control inside each block: `storage.metric.free`,
+  `storage.metric.cleanable`, `storage.metric.largeFiles`.
+
+## StorageLedger
+
+```
+Applications                                   11.49 GB
+/Applications                              22 items
+------------------------------------------------------------------
+[] [swatch] Visual Studio Code.app              1.58 GB
+[] [swatch] Google Chrome.app                   1.53 GB
+```
+
+- Fixed 288 pt column with a 1 px leading hairline. Header: folder name
+  (`section`), size (`metric`, tabular), path and `N items` (caption).
+- Rows are 40 pt: native checkbox, 10 x 10 ramp swatch, name (middle
+  truncation), size (tabular). One hairline between rows, no alternating fill.
+- The swatch is the block's ramp colour at the same share, so chart and list
+  cannot drift.
+- Selected and hovered rows use `accentSoft`. Double-click a row opens the
+  folder; the context menu holds `Show in Finder`. Checkboxes are disabled while
+  a scan runs.
+- Read errors add one amber `StatusLabel` under the header.
+- The identifiers are on the controls: `storage.row.<name>`,
+  `storage.ledger.header`.
+
+## Treemap labels
+
+- Direct labels on top-level blocks from 44 x 36 pt up. The name is `row` with
+  medium weight, the size is caption, tabular, and appears only when the block is
+  at least 64 x 54.
+- Label ink is `MapColors.labelDark` or `labelLight`, chosen by the block's
+  share. Mid-tone blocks carry no label; hover names them.
+- A collected block's border is `Theme.accent`. The hovered block's border is
+  `Theme.inkSecondary`. Both values are defined in `Palette.swift`.
+- Hover elsewhere shows a small plain label with the folder name and size on
+  `paperRaised` with a hairline. It is content, not glass.
 
 ## AppCell
 

@@ -75,7 +75,7 @@ struct ContentView: View {
         if selection == "applications" {
             UninstallWorkspace()
         } else if selection == "disk-map" {
-            DiskMapView()
+            DiskMapView(destination: $selection)
         } else if selection == "tweaks" {
             TweaksView()
         } else if selection == "snapshots" {

@@ -5,10 +5,14 @@ import SwiftUI
 
 /// Deep inspection: a Metal-rendered nested treemap of the home folder that grows into its
 /// final shape while the scan runs (walker rollups merge into `model.liveTree`), then swaps
-/// to the full tree. Click a folder block to zoom in; each block paints its own children.
+/// to the full tree. One surface for reading and acting: the chart, the child ledger, and the
+/// command bar share one collection, and the collection moves to the Trash together.
 struct DiskMapView: View {
     @Environment(ScanModel.self) private var model
     @Environment(\.colorScheme) private var colorScheme
+    /// Sidebar destination, so the metric links can open Home or the large-files category.
+    @Binding var destination: String?
+
     /// Navigation path as URLs, not nodes: the live tree is replaced several times a second
     /// while scanning, so the current node is re-resolved from the newest tree every render.
     @State private var stack: [URL] = []
@@ -21,127 +25,58 @@ struct DiskMapView: View {
     @State private var hovered: FolderNode?
     /// Name + size labels for the top-tier blocks, published by the Metal view.
     @State private var labels: [TreemapLabel] = []
+    /// Collected children, keyed by URL. Survives drill-down and drill-out.
+    @State private var collection: [URL: StorageEntry] = [:]
+    @State private var volume: VolumeCapacity?
+    /// Frozen when the sheet opens, so the list cannot change under the user. The
+    /// item form gives the sheet the exact entries that opened it.
+    @State private var trashRequest: TrashRequest?
+    @State private var trashReport: StorageTrashResult?
+
+    private struct TrashRequest: Identifiable {
+        let id = UUID()
+        let entries: [StorageEntry]
+    }
 
     private var isDark: Bool { colorScheme == .dark }
+    private var palette: TreemapPalette { TreemapPalette(isDark: isDark) }
+    private var current: FolderNode? { pathNodes.last }
+    private var collected: [StorageEntry] {
+        collection.values.sorted { $0.bytes > $1.bytes }
+    }
+    private var collectedBytes: Int64 {
+        collection.values.reduce(0) { $0 + $1.bytes }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             pageHeader
-            DiskMapChrome(
+            StorageLocationBar(
                 pathNodes: pathNodes,
-                isDark: isDark,
+                volume: volume,
                 sizeBasis: model.treeSizeBasis,
                 onSelect: { index in
                     guard index < stack.count else { return }
                     stack.removeSubrange((index + 1)...)
+                    hovered = nil
                 })
-            if !model.readErrors.isEmpty {
-                HStack(spacing: Spacing.s2) {
-                    StatusLabel(
-                        text: "Some folders could not be read. Sizes may be too small.",
-                        systemImage: "exclamationmark.triangle",
-                        tone: .amber)
-                    Spacer()
-                }
-                .pageHorizontalPadding()
-                .padding(.bottom, Spacing.s2)
-            }
-            // Top section: the diagram. It grows live while the scan runs.
-            if let current = pathNodes.last {
-                TreemapCanvas(
-                    node: current,
-                    isDark: isDark,
-                    onHover: { hovered = $0 },
-                    onOpen: { child in
-                        if !child.children.isEmpty { stack.append(child.url) }
-                    },
-                    onLabels: { labels = $0 }
-                )
-                .overlay {
-                    // Direct labels on the top tier: the biggest folders read without
-                    // hovering. Coordinates are the canvas layout's own, top-left origin.
-                    GeometryReader { geo in
-                        ForEach(labels) { label in
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(label.title)
-                                    .font(Typography.section)
-                                    .lineLimit(1)
-                                    .truncationMode(.tail)
-                                Text(label.subtitle)
-                                    .font(Typography.caption)
-                                    .monospacedDigit()
-                                    .lineLimit(1)
-                            }
-                            .foregroundStyle(
-                                label.darkText
-                                    ? Theme.mapLabelDark
-                                    : Theme.mapLabelLight
-                            )
-                            .frame(maxWidth: label.rect.width - 12, alignment: .leading)
-                            .offset(x: label.rect.minX + 8, y: label.rect.minY + 8)
-                        }
-                    }
-                    .allowsHitTesting(false)
-                }
-                .accessibilityLabel(
-                    "Storage map for \(current.url.lastPathComponent), \(current.size.formatted(.byteCount(style: .file)))"
-                )
-                .accessibilityHint("Click a folder block to open it.")
-                .clipShape(.rect(corners: .fixed(Metrics.panelRadius)))
-                .pageHorizontalPadding()
-                .padding(.bottom, Spacing.s3)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .overlay(alignment: .bottomLeading) {
-                    if let hovered {
-                        HStack(spacing: Spacing.s2) {
-                            Text(hovered.url.lastPathComponent)
-                                .font(Typography.row)
-                                .fontWeight(.medium)
-                                .foregroundStyle(Theme.ink)
-                            Text(hovered.size.formatted(.byteCount(style: .file)))
-                                .font(Typography.row)
-                                .monospacedDigit()
-                                .foregroundStyle(Theme.inkSecondary)
-                        }
-                        .padding(.horizontal, Spacing.s3)
-                        .padding(.vertical, Spacing.s1)
-                        .background(Theme.paperRaised, in: .rect(corners: .fixed(Metrics.innerRadius)))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: Metrics.innerRadius, style: .continuous)
-                                .strokeBorder(Theme.hairline, lineWidth: 1)
-                        }
-                        .padding(Spacing.s6)
-                        .allowsHitTesting(false)
-                    }
-                }
-            } else if !model.isScanning {
-                EmptyStateView(
-                    title: "The disk map appears after a scan.",
-                    message: "Scan this Mac to see where the space goes.",
-                    actionTitle: "Scan this Mac",
-                    action: { model.scan() }
-                )
-                .pageHorizontalPadding()
-            } else {
-                VStack(spacing: Spacing.s2) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Measuring your folders")
-                        .font(Typography.caption)
-                        .foregroundStyle(Theme.inkSecondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            if let current = pathNodes.last {
-                largestFolders(current)
-            }
-            // Bottom section: progress. Its per-tick text updates never touch the canvas.
+            metricsRow
+            bodyContent
             if model.isScanning {
                 progressPanel
             }
+            if let trashReport, !trashReport.moved.isEmpty || !trashReport.failed.isEmpty {
+                trashNotice(trashReport)
+            }
         }
         .background(Theme.paper)
-        .backgroundExtensionEffect()
+        .safeAreaBar(edge: .bottom) { commandBar }
+        .sheet(item: $trashRequest) { request in
+            StorageTrashSheet(entries: request.entries, onConfirm: performTrash)
+        }
+        .task {
+            volume = VolumeCapacity.current()
+        }
         // The final trees replace the live render (same canvas, full data).
         .task(id: model.folderTrees) {
             guard !model.folderTrees.isEmpty else { return }
@@ -163,7 +98,262 @@ struct DiskMapView: View {
                 hovered = hovered.flatMap { Self.node(with: $0.url, in: newest) }
             }
         }
+        .onChange(of: model.isScanning) { _, scanning in
+            // A new scan can change every size; a collection from the old tree would
+            // come back with numbers nothing measured.
+            if scanning {
+                collection.removeAll()
+                trashReport = nil
+            }
+        }
     }
+
+    // MARK: - Header and metrics
+
+    /// Nil before the first scan, so the page shows no number it cannot source.
+    private var pageHeader: some View {
+        PageHeader(
+            title: "Storage",
+            subtitle: "Where your space goes.",
+            metric: current?.size.formatted(.byteCount(style: .file)),
+            metricLabel: current == nil ? nil : "in this folder"
+        )
+        .accessibilityIdentifier("storage.header")
+        .pageHorizontalPadding()
+        .padding(.top, Spacing.s6)
+        .padding(.bottom, Spacing.s3)
+    }
+
+    private var largeCategory: CategoryState? {
+        model.categories.first { $0.id == "large-files" }
+    }
+
+    private var metricsRow: some View {
+        let used = volume.map {
+            Double($0.total - $0.free) / Double(max($0.total, 1))
+        }
+        return StorageMetricsRow(
+            free: volume?.free,
+            usedShare: used,
+            cleanable: model.didFinishScan ? model.totalBytes : nil,
+            largeFilesBytes: largeCategory?.bytes,
+            largeFilesCount: largeCategory?.items.count,
+            didFinishScan: model.didFinishScan,
+            onScan: { model.scan() },
+            onOpenFindings: { destination = "overview" },
+            onOpenLargeFiles: {
+                if largeCategory != nil { destination = "large-files" }
+            }
+        )
+        .padding(.bottom, Spacing.s4)
+    }
+
+    // MARK: - Body
+
+    @ViewBuilder private var bodyContent: some View {
+        if let current {
+            HStack(alignment: .top, spacing: Spacing.s4) {
+                canvas(current)
+                StorageLedger(
+                    folder: current,
+                    palette: palette,
+                    selected: Set(collection.keys),
+                    hovered: hovered?.url,
+                    isEnabled: !model.isScanning,
+                    hasReadErrors: !model.readErrors.isEmpty,
+                    onToggle: toggle,
+                    onOpen: open,
+                    onReveal: reveal)
+            }
+            .pageHorizontalPadding()
+            .padding(.top, Spacing.s4)
+            .padding(.bottom, Spacing.s3)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        } else if !model.isScanning {
+            EmptyStateView(
+                title: "The disk map appears after a scan.",
+                message: "Scan this Mac to see where the space goes.",
+                actionTitle: "Scan this Mac",
+                action: { model.scan() }
+            )
+            .padding(Spacing.s8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            VStack(spacing: Spacing.s2) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Measuring your folders")
+                    .font(Typography.caption)
+                    .foregroundStyle(Theme.inkSecondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    private func canvas(_ current: FolderNode) -> some View {
+        TreemapCanvas(
+            node: current,
+            isDark: isDark,
+            selected: Set(collection.keys),
+            onHover: { hovered = $0 },
+            onToggle: { toggle($0) },
+            onOpen: { open($0) },
+            onLabels: { labels = $0 }
+        )
+        .overlay {
+            // Direct labels on the top tier: the biggest folders read without hovering.
+            // Coordinates are the canvas layout's own, top-left origin.
+            GeometryReader { _ in
+                ForEach(labels) { label in
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(label.title)
+                            .font(Typography.row)
+                            .fontWeight(.medium)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        if !label.subtitle.isEmpty {
+                            Text(label.subtitle)
+                                .font(Typography.caption)
+                                .monospacedDigit()
+                                .lineLimit(1)
+                        }
+                    }
+                    .foregroundStyle(label.darkText ? MapColors.labelDark : MapColors.labelLight)
+                    .frame(maxWidth: max(0, label.rect.width - 12), alignment: .leading)
+                    .offset(x: label.rect.minX + 6, y: label.rect.minY + 5)
+                }
+            }
+            .allowsHitTesting(false)
+        }
+        .accessibilityLabel(
+            "Storage map for \(current.url.lastPathComponent), "
+                + current.size.formatted(.byteCount(style: .file))
+        )
+        .accessibilityHint("Click a block to collect it. Double-click to open a folder.")
+        .clipShape(.rect(corners: .fixed(Metrics.panelRadius)))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(minHeight: 320)
+        .overlay(alignment: .bottomLeading) {
+            if let hovered {
+                HStack(spacing: Spacing.s2) {
+                    Text(hovered.url.lastPathComponent)
+                        .font(Typography.row)
+                        .fontWeight(.medium)
+                        .foregroundStyle(Theme.ink)
+                    Text(hovered.size.formatted(.byteCount(style: .file)))
+                        .font(Typography.row)
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.inkSecondary)
+                }
+                .padding(.horizontal, Spacing.s3)
+                .padding(.vertical, Spacing.s1)
+                .background(Theme.paperRaised, in: .rect(corners: .fixed(Metrics.innerRadius)))
+                .overlay {
+                    RoundedRectangle(cornerRadius: Metrics.innerRadius, style: .continuous)
+                        .strokeBorder(Theme.hairline, lineWidth: 1)
+                }
+                .padding(Spacing.s6)
+                .allowsHitTesting(false)
+            }
+        }
+    }
+
+    // MARK: - Collection
+
+    private func toggle(_ node: FolderNode) {
+        guard !model.isScanning else { return }
+        if collection[node.url] != nil {
+            collection[node.url] = nil
+        } else {
+            collection[node.url] = StorageEntry(url: node.url, bytes: node.size)
+        }
+    }
+
+    private func open(_ node: FolderNode) {
+        guard !node.children.isEmpty else { return }
+        stack.append(node.url)
+        hovered = nil
+    }
+
+    private func reveal(_ node: FolderNode) {
+        NSWorkspace.shared.activateFileViewerSelecting([node.url])
+    }
+
+    private func performTrash() {
+        let policy = SafetyPolicy(
+            home: FileManager.default.homeDirectoryForCurrentUser,
+            allowsOutsideHome: model.scanOutsideHome,
+            excludedPaths: model.excludedPaths)
+        let result = StorageTrasher(policy: policy, dryRun: DryRun.enabled)
+            .trash(trashRequest?.entries ?? [])
+        trashReport = result
+        collection.removeAll()
+        trashRequest = nil
+    }
+
+    private func trashNotice(_ result: StorageTrashResult) -> some View {
+        var parts: [String] = []
+        if !result.moved.isEmpty {
+            parts.append("Moved \(result.moved.count) \(result.moved.count == 1 ? "item" : "items") to the Trash.")
+        }
+        if result.failed.count == 1, let failure = result.failed.first {
+            parts.append("Could not move \(failure.name): \(failure.reason).")
+        } else if !result.failed.isEmpty {
+            parts.append("\(result.failed.count) could not be moved.")
+        }
+        if !result.moved.isEmpty {
+            parts.append("Rescan to update the sizes.")
+        }
+        return StatusStrip(
+            text: parts.joined(separator: " "),
+            systemImage: result.failed.isEmpty ? "trash" : "exclamationmark.triangle",
+            tone: result.failed.isEmpty ? .neutral : .amber,
+            action: .init(
+                title: "Scan again",
+                perform: {
+                    trashReport = nil
+                    model.scan()
+                }),
+            dismiss: .init(label: "Dismiss", perform: { trashReport = nil })
+        )
+    }
+
+    private var barDetail: String {
+        if model.isScanning { return "Wait for the scan to finish." }
+        if collection.isEmpty { return "Click a block or check a row to collect it." }
+        let count = collection.count
+        return "\(count) \(count == 1 ? "item" : "items") collected. "
+            + "Click a block or check a row to collect it."
+    }
+
+    private var barReason: String? {
+        if model.isScanning { return "Wait for the scan to finish." }
+        if collection.isEmpty { return "Nothing collected." }
+        return nil
+    }
+
+    private var commandBar: some View {
+        CommandBar(
+            metric: collectedBytes.formatted(.byteCount(style: .file)),
+            detail: barDetail,
+            actionTitle: "Move to Trash...",
+            // Under the dry-run gate the sheet opens as a preview and its confirm button
+            // stays disabled, so the user can still see what would move.
+            isEnabled: !collection.isEmpty && !model.isScanning,
+            isDestructive: true,
+            secondaryTitle: "Clear",
+            secondaryAction: { collection.removeAll() },
+            isSecondaryEnabled: !collection.isEmpty,
+            help: "Move the collected folders to the Trash.",
+            accessibilityLabel: "Move \(collection.count) "
+                + "\(collection.count == 1 ? "item" : "items") to the Trash",
+            disabledReason: barReason,
+            primaryIdentifier: "storage.trash",
+            secondaryIdentifier: "storage.clear",
+            action: { trashRequest = TrashRequest(entries: collected) })
+    }
+
+    // MARK: - Navigation
 
     /// The newest node with this URL, or nil when the update dropped it.
     private static func node(with url: URL, in tree: FolderNode) -> FolderNode? {
@@ -187,91 +377,7 @@ struct DiskMapView: View {
         return nodes
     }
 
-    /// Nil before the first scan, so the page shows no number it cannot source.
-    private var pageHeader: some View {
-        let current = pathNodes.last
-        return PageHeader(
-            title: "Storage",
-            subtitle: "Where your space goes.",
-            metric: current?.size.formatted(.byteCount(style: .file)),
-            metricLabel: current == nil ? nil : "in this folder"
-        )
-        .accessibilityIdentifier("storage.header")
-        .pageHorizontalPadding()
-        .padding(.top, Spacing.s6)
-        .padding(.bottom, Spacing.s3)
-    }
-
-    /// The five biggest children of the current folder. A row opens the folder when it has
-    /// children of its own.
-    private func largestFolders(_ current: FolderNode) -> some View {
-        let children = Array(current.children.sorted { $0.size > $1.size }.prefix(5))
-        return VStack(alignment: .leading, spacing: Spacing.s3) {
-            if children.isEmpty {
-                Text("No folders inside this one.")
-                    .font(Typography.caption)
-                    .foregroundStyle(Theme.inkSecondary)
-            } else {
-                SectionHeader(title: "Largest folders")
-                VStack(spacing: 0) {
-                    ForEach(children, id: \.url) { child in
-                        largestFolderRow(child, of: current)
-                        if child.url != children.last?.url { Hairline() }
-                    }
-                }
-            }
-        }
-        .pageHorizontalPadding()
-        .padding(.bottom, Spacing.s3)
-    }
-
-    @ViewBuilder
-    private func largestFolderRow(_ child: FolderNode, of parent: FolderNode) -> some View {
-        let share = Double(child.size) / Double(max(parent.size, 1))
-        let size = child.size.formatted(.byteCount(style: .file))
-        let shareText = share.formatted(.percent.precision(.fractionLength(0)))
-        if child.children.isEmpty {
-            folderRowLabel(child, size: size, share: shareText)
-                .help(child.url.path)
-                .accessibilityLabel("\(child.url.lastPathComponent), \(size), \(shareText) of this folder")
-        } else {
-            Button {
-                stack.append(child.url)
-            } label: {
-                folderRowLabel(child, size: size, share: shareText)
-            }
-            .buttonStyle(.plain)
-            .help(child.url.path)
-            .accessibilityLabel("\(child.url.lastPathComponent), \(size), \(shareText) of this folder")
-        }
-    }
-
-    private func folderRowLabel(_ child: FolderNode, size: String, share: String) -> some View {
-        HStack(spacing: Spacing.s3) {
-            Image(systemName: "folder")
-                .font(Typography.iconRow)
-                .foregroundStyle(Theme.inkSecondary)
-                .frame(width: 22)
-            Text(child.url.lastPathComponent)
-                .font(Typography.row)
-                .foregroundStyle(Theme.ink)
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Spacer(minLength: Spacing.s3)
-            Text(size)
-                .font(Typography.row)
-                .monospacedDigit()
-                .foregroundStyle(Theme.inkSecondary)
-            Text(share)
-                .font(Typography.caption)
-                .monospacedDigit()
-                .foregroundStyle(Theme.inkSecondary)
-                .frame(width: 44, alignment: .trailing)
-        }
-        .padding(.vertical, Spacing.s2)
-        .frame(minHeight: Metrics.rowHeight)
-        .contentShape(Rectangle())
-    }
+    // MARK: - Scan progress
 
     /// Bottom section: everything the scan is doing right now, in one strip. Text-only,
     /// so its per-tick updates never relayout the Metal canvas above.
@@ -314,17 +420,15 @@ struct DiskMapView: View {
                 HStack(spacing: Spacing.s2) {
                     Spacer()
                     SecondaryActionButton(
-                        title: model.isPaused ? "Resume" : "Pause",
+                        title: "Pause", isEnabled: !model.isPaused,
                         action: { model.togglePause() }
                     )
-                    .accessibilityIdentifier(model.isPaused ? "storage.resume" : "storage.pause")
-                    PrimaryActionButton(
-                        title: "Stop scan",
-                        systemImage: "stop.circle",
-                        help: "Stop the scan",
-                        action: { model.cancel() }
+                    .accessibilityIdentifier("storage.pause")
+                    SecondaryActionButton(
+                        title: "Resume", isEnabled: model.isPaused,
+                        action: { model.togglePause() }
                     )
-                    .accessibilityIdentifier("storage.stop")
+                    .accessibilityIdentifier("storage.resume")
                 }
             }
             .pageHorizontalPadding()
@@ -344,80 +448,12 @@ struct DiskMapView: View {
     }
 }
 
-struct DiskMapChrome: View {
-    let pathNodes: [FolderNode]
-    let isDark: Bool
-    let sizeBasis: SizeBasis
-    let onSelect: (Int) -> Void
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: Spacing.s2) {
-                HStack(spacing: Spacing.s1) {
-                    ForEach(Array(pathNodes.enumerated()), id: \.offset) { index, node in
-                        if index > 0 {
-                            Image(systemName: "chevron.right")
-                                .font(Typography.caption)
-                                .foregroundStyle(Theme.inkSecondary)
-                        }
-                        if index == pathNodes.count - 1 {
-                            Text(index == 0 ? "Home" : node.url.lastPathComponent)
-                                .font(Typography.caption)
-                                .foregroundStyle(Theme.ink)
-                                .lineLimit(1)
-                        } else {
-                            Button(index == 0 ? "Home" : node.url.lastPathComponent) {
-                                onSelect(index)
-                            }
-                            .buttonStyle(.plain)
-                            .font(Typography.caption)
-                            .foregroundStyle(Theme.inkSecondary)
-                            .lineLimit(1)
-                            .focusable()
-                            .focusRing()
-                        }
-                    }
-                }
-                Spacer()
-                legend
-            }
-            .pageHorizontalPadding()
-            .padding(.vertical, Spacing.s2)
-            Hairline()
-        }
-        .background(Theme.paper)
-    }
-
-    private var legend: some View {
-        HStack(spacing: Spacing.s2) {
-            ForEach(0..<4, id: \.self) { step in
-                Rectangle()
-                    .fill(swatch(step))
-                    .frame(width: 10, height: 10)
-            }
-            Text(isDark ? "Lighter means a larger share" : "Darker means a larger share")
-                .font(Typography.caption)
-                .foregroundStyle(Theme.inkSecondary)
-            if sizeBasis == .allocated {
-                Text("Size on disk")
-                    .font(Typography.caption)
-                    .padding(.leading, Spacing.s2)
-                    .help("The space these files take on the disk.")
-            }
-        }
-    }
-
-    private func swatch(_ step: Int) -> Color {
-        let palette = TreemapPalette(isDark: isDark)
-        let color = palette.ramp(CGFloat(step) / 3)
-        return Color(.sRGB, red: Double(color.x), green: Double(color.y), blue: Double(color.z), opacity: 1)
-    }
-}
-
 struct TreemapCanvas: NSViewRepresentable {
     let node: FolderNode
     let isDark: Bool
+    let selected: Set<URL>
     let onHover: (FolderNode?) -> Void
+    let onToggle: (FolderNode) -> Void
     let onOpen: (FolderNode) -> Void
     let onLabels: ([TreemapLabel]) -> Void
 
@@ -430,6 +466,7 @@ struct TreemapCanvas: NSViewRepresentable {
 
     func updateNSView(_ view: TreemapMTKView, context: Context) {
         view.onHover = onHover
+        view.onToggle = onToggle
         view.onOpen = onOpen
         view.onLabels = onLabels
         let appearanceChanged = view.isDark != isDark
@@ -438,7 +475,10 @@ struct TreemapCanvas: NSViewRepresentable {
         // during a scan even though the URL stays the same).
         if view.node != node || appearanceChanged {
             view.node = node
+            view.selected = selected
             view.relayout()
+        } else {
+            view.selected = selected
         }
     }
 }
@@ -449,11 +489,10 @@ struct TreemapCanvas: NSViewRepresentable {
 struct TreemapTile {
     let rect: CGRect
     let color: SIMD4<Float>
-    let border: SIMD4<Float>
     let node: FolderNode
 }
 
-/// A name and byte count drawn directly on a big top-level block.
+/// A name and byte count drawn directly on a block.
 struct TreemapLabel: Identifiable {
     let rect: CGRect
     let title: String
@@ -462,45 +501,24 @@ struct TreemapLabel: Identifiable {
     var id: CGRect { rect }
 }
 
-/// One neutral ramp, read in one direction per appearance. Small blocks sit near
-/// the paper, large blocks sit near the ink.
-struct TreemapPalette {
-    let isDark: Bool
-
-    var background: SIMD4<Float> {
-        isDark ? SIMD4(0.071, 0.075, 0.086, 1) : SIMD4(0.965, 0.957, 0.937, 1)
-    }
-
-    var border: SIMD4<Float> { background }
-
-    func ramp(_ t: CGFloat) -> SIMD4<Float> {
-        let t = Float(min(1, max(0, t)))
-        let start: SIMD3<Float> = isDark ? SIMD3(0.165, 0.173, 0.192) : SIMD3(0.894, 0.878, 0.843)
-        let end: SIMD3<Float> = isDark ? SIMD3(0.847, 0.831, 0.796) : SIMD3(0.114, 0.125, 0.149)
-        let color = start + (end - start) * t
-        return SIMD4(color.x, color.y, color.z, 1)
-    }
-
-    func rampShare(_ share: CGFloat) -> SIMD4<Float> {
-        ramp(CGFloat(sqrt(max(0, share))))
-    }
-
-    func labelIsDark(_ share: CGFloat) -> Bool {
-        let t = sqrt(max(0, share))
-        return isDark ? t > 0.45 : t < 0.45
-    }
-}
-
 final class TreemapMTKView: MTKView, MTKViewDelegate {
     var node: FolderNode?
     var isDark = false
+    /// Direct children currently in the collection.
+    var selected: Set<URL> = [] {
+        didSet { if selected != oldValue { rebuildInstances() } }
+    }
     var onHover: (FolderNode?) -> Void = { _ in }
+    /// A click collects the top-level child under the pointer.
+    var onToggle: (FolderNode) -> Void = { _ in }
+    /// A double click opens a folder that has children.
     var onOpen: (FolderNode) -> Void = { _ in }
     /// Publishes the top-tier labels (name + size on big blocks) to the SwiftUI layer.
     var onLabels: ([TreemapLabel]) -> Void = { _ in }
     private var tiles: [TreemapTile] = []
     private var instances: MTLBuffer?
     private var pipeline: MTLRenderPipelineState?
+    private var hoveredURL: URL?
 
     /// How many nested levels are drawn: the node itself plus this many child levels.
     static let nestingLevels = 3
@@ -524,9 +542,20 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
     }
 
     func relayout() {
-        guard let node, bounds.width > 0, bounds.height > 0, let device else { return }
+        guard let node, bounds.width > 0, bounds.height > 0 else { return }
         let palette = TreemapPalette(isDark: isDark)
         tiles = Self.tiles(for: node, in: CGRect(origin: .zero, size: bounds.size), palette: palette)
+        rebuildInstances(palette: palette)
+        onLabels(Self.labels(for: node, in: bounds, palette: palette))
+    }
+
+    private func rebuildInstances(palette supplied: TreemapPalette? = nil) {
+        guard let device, bounds.width > 0, bounds.height > 0, !tiles.isEmpty else {
+            instances = nil
+            needsDisplay = true
+            return
+        }
+        let palette = supplied ?? TreemapPalette(isDark: isDark)
         var data: [SIMD4<Float>] = []
         for tile in tiles {
             let r = tile.rect
@@ -535,22 +564,27 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
                     Float(r.minX / bounds.width), Float(r.minY / bounds.height), Float(r.width / bounds.width),
                     Float(r.height / bounds.height)))
             data.append(tile.color)
-            data.append(tile.border)
+            if selected.contains(tile.node.url) {
+                data.append(palette.accentBorder)
+            } else if hoveredURL == tile.node.url {
+                data.append(palette.hoverBorder)
+            } else {
+                data.append(palette.border)
+            }
         }
         instances =
             data.isEmpty ? nil : device.makeBuffer(bytes: data, length: data.count * MemoryLayout<SIMD4<Float>>.stride)
         needsDisplay = true
-        onLabels(Self.labels(for: node, in: bounds, palette: palette))
     }
 
-    /// Labels for top-level children big enough to carry two lines of text (84 pt a
-    /// side). Shares mirror `tiles(for:in:level:)`, so label rects match the canvas.
+    /// Labels for top-level children big enough to carry text (44 x 36 pt). Shares mirror
+    /// `tiles(for:in:level:)`, so label rects match the canvas.
     static func labels(for node: FolderNode, in bounds: CGRect, palette: TreemapPalette) -> [TreemapLabel] {
         guard !node.children.isEmpty, bounds.width > 0 else { return [] }
         let boundsArea = bounds.width * bounds.height
         var out: [TreemapLabel] = []
         for item in Treemap.layout(node.children.map(\.size), in: bounds)
-        where item.rect.width >= 84 && item.rect.height >= 84 {
+        where item.rect.width >= 44 && item.rect.height >= 36 {
             let child = node.children[item.index]
             let share = boundsArea > 0 ? item.rect.width * item.rect.height / boundsArea : 0
             let t = sqrt(max(0, share))
@@ -561,7 +595,8 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
                 TreemapLabel(
                     rect: item.rect,
                     title: child.url.lastPathComponent,
-                    subtitle: child.size.formatted(.byteCount(style: .file)),
+                    subtitle: item.rect.height >= 54 && item.rect.width >= 64
+                        ? child.size.formatted(.byteCount(style: .file)) : "",
                     darkText: palette.labelIsDark(share)))
         }
         return out
@@ -573,9 +608,7 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
         for node: FolderNode, in bounds: CGRect, level: Int = 0, palette: TreemapPalette
     ) -> [TreemapTile] {
         guard !node.children.isEmpty else { return [] }
-        var out = [
-            TreemapTile(rect: bounds, color: palette.background, border: palette.border, node: node)
-        ]
+        var out = [TreemapTile(rect: bounds, color: palette.background, node: node)]
         let rects = Treemap.layout(node.children.map(\.size), in: bounds)
         let boundsArea = bounds.width * bounds.height
         for item in rects where item.rect.width > 4 && item.rect.height > 4 {
@@ -583,11 +616,7 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
             let inner = item.rect.insetBy(dx: 1, dy: 1)
             let share = boundsArea > 0 ? item.rect.width * item.rect.height / boundsArea : 0
             out.append(
-                TreemapTile(
-                    rect: inner,
-                    color: palette.rampShare(share),
-                    border: palette.border,
-                    node: child))
+                TreemapTile(rect: inner, color: palette.rampShare(share), node: child))
             if level < nestingLevels - 1, !child.children.isEmpty,
                 inner.width * inner.height >= boundsArea * minRecursionFraction
             {
@@ -598,8 +627,10 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
         }
         return out
     }
+
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
+        hoveredURL = nil
         relayout()
     }
 
@@ -630,15 +661,57 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
             .min { $0.rect.width * $0.rect.height < $1.rect.width * $1.rect.height }
     }
 
-    override func mouseMoved(with event: NSEvent) {
-        onHover(tile(at: convert(event.locationInWindow, from: nil))?.node)
+    /// The direct child of the shown folder that contains `node`. A click on a nested
+    /// block collects its top-level parent, which is the row the ledger shows.
+    private func directChild(containing node: FolderNode) -> FolderNode? {
+        guard let root = self.node else { return nil }
+        return root.children.first { child in
+            child.url == node.url || node.url.path.hasPrefix(child.url.path + "/")
+        }
     }
-    override func mouseExited(with event: NSEvent) { onHover(nil) }
+
+    override func mouseMoved(with event: NSEvent) {
+        let hit = tile(at: convert(event.locationInWindow, from: nil))?.node
+        onHover(hit)
+        if hit?.url != hoveredURL {
+            hoveredURL = hit?.url
+            rebuildInstances()
+        }
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        onHover(nil)
+        if hoveredURL != nil {
+            hoveredURL = nil
+            rebuildInstances()
+        }
+    }
+
+    /// A single click waits out the double-click interval, so the first half of a
+    /// double click never toggles the collection. A double click opens instead.
+    private var pendingClick: DispatchWorkItem?
+    private var pendingNode: FolderNode?
 
     override func mouseDown(with event: NSEvent) {
-        if let node = tile(at: convert(event.locationInWindow, from: nil))?.node, !node.children.isEmpty {
-            onOpen(node)
+        guard let hit = tile(at: convert(event.locationInWindow, from: nil))?.node else { return }
+        if event.clickCount >= 2 {
+            pendingClick?.cancel()
+            pendingClick = nil
+            pendingNode = nil
+            if !hit.children.isEmpty { onOpen(hit) }
+            return
         }
+        pendingClick?.cancel()
+        pendingNode = hit
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, let node = self.pendingNode,
+                let child = self.directChild(containing: node)
+            else { return }
+            self.pendingNode = nil
+            self.onToggle(child)
+        }
+        pendingClick = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + NSEvent.doubleClickInterval, execute: work)
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {
@@ -654,5 +727,4 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
     @objc private func reveal(_ sender: NSMenuItem) {
         if let url = sender.representedObject as? URL { NSWorkspace.shared.activateFileViewerSelecting([url]) }
     }
-
 }

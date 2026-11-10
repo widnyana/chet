@@ -3,57 +3,6 @@ import SwiftUI
 
 // MARK: - Tokens
 
-enum Theme {
-    static let paper = dynamic(
-        light: NSColor(srgbRed: 0.965, green: 0.957, blue: 0.937, alpha: 1),
-        dark: NSColor(srgbRed: 0.071, green: 0.075, blue: 0.086, alpha: 1))
-    static let paperRaised = dynamic(
-        light: NSColor(srgbRed: 0.988, green: 0.984, blue: 0.973, alpha: 1),
-        dark: NSColor(srgbRed: 0.098, green: 0.106, blue: 0.118, alpha: 1))
-    static let ink = dynamic(
-        light: NSColor(srgbRed: 0.106, green: 0.110, blue: 0.118, alpha: 1),
-        dark: NSColor(srgbRed: 0.949, green: 0.941, blue: 0.918, alpha: 1))
-    static let inkSecondary = dynamic(
-        light: NSColor(srgbRed: 0.388, green: 0.388, blue: 0.373, alpha: 1),
-        dark: NSColor(srgbRed: 0.639, green: 0.631, blue: 0.604, alpha: 1))
-    static let inkTertiary = dynamic(
-        light: NSColor(srgbRed: 0.545, green: 0.541, blue: 0.514, alpha: 1),
-        dark: NSColor(srgbRed: 0.455, green: 0.455, blue: 0.435, alpha: 1))
-    static let hairline = dynamic(
-        light: NSColor(srgbRed: 0.867, green: 0.851, blue: 0.816, alpha: 1),
-        dark: NSColor(srgbRed: 0.173, green: 0.180, blue: 0.196, alpha: 1))
-    static let accent = dynamic(
-        light: NSColor(srgbRed: 0.141, green: 0.298, blue: 0.604, alpha: 1),
-        dark: NSColor(srgbRed: 0.561, green: 0.659, blue: 0.910, alpha: 1))
-    static let accentSoft = dynamic(
-        light: NSColor(srgbRed: 0.910, green: 0.929, blue: 0.973, alpha: 1),
-        dark: NSColor(srgbRed: 0.106, green: 0.141, blue: 0.212, alpha: 1))
-    static let onAccent = dynamic(
-        light: NSColor.white,
-        dark: NSColor(srgbRed: 0.063, green: 0.067, blue: 0.078, alpha: 1))
-    static let amber = dynamic(
-        light: NSColor(srgbRed: 0.604, green: 0.357, blue: 0.000, alpha: 1),
-        dark: NSColor(srgbRed: 0.878, green: 0.643, blue: 0.345, alpha: 1))
-    static let red = dynamic(
-        light: NSColor(srgbRed: 0.639, green: 0.137, blue: 0.106, alpha: 1),
-        dark: NSColor(srgbRed: 0.941, green: 0.541, blue: 0.510, alpha: 1))
-    static let capacityUsed = dynamic(
-        light: NSColor(srgbRed: 0.839, green: 0.824, blue: 0.784, alpha: 1),
-        dark: NSColor(srgbRed: 0.227, green: 0.235, blue: 0.255, alpha: 1))
-    static let capacityFree = dynamic(
-        light: NSColor(srgbRed: 0.914, green: 0.902, blue: 0.871, alpha: 1),
-        dark: NSColor(srgbRed: 0.133, green: 0.141, blue: 0.157, alpha: 1))
-    static let mapLabelDark = Color(red: 0.07, green: 0.08, blue: 0.09)
-    static let mapLabelLight = Color.white
-
-    private static func dynamic(light: NSColor, dark: NSColor) -> Color {
-        Color(
-            nsColor: NSColor(name: nil) { appearance in
-                appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light
-            })
-    }
-}
-
 enum Typography {
     static let display = Font.system(size: 34, weight: .semibold)
     static let title = Font.system(size: 24, weight: .semibold)
