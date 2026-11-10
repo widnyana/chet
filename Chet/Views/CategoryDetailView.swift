@@ -36,6 +36,14 @@ struct CategoryDetailView: View {
     }
 
     var body: some View {
+        if isInformational {
+            page(bar: EmptyView())
+        } else {
+            page(bar: commandBar)
+        }
+    }
+
+    private func page<Bar: View>(bar: Bar) -> some View {
         PageScreen(
             scrolls: false,
             header: {
@@ -76,7 +84,7 @@ struct CategoryDetailView: View {
                     }
                 }
             },
-            bar: { commandBar }
+            bar: { bar }
         )
         .focusedValue(
             \.selectionActions,
@@ -96,25 +104,23 @@ struct CategoryDetailView: View {
         }
     }
 
-    @ViewBuilder private var commandBar: some View {
-        if !isInformational {
-            CommandBar(
-                metric: categorySelected.reduce(0) { $0 + $1.reclaimableBytes }
-                    .formatted(.byteCount(style: .file)),
-                detail: categorySelected.count == 1
-                    ? "1 item selected" : "\(categorySelected.count) items selected",
-                actionTitle: "Clean",
-                actionSystemImage: "trash",
-                isEnabled: !categorySelected.isEmpty && !model.isCleaning,
-                help: "Review and clean the selected items",
-                accessibilityLabel:
-                    "Clean selected, \(categorySelected.count) items",
-                disabledReason: "Select an item to clean.",
-                action: {
-                    model.beginClean(categorySelected)
-                    onClean()
-                })
-        }
+    private var commandBar: some View {
+        CommandBar(
+            metric: categorySelected.reduce(0) { $0 + $1.reclaimableBytes }
+                .formatted(.byteCount(style: .file)),
+            detail: categorySelected.count == 1
+                ? "1 item selected" : "\(categorySelected.count) items selected",
+            actionTitle: "Clean",
+            actionSystemImage: "trash",
+            isEnabled: !categorySelected.isEmpty && !model.isCleaning,
+            help: "Review and clean the selected items",
+            accessibilityLabel:
+                "Clean selected, \(categorySelected.count) items",
+            disabledReason: "Select an item to clean.",
+            action: {
+                model.beginClean(categorySelected)
+                onClean()
+            })
     }
 
     private var table: some View {

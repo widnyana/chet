@@ -154,10 +154,10 @@ same text layout with `.clear` ink when there is no number.
 
 `PageScreen` applied `.safeAreaBar(edge: .bottom) { bar }` unconditionally.
 Tweaks is the only destination that passes no command bar, so its bar was an
-`EmptyView` — and an empty bar still claims the whole content height: the
-scroll area measured `450,372,710,0` and the entire list was clipped away.
-Header, gate notice, and page summary stayed visible, which reads as "the
-tweaks list is missing" rather than "the page has no room".
+`EmptyView`. An empty bar still claims the whole content height: the scroll
+area measured `450,372,710,0` and the entire list was clipped away. Header,
+gate notice, and page summary stayed visible, which reads as "the tweaks list
+is missing" rather than "the page has no room".
 
 Rule: a view that only decorates the bottom of a page is applied only when it
 exists.
@@ -168,6 +168,21 @@ exists.
         content
     } else {
         content.safeAreaBar(edge: .bottom) { bar }
+    }
+}
+```
+
+`Bar.self` reads the type, so this only works when the empty case has the
+`EmptyView` type. A `@ViewBuilder` bar with one `if` and no `else` is still a
+bar type and still claims the height when the condition is false. A page whose
+bar depends on its data branches above the frame:
+
+```swift
+var body: some View {
+    if isProtected {
+        page(bar: EmptyView())
+    } else {
+        page(bar: commandBar)
     }
 }
 ```
