@@ -447,13 +447,25 @@ struct EmptyStateView: View {
     }
 }
 
+/// An indeterminate spinner, drawn as a circle. A bare `ProgressView` becomes a
+/// horizontal bar inside a toolbar, so the circular style is pinned here once.
+struct ActivitySpinner: View {
+    var controlSize: ControlSize = .small
+
+    var body: some View {
+        ProgressView()
+            .progressViewStyle(.circular)
+            .controlSize(controlSize)
+            .accessibilityHidden(true)
+    }
+}
+
 struct LoadingStateView: View {
     let message: String
 
     var body: some View {
         HStack(spacing: Spacing.s2) {
-            ProgressView()
-                .controlSize(.small)
+            ActivitySpinner()
             Text(message)
                 .font(Typography.body)
                 .foregroundStyle(Theme.inkSecondary)

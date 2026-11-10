@@ -13,7 +13,7 @@ struct SidebarView: View {
             if model.isScanning && safeRows.isEmpty && reviewRows.isEmpty {
                 Section {
                     HStack(spacing: Spacing.s2) {
-                        ProgressView().controlSize(.mini)
+                        ActivitySpinner(controlSize: .mini)
                         Text("Scanning").foregroundStyle(Theme.inkSecondary)
                     }
                     .selectionDisabled()
@@ -57,20 +57,19 @@ struct SidebarView: View {
 
     private func categoryRow(_ category: CategoryState) -> some View {
         let step = ScanStatusView.step(forCategory: category.id)
-        let pending =
-            model.isScanning && !(model.steps.first(where: { $0.id == step })?.done ?? false)
-            && category.bytes == 0
+        // The row exists once the step found something, but the step can still be adding to it.
+        let working = model.isScanning && !(model.steps.first(where: { $0.id == step })?.done ?? false)
         return row(
             category.id, CategoryCopy.title(category.id, fallback: category.title),
             trailing: category.id == "snapshots"
                 ? "\(model.snapshots.count)" : category.bytes.formatted(.byteCount(style: .file)),
             locked: category.needsFullDiskAccess,
-            dimmed: pending)
+            working: working)
     }
 
     private func row(
         _ id: String, _ title: String, trailing: String? = nil, locked: Bool = false,
-        dimmed: Bool = false, symbol: String? = nil
+        working: Bool = false, symbol: String? = nil
     ) -> some View {
         let glyph = symbol ?? CategoryStyle.of(id).symbol
         let isSelected = selection == id
@@ -80,7 +79,7 @@ struct SidebarView: View {
                     .font(Typography.sidebar)
                     .lineLimit(1)
                     .modifier(
-                        SidebarInk(isSelected: isSelected, tone: dimmed ? Theme.inkSecondary : Theme.ink))
+                        SidebarInk(isSelected: isSelected, tone: Theme.ink))
                 if locked {
                     Image(systemName: "lock.fill")
                         .font(Typography.caption)
@@ -89,6 +88,9 @@ struct SidebarView: View {
                         .accessibilityHidden(true)
                 }
                 Spacer(minLength: Spacing.s2)
+                if working {
+                    ActivitySpinner(controlSize: .mini)
+                }
                 if let trailing {
                     Text(trailing)
                         .font(Typography.caption)
