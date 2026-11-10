@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 /// What one scan is allowed to look at. An empty value scans everything the way Chet always
@@ -77,9 +78,16 @@ public struct ScanScope: Sendable, Equatable, Codable {
             guard raw.hasPrefix("/") else { return nil }
             let path = URL(fileURLWithPath: raw).standardizedFileURL.path
             guard path != "/" else { return nil }
-            return seen.insert(path).inserted ? path : nil
+            return seen.insert(Self.canonicalPath(path)).inserted ? path : nil
         }
         return ScanScope(
             categories: categories.filter(Self.knownCategories.contains), roots: cleaned)
+    }
+
+    /// The path with every symlink resolved. Foundation strips `/private` from `/var`, which
+    /// defeats prefix comparison, so realpath(3) is the only spelling both sides share.
+    public static func canonicalPath(_ path: String) -> String {
+        path.withCString { realpath($0, nil) }.map { String(cString: $0) }
+            ?? URL(fileURLWithPath: path).standardizedFileURL.path
     }
 }
