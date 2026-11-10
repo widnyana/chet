@@ -474,7 +474,7 @@ struct EmptyStateView: View {
     var action: (() -> Void)?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s3) {
+        VStack(spacing: Spacing.s3) {
             Text(title)
                 .font(Typography.section)
                 .foregroundStyle(Theme.ink)
@@ -490,7 +490,8 @@ struct EmptyStateView: View {
                 }
             }
         }
-        .frame(maxWidth: 420, alignment: .leading)
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: 420)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 }
