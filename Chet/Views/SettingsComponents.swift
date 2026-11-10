@@ -120,6 +120,7 @@ struct SettingsRow<Control: View>: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, SettingsGrid.rowPadding)
             control
                 .gridColumnAlignment(.trailing)
@@ -136,9 +137,9 @@ struct SettingsActionRow<Content: View>: View {
     var body: some View {
         GridRow {
             Color.clear
-                .frame(width: 0, height: 0)
+                .frame(maxWidth: .infinity, minHeight: 0, maxHeight: 0)
             content
-                .frame(maxWidth: .infinity, alignment: .trailing)
+                .gridColumnAlignment(.trailing)
                 .padding(.vertical, SettingsGrid.rowPadding)
         }
         .frame(minHeight: SettingsGrid.row, alignment: .leading)
