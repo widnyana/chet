@@ -422,34 +422,35 @@ private struct AppCell: View {
                     StatusLabel(text: "Needs administrator", systemImage: "lock.fill", tone: .amber)
                 }
             }
-            Button {
-                model.select(app)
-            } label: {
-                VStack(spacing: Spacing.s2) {
-                    Image(nsImage: IconCache.icon(for: app.url))
-                        .resizable()
-                        .frame(width: 48, height: 48)
-                    Text(app.name)
-                        .font(Typography.row)
-                        .foregroundStyle(Theme.ink)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.center)
-                    Text(app.vendorLabel ?? "Unknown")
+            RowActionButton(
+                help: "Show files left by \(app.name)",
+                accessibilityLabel: "Show files left by \(app.name)",
+                action: { model.select(app) },
+                label: {
+                    VStack(spacing: Spacing.s2) {
+                        Image(nsImage: IconCache.icon(for: app.url))
+                            .resizable()
+                            .frame(width: 48, height: 48)
+                        Text(app.name)
+                            .font(Typography.row)
+                            .foregroundStyle(Theme.ink)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.center)
+                        Text(app.vendorLabel ?? "Unknown")
+                            .font(Typography.caption)
+                            .foregroundStyle(Theme.inkSecondary)
+                            .lineLimit(1)
+                        Text(
+                            "\(model.appSizes[app.url].map { $0.formatted(.byteCount(style: .file)) } ?? "Unknown") · \(model.locationLabel(app))"
+                        )
                         .font(Typography.caption)
+                        .monospacedDigit()
                         .foregroundStyle(Theme.inkSecondary)
                         .lineLimit(1)
-                    Text(
-                        "\(model.appSizes[app.url].map { $0.formatted(.byteCount(style: .file)) } ?? "Unknown") · \(model.locationLabel(app))"
-                    )
-                    .font(Typography.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.inkSecondary)
-                    .lineLimit(1)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, Spacing.s3)
-            }
-            .buttonStyle(.plain)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, Spacing.s3)
+                })
         }
         .padding(Spacing.s3)
         .background(Theme.paperRaised, in: .rect(corners: .fixed(Metrics.innerRadius)))

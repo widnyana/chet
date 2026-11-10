@@ -123,39 +123,35 @@ struct OverviewView: View {
 
     private func categoryRow(_ category: CategoryState) -> some View {
         let title = CategoryCopy.title(category.id, fallback: category.title)
-        return Button {
-            selection = category.id
-        } label: {
-            HStack(spacing: Spacing.s3) {
-                Image(systemName: CategoryStyle.of(category.id).symbol)
-                    .font(Typography.iconRow)
-                    .foregroundStyle(Theme.inkSecondary)
-                    .frame(width: 22)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
-                        .font(Typography.row)
+        return RowActionButton(
+            help: CategoryCopy.explanation(category.id),
+            action: { selection = category.id },
+            label: {
+                HStack(spacing: Spacing.s3) {
+                    Image(systemName: CategoryStyle.of(category.id).symbol)
+                        .font(Typography.iconRow)
+                        .foregroundStyle(Theme.inkSecondary)
+                        .frame(width: 22)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(title)
+                            .font(Typography.row)
+                            .foregroundStyle(Theme.ink)
+                            .lineLimit(1)
+                        Text(categorySubtitle(category))
+                            .font(Typography.caption)
+                            .foregroundStyle(Theme.inkSecondary)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: Spacing.s3)
+                    Text(categoryValue(category))
+                        .font(Typography.metric)
+                        .monospacedDigit()
                         .foregroundStyle(Theme.ink)
                         .lineLimit(1)
-                    Text(categorySubtitle(category))
-                        .font(Typography.caption)
-                        .foregroundStyle(Theme.inkSecondary)
-                        .lineLimit(1)
                 }
-                Spacer(minLength: Spacing.s3)
-                Text(categoryValue(category))
-                    .font(Typography.metric)
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.ink)
-                    .lineLimit(1)
-            }
-            .padding(.vertical, Spacing.s2)
-            .frame(minHeight: Metrics.rowHeight)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .focusable()
-        .focusRing()
-        .help(CategoryCopy.explanation(category.id))
+                .padding(.vertical, Spacing.s2)
+                .frame(minHeight: Metrics.rowHeight)
+            })
     }
 
     private func categorySubtitle(_ category: CategoryState) -> String {

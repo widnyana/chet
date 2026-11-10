@@ -545,6 +545,7 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
 
     func relayout() {
         guard let node, bounds.width > 0, bounds.height > 0 else { return }
+        NSLog("TMAP relayout node=%@ bounds=%.0fx%.0f", node.url.lastPathComponent, bounds.width, bounds.height)
         let palette = TreemapPalette(isDark: isDark)
         tiles = Self.tiles(for: node, in: CGRect(origin: .zero, size: bounds.size), palette: palette)
         rebuildInstances(palette: palette)
@@ -694,11 +695,18 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
     private var lastOpen = Date.distantPast
 
     override func mouseDown(with event: NSEvent) {
+        let hit = tile(at: convert(event.locationInWindow, from: nil))?.node
+        let child = hit.flatMap { directChild(containing: $0) }
+        NSLog(
+            "TMAP mousedown viewnode=%@ hit=%@ child=%@ childKids=%d clickCount=%d",
+            self.node?.url.lastPathComponent ?? "nil", hit?.url.lastPathComponent ?? "nil",
+            child?.url.lastPathComponent ?? "nil", child?.children.isEmpty == false ? child!.children.count : -1,
+            event.clickCount)
         guard event.clickCount == 1 else { return }
-        guard let hit = tile(at: convert(event.locationInWindow, from: nil))?.node,
+        guard let hit,
             // Open the block the user sees at this level, not a nested grandchild the
             // breadcrumb cannot resolve.
-            let child = directChild(containing: hit), !child.children.isEmpty
+            let child, !child.children.isEmpty
         else { return }
         let now = Date()
         guard now.timeIntervalSince(lastOpen) > 0.3 else { return }

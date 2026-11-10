@@ -10,23 +10,20 @@ struct ListHeaderBar: View {
         let selected = items.filter { model.selected.contains($0.url) }
         VStack(spacing: 0) {
             HStack(spacing: Spacing.s3) {
-                Button {
-                    model.setSelected(items.map(\.url), selected.count != items.count)
-                } label: {
-                    Image(systemName: Self.triState(selected: selected.count, total: items.count))
-                        .font(Typography.iconAction)
-                        .foregroundStyle(selected.count > 0 ? Theme.accent : Theme.inkSecondary)
-                }
-                .buttonStyle(.plain)
-                .frame(width: 40, height: 40)
-                .contentShape(Rectangle())
+                RowActionButton(
+                    help: selected.count == items.count ? "Deselect all" : "Select all",
+                    accessibilityLabel: selected.count == items.count ? "Deselect all" : "Select all",
+                    identifier: "list.selectAll",
+                    action: { model.setSelected(items.map(\.url), selected.count != items.count) },
+                    label: {
+                        Image(systemName: Self.triState(selected: selected.count, total: items.count))
+                            .font(Typography.iconAction)
+                            .foregroundStyle(selected.count > 0 ? Theme.accent : Theme.inkSecondary)
+                            .frame(width: 40, height: 40)
+                    }
+                )
                 // 40 pt hit target, 32 pt header. The overhang is the hit area.
                 .padding(.vertical, -Spacing.s1)
-                .focusable()
-                .focusRing()
-                .help(selected.count == items.count ? "Deselect all" : "Select all")
-                .accessibilityLabel(selected.count == items.count ? "Deselect all" : "Select all")
-                .accessibilityIdentifier("list.selectAll")
                 Text(
                     "\(selected.count) of \(items.count) selected · "
                         + selected.reduce(0) { $0 + $1.reclaimableBytes }

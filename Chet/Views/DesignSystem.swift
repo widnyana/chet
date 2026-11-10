@@ -506,6 +506,46 @@ struct IconActionButton: View {
     }
 }
 
+/// A clickable row, tile, glyph, or crumb: no fill, one focus ring, one hit shape, and the
+/// help and accessibility wiring every one of them needs.
+///
+/// These were five hand-written buttons. Two had already drifted: the app tile had no
+/// focus ring, and only some of them set an accessibility label. The label content stays
+/// at the call site; the behaviour does not.
+struct RowActionButton<Label: View>: View {
+    let help: String
+    var accessibilityLabel: String?
+    var identifier: String?
+    let action: () -> Void
+    let label: Label
+
+    init(
+        help: String,
+        accessibilityLabel: String? = nil,
+        identifier: String? = nil,
+        action: @escaping () -> Void,
+        @ViewBuilder label: () -> Label
+    ) {
+        self.help = help
+        self.accessibilityLabel = accessibilityLabel
+        self.identifier = identifier
+        self.action = action
+        self.label = label()
+    }
+
+    var body: some View {
+        Button(action: action) {
+            label.contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .focusable()
+        .focusRing()
+        .help(help)
+        .accessibilityLabel(accessibilityLabel ?? help)
+        .modifier(OptionalAccessibilityIdentifier(identifier: identifier))
+    }
+}
+
 struct SectionHeader: View {
     let title: String
     var trailing: String?

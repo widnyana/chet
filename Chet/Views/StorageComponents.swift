@@ -30,15 +30,16 @@ struct StorageLocationBar: View {
                                     .lineLimit(1)
                                     .accessibilityIdentifier("storage.crumb.current")
                             } else {
-                                Button(title(node, index)) { onSelect(index) }
-                                    .buttonStyle(.plain)
-                                    .font(Typography.caption)
-                                    .foregroundStyle(Theme.accent)
-                                    .lineLimit(1)
-                                    .focusable()
-                                    .focusRing()
-                                    .help("Go to \(title(node, index))")
-                                    .accessibilityIdentifier("storage.crumb.\(index)")
+                                RowActionButton(
+                                    help: "Go to \(title(node, index))",
+                                    identifier: "storage.crumb.\(index)",
+                                    action: { onSelect(index) },
+                                    label: {
+                                        Text(title(node, index))
+                                            .font(Typography.caption)
+                                            .foregroundStyle(Theme.accent)
+                                            .lineLimit(1)
+                                    })
                             }
                         }
                     }
@@ -334,19 +335,17 @@ struct StorageLedgerRow: View {
             if child.children.isEmpty {
                 Color.clear.frame(width: 16, height: 1)
             } else {
-                Button(action: onOpen) {
-                    Image(systemName: "chevron.right")
-                        .font(Typography.caption)
-                        .foregroundStyle(Theme.inkSecondary)
-                        .frame(width: 16, height: Metrics.rowHeight)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .focusable()
-                .focusRing()
-                .help("Open \(child.url.lastPathComponent)")
-                .accessibilityLabel("Open \(child.url.lastPathComponent)")
-                .accessibilityIdentifier("storage.open.\(child.url.lastPathComponent)")
+                RowActionButton(
+                    help: "Open \(child.url.lastPathComponent)",
+                    accessibilityLabel: "Open \(child.url.lastPathComponent)",
+                    identifier: "storage.open.\(child.url.lastPathComponent)",
+                    action: onOpen,
+                    label: {
+                        Image(systemName: "chevron.right")
+                            .font(Typography.caption)
+                            .foregroundStyle(Theme.inkSecondary)
+                            .frame(width: 16, height: Metrics.rowHeight)
+                    })
             }
         }
         .padding(.horizontal, Spacing.s3)
