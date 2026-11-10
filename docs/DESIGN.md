@@ -299,11 +299,10 @@ macOS reports the size only when the snapshot is deleted.
 
 ### Settings
 
-A settings window in the macOS preference shape: a pane switcher with an icon and a word per
-pane, then grouped panels on `paperRaised` with the label on the left and its control on the
-right. The switcher is a component, not a system `TabView`: every segment takes an equal
-share of the width, so the headings line up instead of sizing to their own text. The
-words are for someone who has never opened a terminal: no cache jargon, no "duplicate scope".
+A settings window in the macOS preference shape: a system `TabView` with an icon and a word
+per pane, then grouped panels on `paperRaised` with the label on the left and its control on
+the right. The window is fixed at 560 x 560. The words are for someone who has never opened
+a terminal: no cache jargon, no "duplicate scope".
 
 - `What to find` tab: panel `What to look for` with the note `Chet always checks the usual
   places and measures your folders.`, then the six optional checks as switches. Panel `Speed`
@@ -364,7 +363,7 @@ Rules:
 - `SectionHeader`: sentence-case title, optional text action, hairline.
 - `CapacityBar`: used, reclaimable, free, text legend.
 - `LedgerTable`: checkbox, name and location, size, modified, risk.
-- `CommandBar`: full width, native glass bar, selection summary, one primary action.
+- `CommandBar`: full width, native Liquid Glass bar, selection summary, one primary action.
 - `StatusLabel`: icon plus text, semantic color, no pill.
 - `EmptyState`: title, cause, next action.
 - `PageScreen`: one page frame. Margin, header position, scroll rhythm, bottom bar.
@@ -379,7 +378,6 @@ Rules:
 - `PermissionPage`: plain page, one action.
 - `AboutInfoRow` and `AboutPathRow`: label, value or selectable path, optional
   status icon, detail, and secondary action.
-- `SettingsPaneSwitcher`: equal-width pane segments, icon over word, one selected state.
 - `PreferenceRow` and `DefinitionRow`: the preference list row and the detail sheet's
   label/value row. Geometry lives in the component.
 - `SettingsPanel`, `SettingsRow`, `SettingsActionRow`, `SettingsNote`,
@@ -438,6 +436,11 @@ Full copy is in [design/copy.md](design/copy.md).
 The registry tracks persistent chrome. It is read by `scripts/layout_check.py`
 and `mise run layout`. The redesign removes floating chrome, so the entries are
 in-flow or toolbar-level and cannot overlap the content.
+
+The registry holds six entries: `top-status-strip`, `command-bar`, `scan-toolbar`,
+`storage-location-bar`, `storage-metrics-row`, and `storage-ledger`. Measured at the
+960 x 632 minimum, the window frame is 960 x 684 points with the 52 pt titlebar, and
+the limited-access strip is present.
 
 Rules the script enforces:
 

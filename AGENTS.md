@@ -241,9 +241,9 @@ layout, or component. It is the short decision tree and review gate.
 A screen composes shared components. It does not rebuild a pattern, and it does not set
 spacing on a call site.
 
-- One component per pattern. Settings uses `SettingsPaneSwitcher`, `SettingsPanel`,
+- One component per pattern. Settings uses a system `TabView`, `SettingsPaneView`, `SettingsPanel`,
   `SettingsRow`, `SettingsActionRow`, `SettingsNote`, and `SettingsDivider`; nothing else
-  draws a settings pane or a settings row. Tweaks uses `PreferenceRow` and `DefinitionRow`;
+  draws a pane or a settings row. Tweaks uses `PreferenceRow` and `DefinitionRow`;
   do not hand-build a preference row in a screen.
 - Geometry lives in the component. `SettingsGrid` owns the row height and the row padding,
   and each panel's `Grid` sizes the control column to its widest control. `PreferenceRow`
@@ -334,7 +334,10 @@ identifiers of the controls inside it. Put the identifier on the control you wil
 | `sidebar.<category id>` | category rows: `trash`, `caches`, `logs`, `xcode`, `dev-garbage`, `browser`, `duplicates`, `large-files`, `leftovers`, `snapshots`, and the rest |
 | `toolbar.scan`, `toolbar.scanStop` | toolbar scan control |
 | `home.header`, `home.empty`, `home.scan`, `home.rescan`, `home.pause`, `home.resume` | Home |
+| `home.*` | The Home family: `home.stop`, `home.pause`, `home.resume`, `home.empty`, `home.scan`, `home.rescan`; the enumerated pairs above name which id shows in which state |
 | `apps.header` | Apps |
+| `homebrew.header` | Homebrew page header |
+| `homebrew.sort.<col>`, `homebrew.select.<id>`, `homebrew.search.field`, `homebrew.tap.field`, `homebrew.installer.status`, `homebrew.install`, `homebrew.install.<id>` | Homebrew table and installer sheet |
 | `storage.header`, `storage.pause`, `storage.resume` | Storage |
 | `storage.crumb.current`, `storage.crumb.<n>`, `storage.volume` | Storage location bar |
 | `storage.metric.free`, `storage.metric.cleanable`, `storage.metric.largeFiles` | Storage metric actions |
@@ -345,8 +348,9 @@ identifiers of the controls inside it. Put the identifier on the control you wil
 | `list.selectAll` | category table select-all |
 | `tweaks.header`, `tweaks.page`, `tweaks.reload`, `tweaks.loading`, `tweaks.empty` | Tweaks page |
 | `tweak.toggle.<tweak id>`, `tweak.choice.<tweak id>`, `tweak.range.<tweak id>`, `tweak.text.<tweak id>`, `tweak.folder.<tweak id>`, `tweak.inspect.<tweak id>` | tweak controls |
+| `tweak.control.<tweak id>` | the one control-position element, drawn only when the tweak is unsupported; one element per row |
 | `tweak.detail.<tweak id>`, `tweak.confirm.<tweak id>` | tweak sheets |
-| `settings.pane.whatToFind`, `settings.pane.limits`, `settings.pane.folders`, `settings.pane.tweaks` | Settings panes |
+| `settings.helper.toggle`, `settings.helper.openSettings`, `settings.helper.lifetime` | Settings administrator row |
 
 Controls without an identifier are matched by role and description: `Back`,
 `Hide Sidebar`/`Show Sidebar`, `Empty the Trash`, `Show files left by <app>`,

@@ -56,6 +56,7 @@ shift as they update.
 | `section` | 16 | semibold | Section heading |
 | `body` | 15 | regular | Paragraphs, form labels |
 | `row` | 14 | regular | Table cells, list rows |
+| `sidebar` | 13 | regular | Sidebar row labels |
 | `caption` | 12 | regular | Locations, metadata, hints |
 | `metric` | 18 | medium, tabular | Selection total, page header metric, app size |
 
@@ -87,13 +88,14 @@ rhythm and never separate sections.
 | `space2` | 8 | Inside a row |
 | `space3` | 12 | Row padding, control groups |
 | `space4` | 16 | Card-less section padding |
-| `space6` | 24 | Page side margin at wide widths |
-| `space8` | 32 | Between major sections |
+| `space6` | 24 | Stack spacing and panel padding inside a page |
+| `space8` | 32 | Between major page blocks |
 | `space10` | 40 | Between the capacity hero and the ledger |
-| `space12` | 48 | Page top and bottom margin |
+| `space12` | 48 | Onboarding page padding |
 
-Page content width: 880 pt maximum, centered above 1100 pt. At the minimum
-window of 960 x 632, side margin is 24 pt.
+Page content width: 880 pt maximum, centered above 1100 pt. Not implemented: the code
+sets no content-width cap. At the minimum window of 960 x 632, the page margin is
+`Metrics.pageMargin` 24 pt.
 
 ## Radius
 
@@ -160,7 +162,7 @@ role and a reason.
 | Token | Value |
 |---|---|
 | Row height | 40 pt for custom rows. A native `Table` keeps its system height |
-| Table header height | 32 pt for custom headers |
+| Table header height | 32 pt for custom headers, including `ColumnTable` |
 | Command bar height | 56 pt minimum plus safe-area bottom |
 | Command bar top rule | 1 px `hairline` |
 | Capacity bar height | 10 pt |
