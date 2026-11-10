@@ -89,6 +89,7 @@ struct PreferenceRow<Accessory: View>: View {
 struct DefinitionRow: View {
     let label: String
     let value: String
+    var detail: String?
     var monospaced = false
     var labelWidth: CGFloat = 110
     var identifier: String?
@@ -99,13 +100,24 @@ struct DefinitionRow: View {
                 .font(Typography.caption)
                 .foregroundStyle(Theme.inkSecondary)
                 .frame(width: labelWidth, alignment: .leading)
-            Text(value)
-                .font(monospaced ? Typography.caption : Typography.row)
-                .foregroundStyle(Theme.ink)
-                .monospacedDigit()
-                .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
-                .modifier(OptionalAccessibilityIdentifier(identifier: identifier))
+            VStack(alignment: .leading, spacing: Spacing.s1) {
+                Text(value)
+                    .font(monospaced ? Typography.caption : Typography.row)
+                    .foregroundStyle(Theme.ink)
+                    .monospacedDigit()
+                    .textSelection(.enabled)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .modifier(OptionalAccessibilityIdentifier(identifier: identifier))
+                if let detail {
+                    Text(detail)
+                        .font(Typography.caption)
+                        .foregroundStyle(Theme.inkSecondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .textSelection(.enabled)
+                }
+            }
             Spacer(minLength: 0)
         }
         .padding(.vertical, Spacing.s2)

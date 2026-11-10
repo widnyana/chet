@@ -80,8 +80,8 @@ struct GoModulesView: View {
                 label: "Modules", value: "\(info.moduleCount)", identifier: "go.module-count")
             Hairline()
             DefinitionRow(
-                label: "Toolchain", value: "\(info.source.rawValue) · \(info.executable)",
-                identifier: "go.toolchain")
+                label: "Toolchain", value: "\(info.source.rawValue) · \(info.version)",
+                detail: info.executable, identifier: "go.toolchain")
         }
         .pageHorizontalPadding()
     }

@@ -796,5 +796,8 @@ On · Finder windows   Restart Finder
 ## DefinitionRow
 
 `label` on the left in a 110 pt column, value on the right, selectable, tabular
-digits for numbers. Used by the tweak details sheet. The component owns its
-padding, so a sheet never sets row geometry at the call site.
+digits for numbers. An optional `detail` line sits under the value in caption,
+truncated in the middle, for a path or a secondary fact. The value wraps to two
+lines at most, so a long token cannot stretch the row. Used by the tweak details
+sheet and the Go page. The component owns its padding, so a sheet never sets row
+geometry at the call site.

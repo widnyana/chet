@@ -291,7 +291,8 @@ empty.` when the cache holds nothing, and `Module cache · <size> · <n> modules
 otherwise.
 
 Four rows: `Location`, `Size`, `Modules`, `Toolchain`. `Toolchain` shows the
-discovery source and the executable path. Two empty states: `Go is not installed`
+discovery source and the reported version, with the executable path on a detail
+line. Two empty states: `Go is not installed`
 offers `Open go.dev`, and `The module cache is empty` offers `Reload`.
 
 The command bar reports the cache size and `Module cache`. It carries `Reload`
