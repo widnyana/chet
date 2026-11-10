@@ -32,7 +32,7 @@ struct ContentView: View {
                             }
                         }
                         .toolbar {
-                            if !["overview", "applications", "tweaks", "homebrew"]
+                            if !["applications", "tweaks", "homebrew"]
                                 .contains(selection ?? "")
                             {
                                 scanButton

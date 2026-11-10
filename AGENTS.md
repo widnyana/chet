@@ -116,8 +116,9 @@ The window becomes the split view:
     items are selected the bar holds `Clean selected` as the primary and `Scan again`
     (`home.rescan`) beside it; with nothing selected `Scan again` is the primary (`home.scan`).
 - Toolbar: the scan control (`toolbar.scan`, or `toolbar.scanStop` while scanning) on every
-  destination except Apps and Tweaks. Apps owns search, layout, and reload. Tweaks owns
-  search and `Read again` (`tweaks.reload`).
+  destination except Apps, Tweaks, and Homebrew. Those three own their toolbar instead: Apps
+  has search, layout, and reload; Tweaks has search and `Read again` (`tweaks.reload`);
+  Homebrew has the installer button.
 - Status strip: absent by default. It appears for `DRY_RUN` (`Preview only. Nothing will be
   removed.`), for limited access, or for four seconds after a scan finishes. Tweaks hides the
   cleaning strip and shows its own preview gate.
