@@ -43,14 +43,19 @@ public struct RuleScanner: Sendable {
     public let home: URL
     public let rules: [Rule]
     public let policy: SafetyPolicy
+    /// The complete rule list, used only to decide which roots another rule owns. Filtering
+    /// `rules` for a scan must not make a parent rule claim roots it no longer covers.
+    let claimingRules: [Rule]
 
     public init(
         home: URL = FileManager.default.homeDirectoryForCurrentUser, rules: [Rule] = Rule.catalog,
-        allowOutsideHome: Bool = false, excludedPaths: [String] = []
+        claimingRules: [Rule]? = nil, allowOutsideHome: Bool = false, excludedPaths: [String] = []
     ) {
         self.home = home
         self.rules = rules
-        let absoluteRoots = Set(rules.flatMap { $0.roots }.filter { $0.hasPrefix("/") })
+        self.claimingRules = claimingRules ?? rules
+        let absoluteRoots = Set(
+            (claimingRules ?? rules).flatMap { $0.roots }.filter { $0.hasPrefix("/") })
         policy = SafetyPolicy(
             home: home, externalRoots: absoluteRoots, allowsOutsideHome: allowOutsideHome,
             excludedPaths: excludedPaths)
@@ -59,7 +64,7 @@ public struct RuleScanner: Sendable {
     public func scan(_ rule: Rule, now: Date = Date()) async throws -> CategoryResult {
         var result = CategoryResult(ruleID: rule.id, category: rule.category, items: [], needsFullDiskAccess: false)
         // Roots of other rules are scanned by those rules, so a parent rule skips them.
-        let claimed = rules.filter { $0.id != rule.id }.flatMap(\.roots)
+        let claimed = claimingRules.filter { $0.id != rule.id }.flatMap(\.roots)
         for root in rule.roots + discoveryRoots(for: rule) {
             let rootURL: URL = root.hasPrefix("/") ? URL(fileURLWithPath: root) : home.appendingPathComponent(root)
             let isAbsolute = root.hasPrefix("/")
