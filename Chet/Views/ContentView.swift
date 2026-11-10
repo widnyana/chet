@@ -16,7 +16,7 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if model.access == .denied && !model.accessSkipped {
+            if model.access == .denied && !model.accessSkipped && !model.accessWasGranted {
                 OnboardingView()
             } else {
                 NavigationSplitView {

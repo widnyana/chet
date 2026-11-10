@@ -42,7 +42,19 @@ struct ScanActivity {
 @MainActor
 @Observable
 final class ScanModel {
-    var access = FullDiskAccess.status()
+    var access: FullDiskAccess.Status {
+        didSet {
+            if access == .granted { accessWasGranted = true }
+        }
+    }
+    private(set) var accessWasGranted: Bool
+
+    init() {
+        let status = FullDiskAccess.status()
+        access = status
+        accessWasGranted = status == .granted
+    }
+
     /// Session-only: the user chose "Continue without Full Disk Access", so this launch
     /// shows the app instead of the onboarding screen. Next launch asks again.
     var accessSkipped = false
