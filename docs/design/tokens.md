@@ -151,6 +151,7 @@ Rules:
 | `iconProgress` | 24 | Toolbar scan ring |
 | `iconHeader` | 44 | Page header, app detail header |
 | `iconApp` | 48 | App grid cell |
+| `chevronIconSize` | 8 | Sort-column chevron inside a 14 pt label |
 
 SF Symbols are used at their default weight. Category symbols are monochrome
 and use `inkSecondary` when inactive, `ink` when selected. No multicolor
@@ -163,9 +164,15 @@ role and a reason.
 |---|---|
 | Row height | 40 pt for custom rows. A native `Table` keeps its system height |
 | Table header height | 32 pt for custom headers, including `ColumnTable` |
+| Status strip height | `Metrics.statusStripHeight` 48 pt, the one inset floor so the preview note and the top strip cannot drift |
+| Capacity bar height | `Metrics.capacityBarHeight` 10 pt |
+| Sheet width | `Metrics.sheetWidth` 520 pt for flow sheets |
+| Detail sheet width | `Metrics.detailSheetWidth` 540 pt for a sheet whose ledger needs the room |
+| Ledger byte column | `Metrics.byteColumnWidth` 88 pt, one width so sheet ledgers align |
+| Icon gutter | `Metrics.iconGutter` 22 pt for the glyph column before a row label |
+| Settings control column | `Metrics.controlColumn` 150 pt, sized by the widest control in a panel |
 | Command bar height | 56 pt minimum plus safe-area bottom |
 | Command bar top rule | 1 px `hairline` |
-| Capacity bar height | 10 pt |
 | Capacity bar outline | 1 px `hairline` |
 | Capacity bar segment gap | 1 px `paper` |
 | Focus ring | 2 pt `accent` |

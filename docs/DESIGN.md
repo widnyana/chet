@@ -455,11 +455,11 @@ Rules the script enforces:
   "chrome": [
     {
       "id": "top-status-strip",
-      "file": "Chet/Views/ContentView.swift",
+      "file": "Chet/Views/DesignSystem.swift",
       "mechanism": "safeAreaInset-top",
       "height": 56,
       "verify": {
-        "contains": ["safeAreaInset(edge: .top, spacing: 0) {", "TopStatusStrip("],
+        "contains": ["glassEffect(.regular, in: .rect(cornerRadius: 0))", "struct StatusStrip"],
         "not-contains": [".overlay(alignment: .top)"]
       }
     },
@@ -468,7 +468,7 @@ Rules the script enforces:
       "file": "Chet/Views/CommandBar.swift",
       "mechanism": "in-flow-bottom",
       "height": 52,
-      "verify": {"contains": ["struct CommandBar"]}
+      "verify": {"contains": ["struct CommandBar", "GlassBar"]}
     },
     {
       "id": "scan-toolbar",

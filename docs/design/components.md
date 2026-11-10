@@ -294,6 +294,17 @@ Rules:
 - No floating, no capsule, no overlay on content.
 - The strip pushes content down; it never covers it.
 
+## PreviewNotice
+
+The one dry-run gate treatment. The call site supplies the verb that matches its
+action.
+
+- Tones: `destructive` is `exclamationmark.triangle` in amber; `inert` is
+  `eye.slash` in neutral. The default is `destructive`.
+- It renders `StatusLabel` and draws no surface of its own: no bar, no hairline.
+- The component absorbs the five inline gate rows, or `StatusStrip` replaces it
+  at those sites. A page-level gate lives in the top strip, not in an inline row.
+
 ## Toolbar scan control
 
 Shown on category, Snapshots, and Storage. Home owns scan in its command bar;
@@ -479,8 +490,9 @@ Each item is checked again before it moves.       (caption)
 
 Rules:
 
-- Width 520 pt. System sheet background. Flow sheets are 520 pt; detail sheets
-  are 540 pt; 480 pt is not used.
+- Width `Metrics.sheetWidth` 520 pt. System sheet background. Flow sheets are
+  520 pt; detail sheets are 540 pt (`Metrics.detailSheetWidth`); 480 pt is not
+  used.
 - No huge icon, no sparkle, no glass.
 - The rows are a ledger, not cards.
 - The destructive button uses the red tint. Cancel is the default button and
@@ -488,6 +500,23 @@ Rules:
 - The dry-run notice is the exact line: `Preview only. Nothing will be
   removed.` The uninstall sheet uses `Preview only. Nothing will be moved.`
 - The running warning is an amber `StatusLabel`, not a colored block.
+
+## SheetLedgerBox
+
+The one ledger recipe, used by the six ledger sheets:
+
+```
+ScrollView
+  ledger rows                              (name, location, size)
+  hairline per row
+```
+
+- `Theme.paperRaised`, radius `Metrics.controlRadius` 6, horizontal `Spacing.s3`.
+- `frame(maxHeight: 220)` keeps a long ledger from pushing the actions off the
+  sheet.
+- The byte column is `SheetLedgerBox.byteColumn` (88 pt). A row never writes
+  its own 88, 84, or 80.
+- The box owns the scroll and the surface. A call site adds rows, never padding.
 
 ## SummarySheet
 

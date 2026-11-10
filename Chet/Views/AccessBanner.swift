@@ -23,7 +23,6 @@ struct TopStatusStrip: View {
                     dismiss: .init(label: "Dismiss", perform: { self.finishedText = nil }))
             }
         }
-        .background(Theme.paper)
         .overlay(alignment: .bottom) { Hairline() }
         .modifier(ScanFinishedObserver(text: $finishedText))
     }

@@ -49,6 +49,14 @@ enum Metrics {
     static let panelRadius: CGFloat = 8
     static let innerRadius: CGFloat = 6
     static let controlMinWidth: CGFloat = 96
+    static let statusStripHeight: CGFloat = 48
+    static let capacityBarHeight: CGFloat = 10
+    static let iconGutter: CGFloat = 22
+    static let controlColumn: CGFloat = 150
+    static let sheetWidth: CGFloat = 520
+    static let detailSheetWidth: CGFloat = 540
+    static let byteColumnWidth: CGFloat = 88
+    static let chevronIconSize: CGFloat = 8
 }
 
 // MARK: - Primitives
@@ -94,14 +102,33 @@ struct StatusLabel: View {
 }
 
 /// The one dry-run gate treatment. The call site supplies the verb that matches its action.
+enum NoticeTone {
+    case destructive, inert
+
+    var systemImage: String {
+        switch self {
+        case .destructive: "exclamationmark.triangle"
+        case .inert: "eye.slash"
+        }
+    }
+
+    var tone: StatusTone {
+        switch self {
+        case .destructive: .amber
+        case .inert: .neutral
+        }
+    }
+}
+
 struct PreviewNotice: View {
     let text: String
+    var tone: NoticeTone = .destructive
 
     var body: some View {
         StatusLabel(
             text: text,
-            systemImage: "exclamationmark.triangle",
-            tone: .amber)
+            systemImage: tone.systemImage,
+            tone: tone.tone)
     }
 }
 
@@ -120,7 +147,7 @@ struct SortColumnButton: View {
                 Text(title)
                     .font(Typography.caption)
                 Image(systemName: ascending ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 8, weight: .semibold))
+                    .font(.system(size: Metrics.chevronIconSize, weight: .semibold))
                     .opacity(isActive ? 1 : 0)
             }
             .foregroundStyle(isActive ? Theme.ink : Theme.inkSecondary)
@@ -144,6 +171,22 @@ struct OptionalAccessibilityIdentifier: ViewModifier {
         } else {
             content
         }
+    }
+}
+
+/// In-flow chrome bar on the system glass material. The glass sits inside the page margin so
+/// content scrolls under it and the bar never floats.
+struct GlassBar<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        GlassEffectContainer(spacing: Spacing.s2) {
+            content()
+                .padding(.horizontal, Spacing.s3)
+                .padding(.vertical, Spacing.s2)
+                .glassEffect(.regular, in: .rect(cornerRadius: Metrics.panelRadius))
+        }
+        .pageHorizontalPadding()
     }
 }
 
@@ -184,7 +227,8 @@ struct StatusStrip: View {
         }
         .pageHorizontalPadding()
         .padding(.vertical, Spacing.s3)
-        .frame(minHeight: 48)
+        .frame(minHeight: Metrics.statusStripHeight)
+        .glassEffect(.regular, in: .rect(cornerRadius: 0))
     }
 }
 
@@ -765,11 +809,29 @@ struct ColumnTable<Item: Identifiable, Header: View, Row: View>: View {
     }
 }
 
+/// The one ledger recipe: a raised, radius-6 box that scrolls and caps its height. A ledger
+/// row takes its byte column from here so every sheet measures the same width.
+struct SheetLedgerBox<Content: View>: View {
+    static var byteColumn: CGFloat { Metrics.byteColumnWidth }
+
+    var maxHeight: CGFloat = 220
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        ScrollView {
+            content()
+        }
+        .padding(.horizontal, Spacing.s3)
+        .background(Theme.paperRaised, in: .rect(corners: .fixed(Metrics.controlRadius)))
+        .frame(maxHeight: maxHeight)
+    }
+}
+
 /// The geometry every action sheet shares: 520 pt wide by default; detail sheets pass 540.
 /// 24 pt padding, and an optional fixed height. The system supplies the sheet window; the
 /// frame supplies the paper body.
 struct SheetFrame<Content: View>: View {
-    var width: CGFloat = 520
+    var width: CGFloat = Metrics.sheetWidth
     var height: CGFloat?
     @ViewBuilder let content: Content
 
@@ -815,7 +877,7 @@ struct CapacityBarView: View {
     let reclaimable: Int64
     var showsHeader = true
     var legendStyle: CapacityLegendStyle = .full
-    var height: CGFloat = 10
+    var height: CGFloat = Metrics.capacityBarHeight
 
     var body: some View {
         let used = max(0, total - free)
