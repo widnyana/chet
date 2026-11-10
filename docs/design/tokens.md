@@ -117,8 +117,8 @@ command bars, tables, and sheets. A 1 or 3 pt radius is a drift, not a style.
 
 No custom shadows. The only glass is the system Liquid Glass on window chrome.
 Content never gets glass. The sidebar and sheet surfaces use the native material.
-The command bar is a custom bar registered with `safeAreaBar`, so it gets the
-system scroll edge effect instead of a painted background. The app icon is the
+The command bar is a full-width glass bar registered with `safeAreaBar`: the surface
+spans the detail pane and its controls sit on the page margin. The app icon is the
 only place with a gradient. `pageSurface()` resolves to the page surface,
 `Theme.paper`; the page frame or the sheet body applies it.
 

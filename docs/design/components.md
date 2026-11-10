@@ -189,8 +189,10 @@ A full-width bar at the bottom of the content area:
 Rules:
 
 - Height 56 pt minimum plus the safe-area bottom. Two lines of summary need it.
-- No painted background. The bar is registered with `safeAreaBar`, so the system
-  scroll edge effect supplies the legibility layer.
+- The surface is the system glass (`GlassBar`) and spans the detail pane edge to edge,
+  from the sidebar to the window edge. It reads as one piece with the top strip.
+- The controls sit on the page margin inside the glass, so the summary aligns with the
+  page content.
 - Top 1 px `hairline`; no radius, no floating, no bottom padding.
 - Left: the selection summary in two lines: the byte total in `metric`, the
   count in `caption`.

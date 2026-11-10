@@ -94,7 +94,8 @@ def main():
     for swift in sorted(VIEWS.rglob("*.swift")):
         text = swift.read_text()
         for match in re.finditer(r"\.overlay\(alignment: \.top[,\)]", text):
-            if "Divider" in text[match.end():match.end() + 40]:
+            tail = text[match.end():match.end() + 40]
+            if "Divider" in tail or "Hairline" in tail:
                 continue
             line = text[: match.start()].count("\n") + 1
             errors.append(f"top overlay forbidden (covers the toolbar): {swift.name}:{line}")

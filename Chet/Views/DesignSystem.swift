@@ -177,19 +177,17 @@ struct OptionalAccessibilityIdentifier: ViewModifier {
     }
 }
 
-/// In-flow chrome bar on the system glass material. The glass sits inside the page margin so
-/// content scrolls under it and the bar never floats.
+/// In-flow chrome bar on the system glass material. The surface spans the detail pane, so the
+/// bar reads as one piece with the window chrome; the call site pads its own content.
 struct GlassBar<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     var body: some View {
         GlassEffectContainer(spacing: Spacing.s2) {
             content()
-                .padding(.horizontal, Spacing.s3)
                 .padding(.vertical, Spacing.s2)
-                .glassEffect(.regular, in: .rect(cornerRadius: Metrics.panelRadius))
+                .glassEffect(.regular, in: .rect(cornerRadius: 0))
         }
-        .pageHorizontalPadding()
     }
 }
 

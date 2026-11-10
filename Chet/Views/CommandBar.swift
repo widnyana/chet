@@ -56,8 +56,10 @@ struct CommandBar: View {
                 primaryButton
                     .modifier(OptionalAccessibilityIdentifier(identifier: primaryIdentifier))
             }
+            .pageHorizontalPadding()
         }
         .frame(minHeight: Metrics.commandBarMinHeight)
+        .overlay(alignment: .top) { Hairline() }
     }
 
     @ViewBuilder private var primaryButton: some View {
