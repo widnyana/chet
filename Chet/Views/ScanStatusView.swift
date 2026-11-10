@@ -37,6 +37,10 @@ struct ScanStatusView: View {
                     .trim(from: 0, to: 0.28)
                     .stroke(Theme.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                     .rotationEffect(.degrees(angle))
+                    // The animation belongs to the arc alone. `withAnimation` would put the
+                    // repeating curve on the whole transaction, so the toolbar item's label
+                    // swap from `Scan` to this glyph would replay the two positions forever.
+                    .animation(rotation, value: angle)
                 RoundedRectangle(cornerRadius: 1.5)
                     .fill(Theme.ink)
                     .frame(width: 7, height: 7)
@@ -47,13 +51,14 @@ struct ScanStatusView: View {
             .onChange(of: isSpinning) { spin() }
         }
 
+        private var rotation: Animation? {
+            isSpinning && !reduceMotion ? .linear(duration: 1).repeatForever(autoreverses: false) : nil
+        }
+
         private func spin() {
-            guard isSpinning, !reduceMotion else {
-                withAnimation(.linear(duration: 0)) { angle = 0 }
-                return
-            }
             angle = 0
-            withAnimation(.linear(duration: 1).repeatForever(autoreverses: false)) { angle = 360 }
+            guard isSpinning, !reduceMotion else { return }
+            angle = 360
         }
     }
 
