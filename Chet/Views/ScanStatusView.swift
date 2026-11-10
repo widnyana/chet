@@ -28,37 +28,45 @@ struct ScanStatusView: View {
     private struct ScanStopGlyph: View {
         let isSpinning: Bool
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
-        @State private var angle = 0.0
+        /// Degrees reached when the arc last stopped.
+        @State private var base = 0.0
+        /// When the arc last started turning; nil while it is still.
+        @State private var since: Date?
 
+        private var moving: Bool { isSpinning && !reduceMotion }
+
+        // The angle is computed from time, not animated. An animation modifier would put a
+        // repeating curve in the transaction, and the toolbar item's label swap from `Scan`
+        // to this glyph would replay its two positions forever.
         var body: some View {
-            ZStack {
-                Circle().stroke(Theme.inkSecondary.opacity(0.3), lineWidth: 2)
-                Circle()
-                    .trim(from: 0, to: 0.28)
-                    .stroke(Theme.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                    .rotationEffect(.degrees(angle))
-                    // The animation belongs to the arc alone. `withAnimation` would put the
-                    // repeating curve on the whole transaction, so the toolbar item's label
-                    // swap from `Scan` to this glyph would replay the two positions forever.
-                    .animation(rotation, value: angle)
-                RoundedRectangle(cornerRadius: 1.5)
-                    .fill(Theme.ink)
-                    .frame(width: 7, height: 7)
+            TimelineView(.animation(paused: since == nil)) { context in
+                ZStack {
+                    Circle().stroke(Theme.inkSecondary.opacity(0.3), lineWidth: 2)
+                    Circle()
+                        .trim(from: 0, to: 0.28)
+                        .stroke(Theme.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                        .rotationEffect(.degrees(angle(at: context.date)))
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(Theme.ink)
+                        .frame(width: 7, height: 7)
+                }
             }
             .frame(width: Spacing.s4, height: Spacing.s4)
             .accessibilityLabel("Stop the scan")
-            .onAppear { spin() }
-            .onChange(of: isSpinning) { spin() }
+            .onChange(of: moving, initial: true) {
+                if moving {
+                    since = .now
+                } else {
+                    base = angle(at: .now)
+                    since = nil
+                }
+            }
         }
 
-        private var rotation: Animation? {
-            isSpinning && !reduceMotion ? .linear(duration: 1).repeatForever(autoreverses: false) : nil
-        }
-
-        private func spin() {
-            angle = 0
-            guard isSpinning, !reduceMotion else { return }
-            angle = 360
+        /// One turn per second.
+        private func angle(at date: Date) -> Double {
+            guard let since else { return base }
+            return (base + date.timeIntervalSince(since) * 360).truncatingRemainder(dividingBy: 360)
         }
     }
 
