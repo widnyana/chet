@@ -64,7 +64,7 @@ struct SidebarView: View {
             ToolRow(id: "homebrew", title: "Homebrew", symbol: "shippingbox"),
         ]
         if mise.isAvailable {
-            rows.append(ToolRow(id: "mise", title: "mise", symbol: "shippingbox.and.arrow.backward"))
+            rows.append(ToolRow(id: "mise", title: "mise", symbol: "terminal"))
         }
         if goModules.isAvailable {
             rows.append(ToolRow(id: "go", title: "Go", symbol: "curlybraces"))
@@ -117,9 +117,12 @@ struct SidebarView: View {
             }
         } icon: {
             Image(systemName: glyph)
+                .resizable()
+                .scaledToFit()
                 .font(Typography.iconSidebar)
+                .padding(Spacing.s1)
+                .frame(width: Metrics.iconGutter, height: Metrics.iconGutter)
                 .modifier(SidebarInk(isSelected: isSelected, tone: Theme.inkSecondary))
-                .frame(width: 18)
         }
         .tag(id)
         .accessibilityIdentifier("sidebar.\(id)")

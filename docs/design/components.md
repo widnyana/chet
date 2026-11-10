@@ -683,6 +683,54 @@ Rules:
 - The update stream buffers the newest sample, so the UI never queues thousands
   of path updates on the main actor.
 
+## MiseView
+
+```
+mise                                                  (title)
+Tool versions declared in your mise config.           (body)
+[Read again]  12 tools                                (toolbar)
+
+Tool                          Requested   Status
+swift                         6.0.3       Active
+  ~/.local/share/mise/installs/swift/6.0.3
+------------------------------------------------------------------ hairline
+Locations
+Config   ~/.config/mise/config.toml
+Cache    ~/.local/share/mise
+```
+
+- `PageScreen(scrolls: false)`: page header, a toolbar with `Read again` and
+  the tool count, the declared tool table, and a `Locations` section. No
+  command bar and no glass on the content.
+- The table is the config, not the installed list. One row per declared tool
+  and version, sorted by name and then requested version. The name takes the
+  remaining width; `version` uses the shared 80 pt column and `status` the
+  shared 118 pt column.
+- `Active` is an accent checkmark, `Inactive` a neutral minus, and
+  `Not installed` an amber warning. A row with a resolved install path shows
+  it as a caption line under the name, middle-truncated. The caption is not an
+  accessibility target; the row's name text carries the row identifier. A
+  declared tool with no resolved entry keeps its row and its `Not installed`
+  label.
+- `Locations` is a `SectionHeader` and two label and path rows: `Config` and
+  `Cache`. The path is caption, selectable, and middle-truncated. `Cache` says
+  `Unavailable` when the read fails.
+- A failed `mise ls --json` is one amber `StatusLabel` above the table. The
+  declared rows stay below it.
+- Empty state: `No tools declared`, with `The mise config has no tools table.`
+- Read-only. The view runs `mise ls --json` and `mise cache path` only; it
+  never installs, uninstalls, switches, or prunes, so there is no confirmation
+  and no dry-run gate.
+- The view is only shown when the config declares at least one tool and a mise
+  binary resolves at `~/.local/bin/mise`, else the first executable `mise` on
+  `PATH`. Without both, the sidebar row and the view are absent.
+- Identifiers: `mise.header` on the header, `mise.page` on the toolbar
+  tool-count text, `mise.refresh` on `Read again`, `mise.empty` on the empty
+  state, `mise.tool.<tool>.<version>` on a tool name, `mise.config` and
+  `mise.cache` on the paths, and `sidebar.mise` on the sidebar row. The header
+  is one accessibility element reading `mise`. `<tool>` and `<version>` are
+  lowercased, and every character outside `[a-z0-9]` becomes `.`.
+
 ## PermissionPage
 
 ```

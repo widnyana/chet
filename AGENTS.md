@@ -93,8 +93,10 @@ The config is checked first; then `~/.local/bin/mise` if it is an executable fil
 executable `mise` on `PATH`. No login shell, alias, or version-manager shim is consulted. A
 missing config, a `[tools]` table with no tools, or a missing binary hides the row and the
 destination. `mise.header`, `mise.page`, `mise.refresh`, `mise.empty`,
-`mise.tool.<tool>.<version>`, `mise.config`, `mise.cache` label the header, the page root,
-`Read again`, the empty state, a tool row, the config path, and the cache path.
+`mise.tool.<tool>.<version>`, `mise.config`, `mise.cache` label the header, the toolbar
+tool-count line, `Read again`, the empty state, a tool row, the config path, and the cache
+path. The header is one accessibility element reading `mise`; the two `Locations` path texts
+are selectable and keep their identifiers.
 `<tool>` and `<version>` are lowercased, and every character outside `[a-z0-9]` becomes `.`.
 The page is read-only: it runs `mise ls --json` and `mise cache path` only, so it needs no
 `DRY_RUN` gate.

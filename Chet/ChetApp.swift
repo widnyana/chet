@@ -72,12 +72,14 @@ struct ChetApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var model = ScanModel()
     @State private var tweaks = TweaksModel()
+    @State private var mise = MiseModel()
 
     var body: some Scene {
         WindowGroup("Chet") {
             ContentView()
                 .environment(model)
                 .environment(tweaks)
+                .environment(mise)
                 .frame(minWidth: 960, minHeight: 632)
         }
         .commands {
@@ -105,6 +107,7 @@ struct ChetApp: App {
             SettingsView()
                 .environment(model)
                 .environment(tweaks)
+                .environment(mise)
         }
         .windowResizability(.contentSize)
         .commands { AboutCommand() }
