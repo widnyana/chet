@@ -67,7 +67,8 @@ label (caption, inkSecondary)
 value (metric, tabular, ink)
 ```
 
-Use for totals and row sizes. The value never sits inside a colored shape. The
+Use for totals, the page-header metric, and the app-detail bundle size. A ledger
+row size uses `row` in `ink`. The value never sits inside a colored shape. The
 metric is right-aligned when it belongs to a table column.
 
 ## CapacityBar
@@ -171,7 +172,8 @@ supports it.
 ```
 title (section)
 one sentence (body, inkSecondary) that says why it is empty
-one action (secondary or primary) when an action exists
+one action when an action exists: secondary when it only navigates
+(`Back to Home`), primary when it fills the state
 ```
 
 Use the screen's normal margins. No illustration, no large icon, no decorative
@@ -194,6 +196,7 @@ with different copy.
 - A button that retries or opens the relevant System Settings page.
 - The underlying error message is available in a disclosure or a tooltip, not
   as the first line.
+- The tone is amber. Red is reserved for protected and destructive rows.
 
 ## PrimaryButton
 
@@ -223,8 +226,12 @@ Uses:
 - Scan finished: neutral icon, the result, dismiss. Auto-dismiss after 4 s.
 - Dry run is engaged: amber icon, `Preview only. Nothing will be removed.`, no
   dismiss. The uninstall workspace uses `Preview only. Nothing will be moved.`
-  The Tweaks page owns `Preview only. No tweak is changed.`
-- Apps and Homebrew workspaces: no scan strip.
+  The Tweaks page owns `Preview only. No tweak is changed.` The Homebrew page
+  uses `Preview only. Nothing will be removed.`; its install sheet uses
+  `Nothing will be installed.` and its uninstall and cleanup sheets use
+  `Nothing will be removed.`
+- Apps and Homebrew are not scan surfaces: their strip shows the page gate
+  only, never the scan result.
 
 Rules:
 
@@ -261,7 +268,9 @@ current folder (caption, inkSecondary, truncating)
 five phase rows with a checkmark or a small circle
 ```
 
-Pause and Stop live in the command bar, not in the section.
+Pause and Stop live in the page's bottom bar: the command bar on Home, the scan
+strip on Storage. The strip shows one Pause/Resume control for the current state
+plus `Stop scan`.
 
 Rules:
 

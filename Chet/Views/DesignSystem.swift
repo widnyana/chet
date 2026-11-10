@@ -63,6 +63,12 @@ enum Typography {
     static let sidebar = Font.system(size: 13, weight: .regular)
     static let caption = Font.system(size: 12, weight: .regular)
     static let metric = Font.system(size: 18, weight: .medium)
+
+    // Glyph sizes come from the icon-size table in tokens.md. A view uses one of these,
+    // never a literal `.font(.system(size:))`.
+    static let iconAction = Font.system(size: 16, weight: .regular)
+    static let iconSidebar = Font.system(size: 16, weight: .regular)
+    static let iconRow = Font.system(size: 22, weight: .regular)
 }
 
 enum Spacing {
@@ -80,8 +86,10 @@ enum Metrics {
     static let pageMargin: CGFloat = 24
     static let widePageMargin: CGFloat = 32
     static let contentMaxWidth: CGFloat = 880
+    static let gridCellMinWidth: CGFloat = 164
     static let rowHeight: CGFloat = 40
     static let commandBarMinHeight: CGFloat = 56
+    static let tableHeaderHeight: CGFloat = 32
     /// Controls use one radius and one height so every primary action matches.
     static let controlRadius: CGFloat = 6
     static let panelRadius: CGFloat = 8
@@ -121,7 +129,7 @@ struct StatusLabel: View {
     var body: some View {
         HStack(spacing: Spacing.s1) {
             Image(systemName: systemImage)
-                .font(.system(size: 16, weight: .regular))
+                .font(Typography.iconAction)
             Text(text)
                 .font(Typography.caption)
         }
@@ -156,6 +164,7 @@ struct SortColumnButton: View {
         Button(action: action) {
             HStack(spacing: 2) {
                 Text(title)
+                    .font(Typography.caption)
                 Image(systemName: ascending ? "chevron.up" : "chevron.down")
                     .font(.system(size: 8, weight: .semibold))
                     .opacity(isActive ? 1 : 0)
@@ -311,7 +320,7 @@ struct PrimaryActionButton: View {
                 Text(title)
             }
         }
-        .buttonStyle(.glassProminent)
+        .buttonStyle(.borderedProminent)
         .controlSize(.large)
         .tint(Theme.accent)
         .frame(minWidth: Metrics.controlMinWidth)
@@ -341,7 +350,7 @@ struct DestructiveActionButton: View {
                 Text(title)
             }
         }
-        .buttonStyle(.glassProminent)
+        .buttonStyle(.borderedProminent)
         .controlSize(.regular)
         .tint(Theme.red)
         .frame(minWidth: Metrics.controlMinWidth)
@@ -371,7 +380,7 @@ struct SecondaryActionButton: View {
                 Text(title)
             }
         }
-        .buttonStyle(.glass)
+        .buttonStyle(.bordered)
         .controlSize(.regular)
         .disabled(!isEnabled)
         .help(help ?? title)
@@ -460,6 +469,7 @@ struct SectionHeader: View {
 struct EmptyStateView: View {
     let title: String
     let message: String
+    var actionIsPrimary = true
     var actionTitle: String?
     var action: (() -> Void)?
 
@@ -473,7 +483,11 @@ struct EmptyStateView: View {
                 .foregroundStyle(Theme.inkSecondary)
                 .fixedSize(horizontal: false, vertical: true)
             if let actionTitle, let action {
-                PrimaryActionButton(title: actionTitle, action: action)
+                if actionIsPrimary {
+                    PrimaryActionButton(title: actionTitle, action: action)
+                } else {
+                    SecondaryActionButton(title: actionTitle, action: action)
+                }
             }
         }
         .frame(maxWidth: 420, alignment: .leading)
@@ -525,16 +539,18 @@ struct ColumnTable<Item: Identifiable, Header: View, Row: View>: View {
     }
 }
 
-/// The geometry every action sheet shares: 520 pt wide, 24 pt padding, and an optional fixed
-/// height. The system supplies the sheet window; the frame supplies the paper body.
+/// The geometry every action sheet shares: 520 pt wide by default; detail sheets pass 540.
+/// 24 pt padding, and an optional fixed height. The system supplies the sheet window; the
+/// frame supplies the paper body.
 struct SheetFrame<Content: View>: View {
+    var width: CGFloat = 520
     var height: CGFloat?
     @ViewBuilder let content: Content
 
     var body: some View {
         content
             .padding(Spacing.s6)
-            .frame(width: 520, height: height)
+            .frame(width: width, height: height)
             .background(Theme.paper)
     }
 }
@@ -547,7 +563,7 @@ struct ErrorStateView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
-            StatusLabel(text: title, systemImage: "exclamationmark.triangle", tone: .red)
+            StatusLabel(text: title, systemImage: "exclamationmark.triangle", tone: .amber)
             Text(message)
                 .font(Typography.body)
                 .foregroundStyle(Theme.inkSecondary)

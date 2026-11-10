@@ -38,7 +38,6 @@ enum AppInfo {
 /// Name cell: app or file icon, a readable title, and a second line saying which app and folder it belongs to.
 struct ItemNameCell: View {
     let item: ScanItem
-    var needsFullDiskAccess = false
 
     var body: some View {
         let app = DisplayName.sourceBundleID(for: item.url, owner: item.ownerBundleID).flatMap(AppInfo.lookup)
@@ -62,20 +61,11 @@ struct ItemNameCell: View {
                 .font(Typography.row)
                 .foregroundStyle(Theme.ink)
                 .lineLimit(1)
-                HStack(spacing: Spacing.s1) {
-                    Text(location)
-                        .font(Typography.caption)
-                        .foregroundStyle(Theme.inkSecondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    if needsFullDiskAccess {
-                        Image(systemName: "lock.fill")
-                            .font(Typography.caption)
-                            .foregroundStyle(Theme.inkSecondary)
-                            .help("Some folders in this category need Full Disk Access")
-                            .accessibilityHidden(true)
-                    }
-                }
+                Text(location)
+                    .font(Typography.caption)
+                    .foregroundStyle(Theme.inkSecondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
         }
         .help(item.url.path)

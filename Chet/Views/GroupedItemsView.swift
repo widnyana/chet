@@ -39,7 +39,6 @@ enum GroupSort: String, CaseIterable, Identifiable {
 struct GroupedItemsView: View {
     @Environment(ScanModel.self) private var model
     let groups: [ItemGroup]
-    var needsFullDiskAccess = false
     @State private var sort: GroupSort = .sizeDesc
 
     private var sorted: [ItemGroup] { sort.sorted(groups) }
@@ -91,14 +90,11 @@ struct GroupedItemsView: View {
                             columns: [GridItem(.adaptive(minimum: 150, maximum: 210), spacing: Spacing.s3)],
                             spacing: Spacing.s3
                         ) {
-                            MediaCard(
-                                url: group.keeper, bytes: nil, isOn: nil,
-                                needsFullDiskAccess: needsFullDiskAccess)
+                            MediaCard(url: group.keeper, bytes: nil, isOn: nil)
                             ForEach(group.items) { item in
                                 MediaCard(
                                     url: item.url, bytes: item.reclaimableBytes,
-                                    isOn: model.isSelected(item.url),
-                                    needsFullDiskAccess: needsFullDiskAccess)
+                                    isOn: model.isSelected(item.url))
                             }
                         }
                     }
@@ -128,7 +124,7 @@ struct GroupedItemsView: View {
                                 .truncationMode(.middle)
                         }
                         Spacer()
-                        StatusLabel(text: "Stays", systemImage: "checkmark", tone: .neutral)
+                        StatusLabel(text: "Keep", systemImage: "checkmark", tone: .neutral)
                     }
                     .frame(minHeight: Metrics.rowHeight)
                     .contextMenu { revealButton(group.keeper) }
@@ -145,20 +141,11 @@ struct GroupedItemsView: View {
                                 Text(item.url.lastPathComponent)
                                     .font(Typography.row)
                                     .lineLimit(1)
-                                HStack(spacing: Spacing.s1) {
-                                    Text(Self.folder(item.url))
-                                        .font(Typography.caption)
-                                        .foregroundStyle(Theme.inkSecondary)
-                                        .lineLimit(1)
-                                        .truncationMode(.middle)
-                                    if needsFullDiskAccess {
-                                        Image(systemName: "lock.fill")
-                                            .font(Typography.caption)
-                                            .foregroundStyle(Theme.inkSecondary)
-                                            .help("Some folders in this category need Full Disk Access")
-                                            .accessibilityHidden(true)
-                                    }
-                                }
+                                Text(Self.folder(item.url))
+                                    .font(Typography.caption)
+                                    .foregroundStyle(Theme.inkSecondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
                             }
                             Spacer()
                             Text(item.reclaimableBytes.formatted(.byteCount(style: .file)))
@@ -183,7 +170,7 @@ struct GroupedItemsView: View {
         let bytes = group.items.reduce(0) { $0 + $1.reclaimableBytes }
         return HStack(spacing: Spacing.s3) {
             Text(
-                "1 file stays, \(group.items.count) can be removed · \(bytes.formatted(.byteCount(style: .file)))"
+                "1 file kept, \(group.items.count) can be removed · \(bytes.formatted(.byteCount(style: .file)))"
             )
             .font(Typography.section)
             .foregroundStyle(Theme.ink)
@@ -208,7 +195,6 @@ struct MediaCard: View {
     let url: URL
     let bytes: Int64?
     let isOn: Binding<Bool>?
-    var needsFullDiskAccess = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s1) {
@@ -223,24 +209,19 @@ struct MediaCard: View {
                         .labelsHidden()
                         .accessibilityLabel("Remove \(url.lastPathComponent)")
                 } else {
-                    StatusLabel(text: "Stays", systemImage: "checkmark", tone: .neutral)
+                    StatusLabel(text: "Keep", systemImage: "checkmark", tone: .neutral)
                 }
                 Text(url.lastPathComponent)
                     .font(Typography.row)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                if needsFullDiskAccess {
-                    Image(systemName: "lock.fill")
-                        .font(Typography.caption)
-                        .foregroundStyle(Theme.inkSecondary)
-                        .help("Some folders in this category need Full Disk Access")
-                        .accessibilityHidden(true)
-                }
                 Spacer(minLength: Spacing.s1)
-                Text(bytes.map { $0.formatted(.byteCount(style: .file)) } ?? "Stays")
-                    .font(Typography.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.inkSecondary)
+                if let bytes {
+                    Text(bytes.formatted(.byteCount(style: .file)))
+                        .font(Typography.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.inkSecondary)
+                }
             }
         }
         .help(url.path)

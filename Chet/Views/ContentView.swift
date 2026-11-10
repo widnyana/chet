@@ -25,10 +25,13 @@ struct ContentView: View {
                 } detail: {
                     detail
                         .safeAreaInset(edge: .top, spacing: 0) {
-                            // Tweaks, Apps, and Homebrew carry their own surface; the
-                            // cleaning strip would repeat a verb that does not apply.
-                            if !["tweaks", "applications", "homebrew"].contains(selection ?? "") {
-                                TopStatusStrip()
+                            // Tweaks owns its own gate and disables the cleaning strip.
+                            if selection != "tweaks" {
+                                TopStatusStrip(
+                                    gateText: selection == "applications"
+                                        ? "Preview only. Nothing will be moved."
+                                        : "Preview only. Nothing will be removed.",
+                                    showsScanResult: !["applications", "homebrew"].contains(selection ?? ""))
                             }
                         }
                         .toolbar {
@@ -53,7 +56,6 @@ struct ContentView: View {
         .environment(appCleaner)
         .environment(homebrew)
         .environment(systemStatus)
-        .tint(Theme.accent)
         .sheet(isPresented: $confirming) {
             CleanFlowSheet()
         }

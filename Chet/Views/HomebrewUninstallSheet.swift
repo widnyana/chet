@@ -65,7 +65,7 @@ struct HomebrewUninstallSheet: View {
 
                 if hasCask {
                     VStack(alignment: .leading, spacing: Spacing.s1) {
-                        Toggle("Delete saved data too", isOn: $deleteData)
+                        Toggle("Uninstall and delete data", isOn: $deleteData)
                             .font(Typography.body)
                         Text("Removes settings and saved files for casks. This cannot be undone.")
                             .font(Typography.caption)

@@ -1,7 +1,7 @@
 import ChetCore
 import SwiftUI
 
-/// Home: capacity, what can be freed, the scan state, and the two ledgers. No chart,
+/// Home: capacity, what can be reclaimed, the scan state, and the two ledgers. No chart,
 /// no card stack, no marketing hero.
 struct OverviewView: View {
     @Environment(ScanModel.self) private var model
@@ -135,7 +135,7 @@ struct OverviewView: View {
         } label: {
             HStack(spacing: Spacing.s3) {
                 Image(systemName: CategoryStyle.of(category.id).symbol)
-                    .font(.system(size: 15, weight: .regular))
+                    .font(Typography.iconRow)
                     .foregroundStyle(Theme.inkSecondary)
                     .frame(width: 22)
                 VStack(alignment: .leading, spacing: 1) {
@@ -156,6 +156,7 @@ struct OverviewView: View {
                     .lineLimit(1)
             }
             .padding(.vertical, Spacing.s2)
+            .frame(minHeight: Metrics.rowHeight)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -166,7 +167,7 @@ struct OverviewView: View {
 
     private func categorySubtitle(_ category: CategoryState) -> String {
         if category.id == "snapshots" {
-            return model.snapshots.count == 1 ? "1 snapshot" : "\(model.snapshots.count) snapshots"
+            return "macOS reports size only when deleted."
         }
         return category.items.count == 1 ? "1 file" : "\(category.items.count) files"
     }
@@ -206,8 +207,8 @@ struct OverviewView: View {
                 ForEach(model.steps) { step in
                     HStack(spacing: Spacing.s2) {
                         Image(systemName: step.done ? "checkmark.circle" : "circle")
-                            .font(.system(size: 12, weight: .regular))
-                            .foregroundStyle(step.done ? Theme.inkSecondary : Theme.inkTertiary)
+                            .font(Typography.caption)
+                            .foregroundStyle(Theme.inkSecondary)
                             .accessibilityHidden(true)
                         Text(ScanStepCopy.title(step.id))
                             .font(Typography.row)

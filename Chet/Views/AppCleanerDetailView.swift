@@ -58,20 +58,17 @@ struct AppCleanerDetailView: View {
     }
 
     private var details: some View {
-        DisclosureGroup("Details") {
-            HStack(spacing: Spacing.s3) {
-                Text(app.url.path)
-                    .font(Typography.caption)
-                    .foregroundStyle(Theme.inkSecondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .textSelection(.enabled)
-                Spacer(minLength: Spacing.s3)
-                SecondaryActionButton(
-                    title: "Show in Finder",
-                    action: { NSWorkspace.shared.activateFileViewerSelecting([app.url]) })
-            }
-            .padding(.top, Spacing.s1)
+        HStack(spacing: Spacing.s3) {
+            Text(app.url.path)
+                .font(Typography.caption)
+                .foregroundStyle(Theme.inkSecondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .textSelection(.enabled)
+            Spacer(minLength: Spacing.s3)
+            SecondaryActionButton(
+                title: "Reveal in Finder",
+                action: { NSWorkspace.shared.activateFileViewerSelecting([app.url]) })
         }
         .pageHorizontalPadding()
         .padding(.bottom, Spacing.s2)
@@ -115,10 +112,11 @@ struct AppCleanerDetailView: View {
                 Text(model.isLoadingDetail ? "Measuring" : model.appBytes.formatted(.byteCount(style: .file)))
                     .font(Typography.metric)
                     .monospacedDigit()
-                    .foregroundStyle(Theme.inkSecondary)
+                    .foregroundStyle(Theme.ink)
             }
             .pageHorizontalPadding()
             .padding(.vertical, Spacing.s2)
+            .frame(minHeight: Metrics.rowHeight)
             Hairline()
         }
     }
@@ -190,6 +188,7 @@ struct AppCleanerDetailView: View {
             isWorking: model.isRemoving,
             help: "Review and move the selected items to the Trash",
             accessibilityLabel: "Move to Trash, \(model.selectedCount) items",
+            disabledReason: "Select an item to remove.",
             action: { model.beginRemoval() })
     }
 }

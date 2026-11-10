@@ -7,18 +7,22 @@ import SwiftUI
 /// access, and the scan result. It pushes content down; it never floats over it.
 struct TopStatusStrip: View {
     @Environment(ScanModel.self) private var model
+    /// The page's dry-run gate sentence. Cleaning pages use the default.
+    var gateText = "Preview only. Nothing will be removed."
+    /// Apps and Homebrew are not scan surfaces, so the finished-scan result never shows there.
+    var showsScanResult = true
     @State private var finishedText: String?
 
     var body: some View {
         Group {
             if DryRun.enabled {
                 StatusStrip(
-                    text: "Preview only. Nothing will be removed.",
+                    text: gateText,
                     systemImage: "exclamationmark.triangle",
                     tone: .amber)
             } else if model.showsAccessBanner {
                 accessStrip
-            } else if let finishedText {
+            } else if let finishedText, showsScanResult {
                 StatusStrip(
                     text: finishedText,
                     systemImage: "checkmark.circle",
@@ -77,7 +81,7 @@ struct ScanFinishedObserver: ViewModifier {
     }
 
     private func show() {
-        text = "Scan finished. \(model.totalBytes.formatted(.byteCount(style: .file))) can be freed."
+        text = "Scan finished. \(model.totalBytes.formatted(.byteCount(style: .file))) can be reclaimed."
         Task {
             try? await Task.sleep(nanoseconds: 4_000_000_000)
             text = nil
@@ -92,7 +96,7 @@ struct ScanFinishedObserver: ViewModifier {
             guard granted else { return }
             let content = UNMutableNotificationContent()
             content.title = "Scan finished"
-            content.body = "\(bytes) can be freed."
+            content.body = "\(bytes) can be reclaimed."
             let request = UNNotificationRequest(identifier: "scan-finished", content: content, trigger: nil)
             UNUserNotificationCenter.current().add(request)
         }

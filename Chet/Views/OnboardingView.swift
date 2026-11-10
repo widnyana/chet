@@ -10,10 +10,6 @@ struct OnboardingView: View {
         // row would hide the next step.
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s4) {
-                Image(systemName: "lock.shield")
-                    .font(.system(size: 28, weight: .regular))
-                    .foregroundStyle(Theme.inkSecondary)
-                    .accessibilityHidden(true)
                 Text("Chet needs Full Disk Access")
                     .accessibilityIdentifier("gate.title")
                     .font(Typography.title)

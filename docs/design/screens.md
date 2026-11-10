@@ -95,7 +95,8 @@ States:
 - Empty: `No entries in this category` and a back link to Home.
 - Loading: the table header remains; rows arrive in place.
 - Filtered to nothing: `No entries match this filter` and a clear action.
-- Partial access: a row-level lock icon plus the top status strip.
+- Partial access: the amber strip inside the page, the top status strip, and the
+  lock on the sidebar row. Readable rows carry no lock mark.
 
 ## Snapshots
 
@@ -155,7 +156,9 @@ Job: answer "which Homebrew package should I remove?".
 
 Top to bottom:
 
-1. Toolbar: search field, `Reload`, `Install packages`, and the action menu. No scan control.
+1. Toolbar: `Search packages` (filters the installed inventory), `Reload`,
+   `Install packages…`, and the action menu. No scan control. The install sheet
+   carries its own `Search formulae and casks`, which searches the catalog.
 2. `PageHeader`: `Homebrew`, subtitle `N packages, M marked`.
 3. Inventory: checkbox, 22 pt package icon, package name, kind (`formula` or
    `cask`), version, size, and status. Columns use the Apps widths. The list is
@@ -164,6 +167,9 @@ Top to bottom:
    count and bytes, `Deselect`, and `Uninstall`.
 5. The uninstall confirmation uses the same grammar and 520 pt width as the app
    uninstall sheet.
+6. `Remove old versions…` in the action menu opens a 520 pt sheet listing
+   `Old package versions` and `Download cache`, with Cancel as the default and a
+   red `Remove`.
 
 States:
 
@@ -172,6 +178,8 @@ States:
   not installed"; that state names `brew` and opens Homebrew's site.
 - Error: the `brew` read failed. Name the failing command and offer `Reload`.
 - Outdated packages: a text label `Outdated`, never a colored pill.
+- Dry run: the top status strip shows `Preview only. Nothing will be removed.`
+  The install sheet keeps `Preview only. Nothing will be installed.`
 
 ## App detail
 
@@ -211,12 +219,14 @@ Top to bottom:
    current folder size when one is open.
 2. `DiskMapChrome`: breadcrumb and a neutral-ramp legend, hairline.
 3. Treemap canvas.
-4. While scanning: the detailed scan strip: phase, linear progress, current
+4. `Largest folders`: the five largest children of the open folder, one 40 pt
+   row each.
+5. While scanning: the detailed scan strip: phase, linear progress, current
    folder, files and bytes, folder trail, Pause and Stop.
-5. Empty (never scanned): `The disk map appears after a scan.` with a primary
+6. Empty (never scanned): `The disk map appears after a scan.` with a primary
    scan action.
-6. Hover: a plain label with folder name and size.
-7. Click: zoom into a folder. Right-click: Reveal in Finder.
+7. Hover: a plain label with folder name and size.
+8. Click: zoom into a folder. Right-click: Reveal in Finder.
 
 The map uses one encoding: size share as a neutral ramp. Darker means a larger
 share in light mode; lighter means a larger share in dark mode. The labels use

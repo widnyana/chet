@@ -162,7 +162,7 @@ Use these before writing a view:
 | Table surface | `ColumnTable` |
 | Sortable column label | `SortColumnButton` |
 | Bottom action bar | `CommandBar` + `safeAreaBar` |
-| Dry-run gate | `PreviewNotice` |
+| Dry-run gate | `PreviewNotice`, inside `TopStatusStrip` on a page or as one amber label in Settings |
 | Short status | `StatusLabel` |
 | Empty, loading, error | `EmptyStateView`, `LoadingStateView`, `ErrorStateView` |
 | Primary, secondary, destructive action | `PrimaryActionButton`, `SecondaryActionButton`, `DestructiveActionButton` |

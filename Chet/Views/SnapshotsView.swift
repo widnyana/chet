@@ -52,6 +52,7 @@ struct SnapshotsView: View {
                 help: "Review and clean the selected snapshots",
                 accessibilityLabel:
                     "Clean selected, \(model.selectedSnapshots.count) snapshots",
+                disabledReason: "Select a snapshot to clean.",
                 action: onClean)
         }
     }

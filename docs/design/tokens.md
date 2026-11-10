@@ -57,7 +57,7 @@ shift as they update.
 | `body` | 15 | regular | Paragraphs, form labels |
 | `row` | 14 | regular | Table cells, list rows |
 | `caption` | 12 | regular | Locations, metadata, hints |
-| `metric` | 18 | medium, tabular | Row size, selection total |
+| `metric` | 18 | medium, tabular | Selection total, page header metric, app size |
 
 Rules:
 
@@ -68,6 +68,10 @@ Rules:
 - Caption at 12 pt is the smallest text the app ships.
 - Use the system leading. Do not set `lineSpacing` or a custom line height.
 - A view uses a `Typography` value, never `.font(.system(size:))`.
+- Glyphs use `Typography.iconAction` (16), `Typography.iconSidebar` (16), or
+  `Typography.iconRow` (22), one per role in the icon-size table.
+
+A ledger row size is `row`, in `ink`.
 
 ## Spacing
 

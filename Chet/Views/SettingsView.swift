@@ -21,10 +21,9 @@ struct SettingsView: View {
     var body: some View {
         VStack(spacing: 0) {
             if DryRun.enabled {
-                StatusStrip(
-                    text: "Preview only. Nothing will be removed.",
-                    systemImage: "eye.slash",
-                    tone: .amber)
+                PreviewNotice(text: "Preview only. Nothing will be removed.")
+                    .padding(.horizontal, Metrics.pageMargin)
+                    .padding(.top, Spacing.s4)
             }
             TabView(selection: $pane) {
                 scanPane

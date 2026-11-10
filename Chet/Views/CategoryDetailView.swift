@@ -41,7 +41,7 @@ struct CategoryDetailView: View {
                 title: CategoryCopy.title(category.id, fallback: category.title),
                 subtitle: riskSentence,
                 metric: category.bytes.formatted(.byteCount(style: .file)),
-                metricLabel: "can be freed"
+                metricLabel: "can be reclaimed"
             )
             .pageHorizontalPadding()
             .padding(.top, Spacing.s6)
@@ -50,6 +50,7 @@ struct CategoryDetailView: View {
                 EmptyStateView(
                     title: "No entries in this category",
                     message: "Scan again to look for new items.",
+                    actionIsPrimary: false,
                     actionTitle: "Back to Home",
                     action: onBack
                 )
@@ -68,9 +69,7 @@ struct CategoryDetailView: View {
                 }
                 ListHeaderBar(items: category.items)
                 if let groups = model.groups[category.id] {
-                    GroupedItemsView(
-                        groups: groups,
-                        needsFullDiskAccess: category.needsFullDiskAccess)
+                    GroupedItemsView(groups: groups)
                 } else {
                     table
                 }
@@ -110,6 +109,7 @@ struct CategoryDetailView: View {
                 help: "Review and clean the selected items",
                 accessibilityLabel:
                     "Clean selected, \(categorySelected.count) items",
+                disabledReason: "Select an item to clean.",
                 action: {
                     model.beginClean(categorySelected)
                     onClean()
@@ -179,11 +179,8 @@ struct CategoryDetailView: View {
                     .accessibilityLabel("Remove \(item.url.lastPathComponent)")
                     .frame(width: CategoryColumns.mark)
             }
-            ItemNameCell(
-                item: item,
-                needsFullDiskAccess: category.needsFullDiskAccess
-            )
-            .frame(maxWidth: .infinity, alignment: .leading)
+            ItemNameCell(item: item)
+                .frame(maxWidth: .infinity, alignment: .leading)
             Text(item.reclaimableBytes.formatted(.byteCount(style: .file)))
                 .font(Typography.row)
                 .monospacedDigit()
@@ -204,7 +201,7 @@ struct CategoryDetailView: View {
         .background(selected ? Theme.accentSoft : Color.clear)
         .contentShape(Rectangle())
         .contextMenu {
-            Button("Show in Finder") {
+            Button("Reveal in Finder") {
                 NSWorkspace.shared.activateFileViewerSelecting([item.url])
             }
             Button("Quick Look") { preview = item.url }

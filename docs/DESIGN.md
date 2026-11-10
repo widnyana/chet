@@ -98,7 +98,7 @@ System font, SF Pro. Numbers use `.monospacedDigit()`.
 | body | 15 | regular | Paragraphs |
 | row | 14 | regular | Table cells |
 | caption | 12 | regular | Locations, metadata |
-| metric | 18 | medium, tabular | Row size |
+| metric | 18 | medium, tabular | Selection total, page header |
 
 No rounded design. No all-caps tracking. No monospace family. The largest text
 on a screen is 34 pt. Caption is the smallest text at 12 pt. Use the system
@@ -137,7 +137,7 @@ One focal point: the reclaimable total and the capacity bar.
 
 Top to bottom:
 
-1. Page header: `Clean up your Mac`, a one-line subtitle, the amount that can be freed.
+1. Page header: `Clean up your Mac`, a one-line subtitle, the amount that can be reclaimed.
 2. Capacity bar: volume name, capacity, used, reclaimable, free, text legend.
 3. Scan state:
    - never scanned: an empty state, `No scan yet`, with the action in the
@@ -241,7 +241,10 @@ version, size, and status. The columns use the same widths as Apps so the two
 inventories align. The command bar is disabled until a package is
 marked, then reports marked count and `Uninstall`. The confirmation sheet uses
 the same grammar and 520 pt width as the app sheets. A `brew` read failure is an
-error state with a retry, never an empty list.
+error state with a retry, never an empty list. The dry-run gate on this page is
+`Preview only. Nothing will be removed.` The action menu's `Remove old versions…`
+opens a 520 pt sheet that lists `Old package versions` and `Download cache`, with
+Cancel as the default and a red `Remove`.
 
 ### App detail
 
@@ -253,8 +256,8 @@ count and bytes and opens the confirmation.
 ### Storage
 
 One encoding: size share as a neutral ramp. Plain breadcrumb, four-step legend,
-canvas, hover label. The detailed scan strip lives here and nowhere else. The
-map is readable in both modes.
+canvas, the five largest folders under the canvas, hover label. The detailed scan
+strip lives here and nowhere else. The map is readable in both modes.
 
 ### Snapshots
 
@@ -418,7 +421,7 @@ Rules the script enforces:
       "mechanism": "safeAreaInset-top",
       "height": 56,
       "verify": {
-        "contains": ["safeAreaInset(edge: .top, spacing: 0) {", "TopStatusStrip()"],
+        "contains": ["safeAreaInset(edge: .top, spacing: 0) {", "TopStatusStrip("],
         "not-contains": [".overlay(alignment: .top)"]
       }
     },
@@ -433,7 +436,7 @@ Rules the script enforces:
       "id": "scan-toolbar",
       "file": "Chet/Views/ScanStatusView.swift",
       "mechanism": "toolbar-inline",
-      "height": 28,
+      "height": 40,
       "verify": {"contains": ["struct ScanStatusView"]}
     },
     {

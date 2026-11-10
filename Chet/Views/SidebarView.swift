@@ -79,14 +79,12 @@ struct SidebarView: View {
                 Text(title)
                     .font(Typography.sidebar)
                     .lineLimit(1)
-                    .foregroundStyle(
-                        isSelected
-                            ? AnyShapeStyle(Color.white)
-                            : AnyShapeStyle(dimmed ? Theme.inkSecondary : Theme.ink))
+                    .modifier(
+                        SidebarInk(isSelected: isSelected, tone: dimmed ? Theme.inkSecondary : Theme.ink))
                 if locked {
                     Image(systemName: "lock.fill")
                         .font(Typography.caption)
-                        .foregroundStyle(isSelected ? Color.white : Theme.inkSecondary)
+                        .modifier(SidebarInk(isSelected: isSelected, tone: Theme.inkSecondary))
                         .help("Some folders need Full Disk Access")
                         .accessibilityHidden(true)
                 }
@@ -94,17 +92,32 @@ struct SidebarView: View {
                 if let trailing {
                     Text(trailing)
                         .font(Typography.caption)
-                        .foregroundStyle(isSelected ? Color.white : Theme.inkSecondary)
+                        .modifier(SidebarInk(isSelected: isSelected, tone: Theme.inkSecondary))
                         .monospacedDigit()
                 }
             }
         } icon: {
             Image(systemName: glyph)
-                .font(Typography.sidebar)
-                .foregroundStyle(isSelected ? Color.white : Theme.inkSecondary)
+                .font(Typography.iconSidebar)
+                .modifier(SidebarInk(isSelected: isSelected, tone: Theme.inkSecondary))
                 .frame(width: 18)
         }
         .tag(id)
         .accessibilityIdentifier("sidebar.\(id)")
+    }
+}
+
+/// The sidebar is system chrome, so the selected row draws its own label color. An explicit
+/// color would override the system selection treatment, so it is used on unselected rows only.
+private struct SidebarInk: ViewModifier {
+    let isSelected: Bool
+    let tone: Color
+
+    func body(content: Content) -> some View {
+        if isSelected {
+            content
+        } else {
+            content.foregroundStyle(tone)
+        }
     }
 }

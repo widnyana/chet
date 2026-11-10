@@ -14,11 +14,14 @@ struct ListHeaderBar: View {
                     model.setSelected(items.map(\.url), selected.count != items.count)
                 } label: {
                     Image(systemName: Self.triState(selected: selected.count, total: items.count))
+                        .font(Typography.iconAction)
                         .foregroundStyle(selected.count > 0 ? Theme.accent : Theme.inkSecondary)
                 }
                 .buttonStyle(.plain)
                 .frame(width: 40, height: 40)
                 .contentShape(Rectangle())
+                // 40 pt hit target, 32 pt header. The overhang is the hit area.
+                .padding(.vertical, -Spacing.s1)
                 .focusable()
                 .focusRing()
                 .help(selected.count == items.count ? "Deselect all" : "Select all")
@@ -59,9 +62,8 @@ struct ListHeaderBar: View {
                 .menuStyle(.borderlessButton)
                 .fixedSize()
             }
-            .frame(minHeight: Metrics.rowHeight)
+            .frame(height: Metrics.tableHeaderHeight)
             .pageHorizontalPadding()
-            .padding(.vertical, Spacing.s2)
             Hairline()
         }
     }

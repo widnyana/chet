@@ -6,7 +6,7 @@ struct HomebrewView: View {
     @Environment(HomebrewModel.self) private var model
     @State private var query = ""
     @State private var confirmingUpgrade = false
-    @State private var confirmingCleanup = false
+    @State private var showingCleanup = false
 
     var body: some View {
         @Bindable var model = model
@@ -19,12 +19,6 @@ struct HomebrewView: View {
             .pageHorizontalPadding()
             .padding(.top, Spacing.s6)
             .padding(.bottom, Spacing.s3)
-            if DryRun.enabled {
-                PreviewNotice(text: "Preview only. Nothing will be changed.")
-                    .pageHorizontalPadding()
-                    .padding(.bottom, Spacing.s2)
-            }
-
             content
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -38,6 +32,9 @@ struct HomebrewView: View {
         }
         .sheet(isPresented: $model.showUninstallConfirm) {
             HomebrewUninstallSheet()
+        }
+        .sheet(isPresented: $showingCleanup) {
+            HomebrewCleanupSheet()
         }
         .alert(
             "Homebrew",
@@ -58,26 +55,15 @@ struct HomebrewView: View {
         } message: {
             Text(
                 DryRun.enabled
-                    ? "Preview only. Nothing will be changed. Homebrew would replace the selected packages with the latest versions."
+                    ? "Preview only. Nothing will be removed. Homebrew would replace the selected packages with the latest versions."
                     : "Homebrew replaces the selected packages with the latest versions.")
-        }
-        .confirmationDialog(
-            "Remove old versions?", isPresented: $confirmingCleanup, titleVisibility: .visible
-        ) {
-            Button("Remove", role: .destructive) { model.cleanup() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text(
-                DryRun.enabled
-                    ? "Preview only. Nothing will be removed. This would delete old package versions and the download cache. Current versions stay."
-                    : "This deletes old package versions and the download cache. Current versions stay.")
         }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
                     model.openInstaller()
                 } label: {
-                    Label("Install packages", systemImage: "plus")
+                    Label("Install packages…", systemImage: "plus")
                 }
                 .help("Search for a formula or cask to install")
                 .accessibilityIdentifier("homebrew.install")
@@ -99,8 +85,8 @@ struct HomebrewView: View {
                         confirmingUpgrade = true
                     }
                     .disabled(!model.canUpgrade)
-                    Button("Remove old versions", systemImage: "trash") {
-                        confirmingCleanup = true
+                    Button("Remove old versions…", systemImage: "trash") {
+                        showingCleanup = true
                     }
                     .disabled(!model.canAct)
                 } label: {
@@ -270,7 +256,7 @@ private struct HomebrewRow: View {
             .accessibilityLabel("Select \(package.title) to uninstall")
             .accessibilityIdentifier("homebrew.select.\(package.id)")
             Image(systemName: package.kind == .cask ? "shippingbox.fill" : "shippingbox")
-                .font(.system(size: 16, weight: .regular))
+                .font(Typography.iconRow)
                 .foregroundStyle(Theme.inkSecondary)
                 .frame(width: HomebrewColumns.icon)
                 .accessibilityHidden(true)
@@ -289,7 +275,7 @@ private struct HomebrewRow: View {
                 .font(Typography.caption).monospacedDigit().foregroundStyle(Theme.inkSecondary)
                 .lineLimit(1).frame(width: HomebrewColumns.version, alignment: .leading)
             Text(package.size.formatted(.byteCount(style: .file)))
-                .font(Typography.caption).monospacedDigit().foregroundStyle(Theme.ink)
+                .font(Typography.row).monospacedDigit().foregroundStyle(Theme.ink)
                 .frame(width: HomebrewColumns.size, alignment: .trailing)
             statusLabel.frame(width: HomebrewColumns.status, alignment: .leading)
         }

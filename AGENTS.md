@@ -87,7 +87,6 @@ Top to bottom:
 
 | Element | Identifier | Kind |
 |---|---|---|
-| Padlock icon | none | `AXImage`, label `lock.shield` |
 | `Chet needs Full Disk Access` | `gate.title` | `AXStaticText` |
 | One-sentence explanation | none | `AXStaticText` |
 | Three numbered steps | none | `AXStaticText` |

@@ -25,31 +25,30 @@ struct TweakDetailView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s4) {
-            header
-            Hairline()
-            Text(tweak.detail)
-                .font(Typography.body)
-                .foregroundStyle(Theme.inkSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-            if model.isGated {
-                StatusLabel(
-                    text: "Preview only. No tweak is changed.", systemImage: "eye.slash",
-                    tone: .amber)
+        SheetFrame(width: 540) {
+            VStack(alignment: .leading, spacing: Spacing.s4) {
+                header
+                Hairline()
+                Text(tweak.detail)
+                    .font(Typography.body)
+                    .foregroundStyle(Theme.inkSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if model.isGated {
+                    StatusLabel(
+                        text: "Preview only. No tweak is changed.", systemImage: "eye.slash",
+                        tone: .amber)
+                }
+                if !isSupported, let reading {
+                    StatusLabel(
+                        text: TweakCopy.state(reading.state),
+                        systemImage: "questionmark.circle",
+                        tone: .neutral)
+                }
+                facts
+                actions
+                    .disabled(model.isGated || !isSupported)
             }
-            if !isSupported, let reading {
-                StatusLabel(
-                    text: TweakCopy.state(reading.state),
-                    systemImage: "questionmark.circle",
-                    tone: .neutral)
-            }
-            facts
-            actions
-                .disabled(model.isGated || !isSupported)
         }
-        .padding(Spacing.s6)
-        .frame(width: 540, alignment: .leading)
-        .background(Theme.paper)
         .accessibilityIdentifier("tweak.detail.\(tweak.id)")
         .confirmationDialog(
             "Revert the last change?",

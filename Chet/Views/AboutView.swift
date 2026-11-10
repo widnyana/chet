@@ -135,7 +135,7 @@ private struct AboutInfoRow: View {
                 HStack(spacing: Spacing.s1) {
                     if let systemImage {
                         Image(systemName: systemImage)
-                            .font(.system(size: 11, weight: .medium))
+                            .font(Typography.iconAction)
                             .foregroundStyle(tone.color)
                     }
                     Text(value)

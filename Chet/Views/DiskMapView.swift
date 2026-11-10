@@ -121,8 +121,7 @@ struct DiskMapView: View {
                     actionTitle: "Scan this Mac",
                     action: { model.scan() }
                 )
-                .padding(Spacing.s8)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .pageHorizontalPadding()
             } else {
                 VStack(spacing: Spacing.s2) {
                     ProgressView()
@@ -250,7 +249,7 @@ struct DiskMapView: View {
     private func folderRowLabel(_ child: FolderNode, size: String, share: String) -> some View {
         HStack(spacing: Spacing.s3) {
             Image(systemName: "folder")
-                .font(.system(size: 14, weight: .regular))
+                .font(Typography.iconRow)
                 .foregroundStyle(Theme.inkSecondary)
                 .frame(width: 22)
             Text(child.url.lastPathComponent)
@@ -270,6 +269,7 @@ struct DiskMapView: View {
                 .frame(width: 44, alignment: .trailing)
         }
         .padding(.vertical, Spacing.s2)
+        .frame(minHeight: Metrics.rowHeight)
         .contentShape(Rectangle())
     }
 
@@ -314,15 +314,17 @@ struct DiskMapView: View {
                 HStack(spacing: Spacing.s2) {
                     Spacer()
                     SecondaryActionButton(
-                        title: "Pause", isEnabled: !model.isPaused,
+                        title: model.isPaused ? "Resume" : "Pause",
                         action: { model.togglePause() }
                     )
-                    .accessibilityIdentifier("storage.pause")
-                    SecondaryActionButton(
-                        title: "Resume", isEnabled: model.isPaused,
-                        action: { model.togglePause() }
+                    .accessibilityIdentifier(model.isPaused ? "storage.resume" : "storage.pause")
+                    PrimaryActionButton(
+                        title: "Stop scan",
+                        systemImage: "stop.circle",
+                        help: "Stop the scan",
+                        action: { model.cancel() }
                     )
-                    .accessibilityIdentifier("storage.resume")
+                    .accessibilityIdentifier("storage.stop")
                 }
             }
             .pageHorizontalPadding()
@@ -356,7 +358,7 @@ struct DiskMapChrome: View {
                         if index > 0 {
                             Image(systemName: "chevron.right")
                                 .font(Typography.caption)
-                                .foregroundStyle(Theme.inkTertiary)
+                                .foregroundStyle(Theme.inkSecondary)
                         }
                         if index == pathNodes.count - 1 {
                             Text(index == 0 ? "Home" : node.url.lastPathComponent)
@@ -398,7 +400,8 @@ struct DiskMapChrome: View {
                 .foregroundStyle(Theme.inkSecondary)
             if sizeBasis == .allocated {
                 Text("Size on disk")
-                    .padding(.leading, 8)
+                    .font(Typography.caption)
+                    .padding(.leading, Spacing.s2)
                     .help("The space these files take on the disk.")
             }
         }

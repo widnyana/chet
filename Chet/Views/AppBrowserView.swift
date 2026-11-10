@@ -67,7 +67,7 @@ struct UninstallWorkspace: View {
 struct AppBrowserView: View {
     @Environment(AppCleanerModel.self) private var model
 
-    private let columns = [GridItem(.adaptive(minimum: 164), spacing: Spacing.s3)]
+    private let columns = [GridItem(.adaptive(minimum: Metrics.gridCellMinWidth), spacing: Spacing.s3)]
     @State private var sort: AppSort = .name
     @State private var ascending = true
 
@@ -83,11 +83,6 @@ struct AppBrowserView: View {
             .pageHorizontalPadding()
             .padding(.top, Spacing.s6)
             .padding(.bottom, Spacing.s3)
-            if DryRun.enabled {
-                PreviewNotice(text: "Preview only. Nothing will be moved.")
-                    .pageHorizontalPadding()
-                    .padding(.bottom, Spacing.s2)
-            }
             if model.isLoadingApps && model.apps.isEmpty {
                 LoadingStateView(message: "Reading applications")
                     .pageHorizontalPadding()
@@ -347,7 +342,7 @@ private struct AppRow: View {
                     .font(Typography.row)
                     .foregroundStyle(Theme.ink)
                     .lineLimit(1)
-                Text(app.bundleID ?? "No bundle ID")
+                Text(app.bundleID ?? "Unknown")
                     .font(Typography.caption)
                     .foregroundStyle(Theme.inkSecondary)
                     .lineLimit(1)
@@ -368,7 +363,7 @@ private struct AppRow: View {
             Text(model.appSizes[app.url].map { $0.formatted(.byteCount(style: .file)) } ?? "Unknown")
                 .font(Typography.row)
                 .monospacedDigit()
-                .foregroundStyle(Theme.inkSecondary)
+                .foregroundStyle(Theme.ink)
                 .lineLimit(1)
                 .frame(width: AppColumns.size, alignment: .trailing)
             status
@@ -378,6 +373,12 @@ private struct AppRow: View {
         .pageHorizontalPadding()
         .background(model.markedApps.contains(app.url) ? Theme.accentSoft : Color.clear)
         .contentShape(Rectangle())
+        .focusable()
+        .onKeyPress(.return) {
+            model.select(app)
+            return .handled
+        }
+        .focusRing()
         .onTapGesture(count: 2) { model.select(app) }
         .contextMenu { appContextMenu(for: app, model: model) }
     }
@@ -435,18 +436,17 @@ private struct AppCell: View {
                         .foregroundStyle(Theme.ink)
                         .lineLimit(2)
                         .multilineTextAlignment(.center)
-                    Text(app.vendorLabel ?? "Unknown developer")
+                    Text(app.vendorLabel ?? "Unknown")
                         .font(Typography.caption)
                         .foregroundStyle(Theme.inkSecondary)
                         .lineLimit(1)
-                    Text(model.appSizes[app.url].map { $0.formatted(.byteCount(style: .file)) } ?? "Unknown")
-                        .font(Typography.caption)
-                        .monospacedDigit()
-                        .foregroundStyle(Theme.inkSecondary)
-                    Text(model.locationLabel(app))
-                        .font(Typography.caption)
-                        .foregroundStyle(Theme.inkSecondary)
-                        .lineLimit(1)
+                    Text(
+                        "\(model.appSizes[app.url].map { $0.formatted(.byteCount(style: .file)) } ?? "Unknown") · \(model.locationLabel(app))"
+                    )
+                    .font(Typography.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.inkSecondary)
+                    .lineLimit(1)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, Spacing.s3)
@@ -454,9 +454,9 @@ private struct AppCell: View {
             .buttonStyle(.plain)
         }
         .padding(Spacing.s3)
-        .background(Theme.paperRaised, in: .rect(corners: .fixed(Metrics.panelRadius)))
+        .background(Theme.paperRaised, in: .rect(corners: .fixed(Metrics.innerRadius)))
         .overlay {
-            RoundedRectangle(cornerRadius: Metrics.panelRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: Metrics.innerRadius, style: .continuous)
                 .strokeBorder(
                     marked ? Theme.accent : (hovering ? Theme.inkTertiary : Theme.hairline),
                     lineWidth: marked ? 2 : 1)

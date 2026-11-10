@@ -68,6 +68,7 @@ inspection surface. The one fixed exception is the permission link
 - Protected: `Protected. Chet never removes this.`
 - Dry run, cleaning: `Preview only. Nothing will be removed.`
 - Dry run, uninstall: `Preview only. Nothing will be moved.`
+- Dry run, Homebrew page: `Preview only. Nothing will be removed.`
 - Dry run, tweaks: `Preview only. No tweak is changed.`
 - Partial access: `Limited access. Some folders are hidden.`
 
@@ -83,6 +84,7 @@ One word per state. Do not invent a synonym:
 | Progress labels | `Items`, `Bytes`, `Freed`, `Skipped`, `Failed`, `Current` |
 | Dry-run labels | `Would free`, `Would skip`, `Would fail` |
 | Missing value | `Unknown` |
+| Duplicate keeper | `Keep` |
 | Log action | `Show audit log` |
 
 Singular and plural both sound right: `1 item`, `2 items`, `1 app`, `2 apps`.
@@ -270,9 +272,9 @@ Uninstall complete
 
 ## Homebrew
 
-- Header: `N packages, M marked`. Metric label `on disk`.
+- Header: `N packages, M marked`.
 - Actions: `Update catalog`, `Upgrade N packages`, `Install packages…`,
-  `Remove old versions`, `Uninstall`.
+  `Remove old versions…`, `Uninstall`.
 - Empty, no packages: `No Homebrew packages. Install one with brew, then reload.`
 - Missing Homebrew: `Homebrew is not installed. Install it from brew.sh, then
   reload.`
@@ -280,8 +282,11 @@ Uninstall complete
   reload.`
 - Gate, uninstall: `Preview only. Nothing will be removed.`
 - Gate, install: `Preview only. Nothing will be installed.`
+- Gate, page: `Preview only. Nothing will be removed.`
 - Confirm: `Uninstall N packages?`, with `Uninstall` and, for casks,
   `Uninstall and delete data`. The message names what the data option deletes.
+- Confirm, cleanup: `Remove old versions?`, with `Remove` and Cancel. The message
+  names old versions and the download cache.
 - Results: `Removed N packages.`, `Installed N packages.`,
   `Upgraded N packages.`, `Added the tap name.`, `Freed X.`,
   `No old versions to remove.`, `Homebrew's catalog is up to date.`
