@@ -15,6 +15,7 @@ struct SettingsView: View {
     @State private var helperState = HelperService.state
     @State private var helperBusy = false
     @State private var helperError: String?
+    @State private var showingScope = false
 
     private let optionalSteps: [ScanStep] = [.largeFiles, .duplicates, .leftovers, .photos, .videos, .snapshots]
 
@@ -49,6 +50,7 @@ struct SettingsView: View {
             }
         }
         .frame(width: 560, height: 560)
+        .sheet(isPresented: $showingScope) { ScanScopeSheet() }
         .confirmationDialog(
             "Reset every tweak?", isPresented: $confirmingReset, titleVisibility: .visible
         ) {
@@ -80,6 +82,20 @@ struct SettingsView: View {
                         isOn: Binding(
                             get: { model.isStepEnabled(step) },
                             set: { model.setStep(step, enabled: $0) }))
+                }
+            }
+            SettingsPanel(title: "A part of this Mac") {
+                SettingsNote(
+                    "Read only the categories or folders you pick. The rest of the Mac is left alone."
+                )
+                SettingsDivider()
+                SettingsRow(label: "Scan scope", detail: model.scopeSummary) {
+                    SecondaryActionButton(
+                        title: "Choose…", help: "Pick the categories and folders one scan reads"
+                    ) {
+                        showingScope = true
+                    }
+                    .accessibilityIdentifier("settings.scan.scope")
                 }
             }
             SettingsPanel(title: "Speed") {

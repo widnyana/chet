@@ -176,6 +176,7 @@ struct SettingsToggleRow: View {
     let label: String
     var detail: String?
     @Binding var isOn: Bool
+    var identifier: String?
 
     var body: some View {
         SettingsRow(label: label, detail: detail) {
@@ -184,6 +185,7 @@ struct SettingsToggleRow: View {
                 .toggleStyle(.switch)
                 .controlSize(.small)
                 .accessibilityLabel(label)
+                .modifier(OptionalAccessibilityIdentifier(identifier: identifier))
         }
     }
 }

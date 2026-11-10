@@ -26,6 +26,23 @@ enum CategoryCopy {
         copy[id]?.explanation ?? ""
     }
 
+    /// One row of the scan scope sheet. Only the categories Chet can produce are listed.
+    struct ScopeEntry: Identifiable {
+        let id: String
+        let title: String
+        let explanation: String
+        let section: CategorySection
+    }
+
+    static var scopeEntries: [ScopeEntry] {
+        ScanScope.knownCategories.compactMap { id in
+            guard let entry = copy[id] else { return nil }
+            return ScopeEntry(
+                id: id, title: entry.title, explanation: entry.explanation,
+                section: entry.section)
+        }
+    }
+
     private struct Entry {
         let title: String
         let section: CategorySection

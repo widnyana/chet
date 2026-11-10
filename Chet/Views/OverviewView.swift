@@ -7,16 +7,35 @@ struct OverviewView: View {
     @Environment(ScanModel.self) private var model
     @Binding var selection: String?
     let onClean: () -> Void
+    @State private var showingScope = false
 
     var body: some View {
         PageScreen(
             header: { pageHeader },
             content: {
                 capacity
+                if model.isPartialScan { scopeNotice }
                 content
             },
             bar: { commandBar }
         )
+        .sheet(isPresented: $showingScope) { ScanScopeSheet() }
+    }
+
+    private var scopeNotice: some View {
+        HStack(spacing: Spacing.s3) {
+            StatusLabel(
+                text: "Partial scan: \(model.resultScopeSummary)",
+                systemImage: "circle.lefthalf.filled", tone: .amber)
+            Spacer(minLength: Spacing.s3)
+            QuietActionButton(
+                title: "Scan everything", help: "Measure the whole Mac again"
+            ) {
+                model.scanEverything()
+            }
+            .accessibilityIdentifier("home.scan.everything")
+        }
+        .pageHorizontalPadding()
     }
 
     private var pageHeader: some View {
@@ -242,9 +261,12 @@ struct OverviewView: View {
                 detail: "No scan yet",
                 actionTitle: "Scan this Mac",
                 actionSystemImage: "magnifyingglass",
+                secondaryTitle: "Scope…",
+                secondaryAction: { showingScope = true },
                 help: "Scan for caches, logs, and large files (Command-R)",
                 accessibilityLabel: "Scan for caches, logs, and large files",
                 primaryIdentifier: "home.scan",
+                secondaryIdentifier: "home.scope",
                 action: { model.scan() })
         } else if model.selectedItems.isEmpty {
             CommandBar(
@@ -253,9 +275,12 @@ struct OverviewView: View {
                     ? "1 category" : "\(model.categories.count) categories",
                 actionTitle: "Scan again",
                 actionSystemImage: "magnifyingglass",
+                secondaryTitle: "Scope…",
+                secondaryAction: { showingScope = true },
                 help: "Scan for caches, logs, and large files (Command-R)",
                 accessibilityLabel: "Scan for caches, logs, and large files",
                 primaryIdentifier: "home.scan",
+                secondaryIdentifier: "home.scope",
                 action: { model.scan() })
         } else {
             let count = model.selectedItems.count
