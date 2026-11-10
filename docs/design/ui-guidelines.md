@@ -336,6 +336,7 @@ Each row is a mistake found in this tree. Read it before you write a view.
 | A fixed 32 pt page margin at every width | Responsive margin: 24 at 960, 32 wide | Wide margins waste the minimum window; 24 at wide widths breaks alignment |
 | A decorative icon or dot with no state | Hide it from VoiceOver, or remove it | A `lock.shield` becomes an AX element named `lock.shield` with no meaning |
 | A claim like "sends nothing off it" with no evidence | State the behavior, or point to the code path | The anti-slop rule applies to privacy too |
+| A canvas publishing derived text (labels, names) back through `@State` written inside `updateNSView` | Compute the text in SwiftUI from the same state and size that position the thing it names | The disk-map labels landed late or not at all, so an old name sat on a tile that had moved; the click resolved the tile and drilled into a different folder than the label said |
 
 ## Field notes
 
@@ -365,6 +366,20 @@ Small techniques that prevent the pitfalls above.
   label. Backfilling identifiers after the test breaks is slower.
 - `DRY_RUN=1` is the only safe way to exercise a removal path. Check the gate
   sentence before you touch the control.
+- One piece of screen state has one producer. If a view and its canvas both
+  derive from it, pass the same snapshot to both in the same render pass; do
+  not let the canvas hand derived data back.
+- Resolve a click against the state that renders the screen, not against a
+  private copy inside the canvas. The breadcrumb and the drill must never read
+  two different trees.
+- When instrumenting a click path, log before the first early return. A guard
+  that swallows the event looks identical to "the user never clicked".
+- Probe a running app with selector-scoped dumps (`axdrv dump id=...`) and
+  frame existence checks. A full-tree JSON dump twice a second starves the
+  app and the probe.
+- A debug copy relaunches itself when the FDA probe flips, so a pid captured
+  once is stale within the minute. Re-resolve the pid every drive step and
+  kill only instances you launched.
 
 ## 11. Asking an agent for UI work
 
@@ -511,3 +526,4 @@ Current SDK notes that matter here:
 |---|---|
 | 2026-11-09 | First version. Merges the five requested sources, corrects the APIs against the 27.2 SDK, and ties the rules to this app's tokens and components |
 | 2026-11-09 | Second version. Adds the working agreement, the shipped-pitfalls catalog, and the verification recipes. Aligns the type scale, row, command bar, window, gate copy, and Homebrew destination across the doc set |
+| 2026-11-10 | Adds the disk-map pitfall (derived text published from the canvas) and field notes on single-producer state, click resolution, instrumentation, and driving a self-relaunching debug copy |
