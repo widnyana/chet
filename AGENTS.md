@@ -337,7 +337,8 @@ identifiers of the controls inside it. Put the identifier on the control you wil
 | `storage.header`, `storage.pause`, `storage.resume` | Storage |
 | `storage.crumb.current`, `storage.crumb.<n>`, `storage.volume` | Storage location bar |
 | `storage.metric.free`, `storage.metric.cleanable`, `storage.metric.largeFiles` | Storage metric actions |
-| `storage.ledger.header`, `storage.row.<name>` | Storage ledger |
+| `storage.ledger.header`, `storage.row.<name>`, `storage.open.<name>` | Storage ledger |
+| `storage.canvas` | Storage treemap |
 | `storage.clear`, `storage.trash` | Storage command bar |
 | `storage.trashTitle`, `storage.trashCancel`, `storage.trashConfirm` | Storage trash sheet |
 | `list.selectAll` | category table select-all |

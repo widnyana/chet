@@ -89,6 +89,15 @@ struct StorageTrashTests {
         #expect(trasher(dir, dryRun: true).check(entry(bundle)) == .denied("app bundle"))
     }
 
+    @Test func crumbKeepsThePathPrefix() {
+        let stack = ["A", "B", "C"]
+        #expect(StoragePath.trimmed(stack, to: 0).isEmpty)
+        #expect(StoragePath.trimmed(stack, to: 1) == ["A"])
+        #expect(StoragePath.trimmed(stack, to: 2) == ["A", "B"])
+        #expect(StoragePath.trimmed(stack, to: 3) == stack)
+        #expect(StoragePath.trimmed(stack, to: 9) == stack)
+    }
+
     @Test func nestedEntriesMoveOnce() throws {
         let dir = try TempDir()
         let parent = dir.url.appendingPathComponent("Downloads/old")

@@ -233,8 +233,8 @@ Top to bottom:
    scan action.
 7. Hover: a plain label with folder name and size, and the ledger row uses
    `accentSoft`.
-8. Click a block: collect its top-level child. Double-click a folder: open it.
-   Right-click: Reveal in Finder.
+8. Click a block: open that folder. Right-click: `Collect` or
+   `Reveal in Finder`.
 9. `CommandBar`: collected bytes, count and the hint, `Clear`, and
    `Move to Trash...`.
 
@@ -250,8 +250,9 @@ Collected blocks carry the accent border; the hovered block carries the ink
 border.
 
 The collection is cleared by `Clear`, by a new scan, and after a trash pass. It
-survives drill-down and drill-out. While a scan runs the controls are disabled
-with the reason `Wait for the scan to finish.`
+survives drill-down and drill-out. While a scan runs the collection controls are
+disabled with the reason `Wait for the scan to finish.`; opening folders and the
+breadcrumb stay available.
 
 The trash sheet lists up to six names and sizes, the total, and the sentence
 `Moved items stay in the Trash until you empty it.` Under `DRY_RUN` it shows

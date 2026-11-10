@@ -277,9 +277,13 @@ ramp value as its block, so chart and list read as one surface. A collected
 block carries the accent border; the hovered block carries an ink border. No
 category colours, in any state.
 
-Click a block to collect its top-level child; double-click a folder to open it.
-The same collection is the ledger checkboxes, and it survives drill-down. The
-map, the ledger, and the bar never disagree.
+Click a block to open that folder. Collection is the ledger checkbox, or
+`Collect` in the block's context menu. A ledger row with children carries a
+chevron that opens it. The same collection survives drill-down, and the map,
+the ledger, and the bar never disagree.
+
+The breadcrumb keeps one button per ancestor, `Home` first. Clicking a crumb
+returns to that folder and removes the deeper entries from the path.
 
 Moving to the Trash is the only destructive action here. It confirms first, it
 re-checks every path through `SafetyPolicy` and the app-folder allow-list, and

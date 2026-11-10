@@ -33,10 +33,11 @@ struct StorageLocationBar: View {
                                 Button(title(node, index)) { onSelect(index) }
                                     .buttonStyle(.plain)
                                     .font(Typography.caption)
-                                    .foregroundStyle(Theme.inkSecondary)
+                                    .foregroundStyle(Theme.accent)
                                     .lineLimit(1)
                                     .focusable()
                                     .focusRing()
+                                    .help("Go to \(title(node, index))")
                                     .accessibilityIdentifier("storage.crumb.\(index)")
                             }
                         }
@@ -228,6 +229,9 @@ struct StorageLedger: View {
                         }
                     }
                 }
+                // A folder change starts the list at the top. Without this the old
+                // scroll offset can leave the shorter new list showing blank rows.
+                .id(folder.url)
                 .scrollContentBackground(.hidden)
             }
         }
@@ -315,6 +319,23 @@ struct StorageLedgerRow: View {
                 .monospacedDigit()
                 .foregroundStyle(Theme.inkSecondary)
                 .lineLimit(1)
+            if child.children.isEmpty {
+                Color.clear.frame(width: 16, height: 1)
+            } else {
+                Button(action: onOpen) {
+                    Image(systemName: "chevron.right")
+                        .font(Typography.caption)
+                        .foregroundStyle(Theme.inkSecondary)
+                        .frame(width: 16, height: Metrics.rowHeight)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .focusable()
+                .focusRing()
+                .help("Open \(child.url.lastPathComponent)")
+                .accessibilityLabel("Open \(child.url.lastPathComponent)")
+                .accessibilityIdentifier("storage.open.\(child.url.lastPathComponent)")
+            }
         }
         .padding(.horizontal, Spacing.s3)
         .frame(height: Metrics.rowHeight)

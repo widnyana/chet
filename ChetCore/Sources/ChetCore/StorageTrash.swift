@@ -16,6 +16,16 @@ public struct StorageEntry: Identifiable, Hashable, Sendable {
     }
 }
 
+/// Breadcrumb arithmetic. The path view is the root plus one entry per crumb, so a
+/// crumb index is exactly the number of stack entries to keep below it.
+public enum StoragePath {
+    public static func trimmed<T>(_ stack: [T], to crumb: Int) -> [T] {
+        if crumb <= 0 { return [] }
+        if crumb >= stack.count { return stack }
+        return Array(stack.prefix(crumb))
+    }
+}
+
 public struct StorageTrashResult: Sendable, Equatable {
     public struct Failure: Identifiable, Sendable, Equatable {
         public var id: URL { url }

@@ -56,8 +56,9 @@ struct DiskMapView: View {
                 volume: volume,
                 sizeBasis: model.treeSizeBasis,
                 onSelect: { index in
-                    guard index < stack.count else { return }
-                    stack.removeSubrange((index + 1)...)
+                    // `pathNodes` is the root plus one node per stack entry: crumb `index`
+                    // means the stack keeps exactly its first `index` entries.
+                    stack = StoragePath.trimmed(stack, to: index)
                     hovered = nil
                 })
             metricsRow
@@ -180,8 +181,7 @@ struct DiskMapView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             VStack(spacing: Spacing.s2) {
-                ProgressView()
-                    .controlSize(.small)
+                ActivitySpinner()
                 Text("Measuring your folders")
                     .font(Typography.caption)
                     .foregroundStyle(Theme.inkSecondary)
@@ -229,7 +229,7 @@ struct DiskMapView: View {
             "Storage map for \(current.url.lastPathComponent), "
                 + current.size.formatted(.byteCount(style: .file))
         )
-        .accessibilityHint("Click a block to collect it. Double-click to open a folder.")
+        .accessibilityHint("Click a block to open that folder. Check a row to collect it.")
         .clipShape(.rect(corners: .fixed(Metrics.panelRadius)))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .frame(minHeight: 320)
@@ -320,10 +320,10 @@ struct DiskMapView: View {
 
     private var barDetail: String {
         if model.isScanning { return "Wait for the scan to finish." }
-        if collection.isEmpty { return "Click a block or check a row to collect it." }
+        let hint = "Click a block to open it. Check a row to collect it."
+        if collection.isEmpty { return hint }
         let count = collection.count
-        return "\(count) \(count == 1 ? "item" : "items") collected. "
-            + "Click a block or check a row to collect it."
+        return "\(count) \(count == 1 ? "item" : "items") collected. " + hint
     }
 
     private var barReason: String? {
@@ -400,7 +400,7 @@ struct DiskMapView: View {
                                 .foregroundStyle(Theme.inkSecondary)
                         }
                     } else {
-                        ProgressView().controlSize(.small)
+                        ActivitySpinner()
                         Text(model.currentStep.map { ScanStepCopy.title($0) } ?? "Starting scan")
                             .font(Typography.section)
                             .foregroundStyle(Theme.ink)
@@ -509,9 +509,9 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
         didSet { if selected != oldValue { rebuildInstances() } }
     }
     var onHover: (FolderNode?) -> Void = { _ in }
-    /// A click collects the top-level child under the pointer.
+    /// Collects the top-level child under the pointer, from the context menu.
     var onToggle: (FolderNode) -> Void = { _ in }
-    /// A double click opens a folder that has children.
+    /// A click opens the top-level child under the pointer when it has children.
     var onOpen: (FolderNode) -> Void = { _ in }
     /// Publishes the top-tier labels (name + size on big blocks) to the SwiftUI layer.
     var onLabels: ([TreemapLabel]) -> Void = { _ in }
@@ -539,6 +539,10 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
             NSTrackingArea(
                 rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
                 owner: self))
+        setAccessibilityElement(true)
+        setAccessibilityRole(.group)
+        setAccessibilityLabel("Storage map")
+        setAccessibilityIdentifier("storage.canvas")
     }
 
     func relayout() {
@@ -687,41 +691,45 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
         }
     }
 
-    /// A single click waits out the double-click interval, so the first half of a
-    /// double click never toggles the collection. A double click opens instead.
-    private var pendingClick: DispatchWorkItem?
-    private var pendingNode: FolderNode?
+    /// The last open, so the second click of a double click cannot drill another level
+    /// in the folder that just appeared.
+    private var lastOpen = Date.distantPast
 
     override func mouseDown(with event: NSEvent) {
-        guard let hit = tile(at: convert(event.locationInWindow, from: nil))?.node else { return }
-        if event.clickCount >= 2 {
-            pendingClick?.cancel()
-            pendingClick = nil
-            pendingNode = nil
-            if !hit.children.isEmpty { onOpen(hit) }
-            return
-        }
-        pendingClick?.cancel()
-        pendingNode = hit
-        let work = DispatchWorkItem { [weak self] in
-            guard let self, let node = self.pendingNode,
-                let child = self.directChild(containing: node)
-            else { return }
-            self.pendingNode = nil
-            self.onToggle(child)
-        }
-        pendingClick = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + NSEvent.doubleClickInterval, execute: work)
+        guard event.clickCount == 1 else { return }
+        guard let hit = tile(at: convert(event.locationInWindow, from: nil))?.node,
+            // Open the block the user sees at this level, not a nested grandchild the
+            // breadcrumb cannot resolve.
+            let child = directChild(containing: hit), !child.children.isEmpty
+        else { return }
+        let now = Date()
+        guard now.timeIntervalSince(lastOpen) > 0.3 else { return }
+        lastOpen = now
+        onOpen(child)
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {
-        guard let child = tile(at: convert(event.locationInWindow, from: nil))?.node else { return nil }
+        guard let hit = tile(at: convert(event.locationInWindow, from: nil))?.node,
+            let child = directChild(containing: hit)
+        else { return nil }
         let menu = NSMenu()
-        let item = NSMenuItem(title: "Reveal in Finder", action: #selector(reveal(_:)), keyEquivalent: "")
-        item.representedObject = child.url
-        item.target = self
-        menu.addItem(item)
+        let collect = NSMenuItem(
+            title: selected.contains(child.url)
+                ? "Remove from collection" : "Collect \(child.url.lastPathComponent)",
+            action: #selector(toggleFromMenu(_:)), keyEquivalent: "")
+        collect.representedObject = child
+        collect.target = self
+        menu.addItem(collect)
+        menu.addItem(.separator())
+        let reveal = NSMenuItem(title: "Reveal in Finder", action: #selector(reveal(_:)), keyEquivalent: "")
+        reveal.representedObject = child.url
+        reveal.target = self
+        menu.addItem(reveal)
         return menu
+    }
+
+    @objc private func toggleFromMenu(_ sender: NSMenuItem) {
+        if let node = sender.representedObject as? FolderNode { onToggle(node) }
     }
 
     @objc private func reveal(_ sender: NSMenuItem) {

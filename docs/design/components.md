@@ -331,12 +331,15 @@ Applications                                   11.49 GB
   truncation), size (tabular). One hairline between rows, no alternating fill.
 - The swatch is the block's ramp colour at the same share, so chart and list
   cannot drift.
-- Selected and hovered rows use `accentSoft`. Double-click a row opens the
-  folder; the context menu holds `Show in Finder`. Checkboxes are disabled while
-  a scan runs.
+- Selected and hovered rows use `accentSoft`. A row with children carries a
+  trailing `chevron.right` button that opens the folder; double-click also
+  opens it, and the context menu holds `Show in Finder`. Checkboxes are disabled
+  while a scan runs.
+- A folder change resets the list scroll to the top. Without it, a deep scroll
+  offset can leave a shorter new sibling list showing blank rows.
 - Read errors add one amber `StatusLabel` under the header.
 - The identifiers are on the controls: `storage.row.<name>`,
-  `storage.ledger.header`.
+  `storage.open.<name>`, `storage.ledger.header`.
 
 ## Treemap labels
 
@@ -347,6 +350,12 @@ Applications                                   11.49 GB
   share. Mid-tone blocks carry no label; hover names them.
 - A collected block's border is `Theme.accent`. The hovered block's border is
   `Theme.inkSecondary`. Both values are defined in `Palette.swift`.
+- Clicking a block opens its folder when it has children. Collection is the tile's
+  context menu and the ledger checkbox; a plain click never toggles. A 300 ms
+  guard after an open stops the second click of a double click from drilling
+  another level.
+- The canvas exposes one accessibility element, `storage.canvas`, with the
+  current folder in its label and the click hint in the hint.
 - Hover elsewhere shows a small plain label with the folder name and size on
   `paperRaised` with a hairline. It is content, not glass.
 
