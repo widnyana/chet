@@ -485,6 +485,15 @@ Grid cell:
 - Selection is a `RowCheckbox`; `apps.select.<id>` lands on the control. `<id>` is
   the bundle identifier, else the app file name, lowercase.
 
+## MediaCard
+
+- Grid card for a grouped destination: thumbnail, checkbox or a Keep label, name, size.
+- The thumbnail clip is `Metrics.panelRadius`.
+- The checkbox is a `RowCheckbox`. A card grid passes `grouped.select.<id>`; a keeper
+  card passes nil.
+- The card's structure (thumbnail, label, actions) stays its own. It is not absorbed
+  into a shared component.
+
 ## AppRow
 
 ```

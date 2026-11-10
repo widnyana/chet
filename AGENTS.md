@@ -77,7 +77,10 @@ List them with `dump`; `python3 scripts/ui_selectors.py --pid <pid> --screen <na
 to `docs/ui-selectors.json` (generated, gitignored, do not hand-edit). A tweak row puts
 `tweak.details.<tweak id>` on the details control; the `info.circle` description match is
 retired there. An app cell puts `apps.select.<id>` on its checkbox; `<id>` is the bundle
-identifier, else the app file name, lowercase.
+identifier, else the app file name, lowercase. Cleaner rows put `cleaner.select.<id>` on
+their checkbox and grouped rows and cards put `grouped.select.<id>`; `<id>` is the path
+relative to home, lowercase, with dots for `/`. The grouped list and card modes never
+render the same item at once.
 
 What costs time:
 

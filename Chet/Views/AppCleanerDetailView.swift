@@ -203,6 +203,7 @@ private struct OwnershipRow: View {
         let selected = model.selectedComponents.contains(component.url)
         HStack(spacing: Spacing.s2) {
             RowCheckbox(
+                identifier: "cleaner.select.\(RowIdentifier.path(component.url))",
                 isOn: Binding(get: { selected }, set: { model.setComponent(component, $0) }),
                 label: "Remove \(component.url.lastPathComponent)",
                 isEnabled: model.canSelect(component))

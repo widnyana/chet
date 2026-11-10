@@ -94,7 +94,8 @@ struct GroupedItemsView: View {
                             ForEach(group.items) { item in
                                 MediaCard(
                                     url: item.url, bytes: item.reclaimableBytes,
-                                    isOn: model.isSelected(item.url))
+                                    isOn: model.isSelected(item.url),
+                                    identifier: "grouped.select.\(RowIdentifier.path(item.url))")
                             }
                         }
                     }
@@ -130,10 +131,10 @@ struct GroupedItemsView: View {
                     .contextMenu { revealButton(group.keeper) }
                     ForEach(group.items) { item in
                         HStack(spacing: Spacing.s2) {
-                            Toggle("Remove", isOn: model.isSelected(item.url))
-                                .toggleStyle(.checkbox)
-                                .labelsHidden()
-                                .accessibilityLabel("Remove \(item.url.lastPathComponent)")
+                            RowCheckbox(
+                                identifier: "grouped.select.\(RowIdentifier.path(item.url))",
+                                isOn: model.isSelected(item.url),
+                                label: "Remove \(item.url.lastPathComponent)")
                             Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path))
                                 .resizable()
                                 .frame(width: 22, height: 22)
@@ -195,18 +196,20 @@ struct MediaCard: View {
     let url: URL
     let bytes: Int64?
     let isOn: Binding<Bool>?
+    var identifier: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s1) {
             Thumbnail(url: url, side: 150)
                 .frame(maxWidth: .infinity)
                 .frame(height: 150)
-                .clipShape(.rect(corners: .fixed(8)))
+                .clipShape(.rect(corners: .fixed(Metrics.panelRadius)))
             HStack(spacing: Spacing.s2) {
                 if let isOn {
                     RowCheckbox(
                         isOn: isOn,
-                        label: "Remove \(url.lastPathComponent)")
+                        label: "Remove \(url.lastPathComponent)",
+                        identifier: identifier)
                 } else {
                     StatusLabel(text: "Keep", systemImage: "checkmark", tone: .neutral)
                 }

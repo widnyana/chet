@@ -805,10 +805,24 @@ struct LoadingStateView: View {
     }
 }
 
-/// One scrolling table: a pinned column header over the rows. The header lives inside the
-/// scroll view, so the first row sits directly under it instead of a dead band, and the header
-/// stays visible while the list scrolls. The header and each row own their horizontal margin,
-/// which keeps a column label over its cells.
+enum RowIdentifier {
+    static func path(_ url: URL) -> String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let path = url.path
+        let relative: String
+        if path.hasPrefix(home) {
+            relative = String(path.dropFirst(home.count))
+        } else {
+            relative = path
+        }
+        let trimmed = relative.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        return
+            trimmed
+            .replacingOccurrences(of: "/", with: ".")
+            .lowercased()
+    }
+}
+
 enum ColumnRole {
     case mark, icon, name, location, version, size, status, age, local, kind, modified, risk
 }
@@ -840,6 +854,10 @@ enum ColumnRegistry {
     }
 }
 
+/// One scrolling table: a pinned column header over the rows. The header lives inside the
+/// scroll view, so the first row sits directly under it instead of a dead band, and the header
+/// stays visible while the list scrolls. The header and each row own their horizontal margin,
+/// which keeps a column label over its cells.
 /// One scrolling table: a pinned column header over the rows. The header lives inside the
 /// scroll view, so the first row sits directly under it instead of a dead band, and the header
 /// stays visible while the list scrolls. The header and each row own their horizontal margin,
