@@ -44,6 +44,7 @@
 !scripts/axdrv.swift
 !scripts/dedupe-launchservices.sh
 !scripts/layout_check.py
+!scripts/ui_id_audit.py
 !scripts/ui_selectors.py
 
 # --- 4. Explicit re-ignores inside committable trees ---

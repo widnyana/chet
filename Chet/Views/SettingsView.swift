@@ -280,9 +280,9 @@ struct SettingsView: View {
                         get: { Double(model.helperLifetimeMinutes) },
                         set: { model.helperLifetimeMinutes = Int($0) }),
                     range: 1...60, step: 1,
-                    isEnabled: !DryRun.enabled && helperState != .unsupported
+                    isEnabled: !DryRun.enabled && helperState != .unsupported,
+                    identifier: "settings.helper.lifetime"
                 )
-                .accessibilityIdentifier("settings.helper.lifetime")
             }
         }
         .onAppear { refreshHelperStatus() }

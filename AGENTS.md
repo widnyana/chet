@@ -107,6 +107,26 @@ the folder picker, the remove control, the remember switch, and the two buttons.
 `settings.scan.scope` opens the same sheet from Settings; `home.scan.everything` returns a
 partial result to a full scan. A partial scan is still driven under `DRY_RUN=1`.
 
+One identifier per accessibility element. An identifier on a container is copied onto its
+labelled children, and a page-root identifier overwrites a child's identifier, so put the id
+on the element that owns the label. `PageHeader` is one element: its label composes title,
+subtitle, metric, and metric label, it is static text, and the id at the call site lands once.
+`EmptyStateView` collapses title and message into one element and takes an optional
+`identifier`; an action button stays a separate pressable element and does not carry the id.
+`SectionHeader` is one element with a composed label. `SettingsSliderRow` takes an optional
+`identifier` applied to the slider only. `LoadingStateView` carries its id on the message text
+and hides the spinner; `StatusLabel` already combines. Page ids (`tweaks.page`, `mise.page`)
+sit on an always-present toolbar text, never on the page root.
+
+Audit a running window for duplicate and missing ids:
+
+```sh
+python3 scripts/ui_id_audit.py --pid <pid> [--screen <name>] [--require <id> ...] [--expected AGENTS.md] [--dump <path>]
+```
+
+It exits 1 on a duplicate, a missing required id, or a failed dump. `--expected AGENTS.md`
+reads the documented identifiers here, treating `<...>` and `*` as prefixes.
+
 What costs time:
 
 - Sidebar rows do not take `AXPress`. Use `select`, on the `AXStaticText` id.

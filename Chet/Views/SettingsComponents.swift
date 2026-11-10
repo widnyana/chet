@@ -199,6 +199,7 @@ struct SettingsSliderRow: View {
     let range: ClosedRange<Double>
     let step: Double
     var isEnabled = true
+    var identifier: String?
 
     var body: some View {
         SettingsRow(label: label) {
@@ -209,6 +210,7 @@ struct SettingsSliderRow: View {
                     .disabled(!isEnabled)
                     .accessibilityLabel(label)
                     .accessibilityValue(readout)
+                    .modifier(OptionalAccessibilityIdentifier(identifier: identifier))
                 Text(readout)
                     .font(Typography.row)
                     .monospacedDigit()

@@ -25,6 +25,9 @@ Rules:
 - The header sits 24 pt from the top. Its side inset is the page margin: 24 pt
   at the minimum window, 32 pt at wide widths.
 - No icon badge, no eyebrow, no pill above the title.
+- The header is one accessibility element: its label composes title, subtitle, metric,
+  and metric label, and it is static text. An identifier at the call site lands once on
+  that element.
 
 States:
 
@@ -113,7 +116,9 @@ hairline
 
 The label is sentence case, not uppercase. The action is a text button that
 does one thing. There is no trailing icon-only menu unless the menu is the only
-action and has an accessibility label.
+action and has an accessibility label. The header is one accessibility element
+with a composed label (`title, trailing`); an identifier at the call site lands
+once on that element.
 
 ## Metric
 
@@ -239,7 +244,9 @@ Use the screen's normal margins. No illustration, no large icon, no decorative
 circle. Do not build an empty state from `ContentUnavailableView`'s default
 symbol, because that renders a large icon. The copy names the cause and the next
 step. First run, filtered to nothing, and permission denied are different states
-with different copy.
+with different copy. `EmptyStateView` collapses the title and message into one
+static-text element and takes an optional `identifier`; the action button stays
+a separate pressable element and does not carry the id.
 
 ## LoadingState
 
@@ -247,6 +254,8 @@ with different copy.
 - If the exact shape is known and stable, a flat skeleton may hold the layout.
 - No shimmer. No pulsing. The system spinner is the only motion.
 - A loading state never claims a number or a result.
+- `LoadingStateView` carries its identifier on the message text; the spinner is
+  hidden from accessibility.
 
 ## ErrorState
 
@@ -758,6 +767,8 @@ Checking for access...                             (caption + spinner)
   aligned.
 - Control sizes: a primary action is `.large`; destructive and secondary actions are
   `.regular`; a settings slider is `.small`.
+- `SettingsSliderRow` takes an optional `identifier` applied to the slider only; the
+  readout text does not carry it.
 
 ## SettingsRow
 

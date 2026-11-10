@@ -133,13 +133,13 @@ struct TweaksView: View {
         EmptyStateView(
             title: model.filter == .changed && model.query.isEmpty ? "No changed tweaks" : "No tweaks match",
             message: emptyMessage,
+            identifier: "tweaks.empty",
             actionTitle: "Show all tweaks",
             action: {
                 model.query = ""
                 model.filter = .all
             }
         )
-        .accessibilityIdentifier("tweaks.empty")
     }
 
     private var emptyMessage: String {

@@ -763,6 +763,13 @@ struct SectionHeader: View {
             }
             Hairline()
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityText)
+    }
+
+    private var accessibilityText: String {
+        guard let trailing else { return title }
+        return "\(title), \(trailing)"
     }
 }
 
@@ -773,19 +780,26 @@ struct SectionHeader: View {
 struct EmptyStateView: View {
     let title: String
     let message: String
+    var identifier: String?
     var actionIsPrimary = true
     var actionTitle: String?
     var action: (() -> Void)?
 
     var body: some View {
         VStack(spacing: Spacing.s3) {
-            Text(title)
-                .font(Typography.section)
-                .foregroundStyle(Theme.ink)
-            Text(message)
-                .font(Typography.body)
-                .foregroundStyle(Theme.inkSecondary)
-                .fixedSize(horizontal: false, vertical: true)
+            VStack(spacing: Spacing.s3) {
+                Text(title)
+                    .font(Typography.section)
+                    .foregroundStyle(Theme.ink)
+                Text(message)
+                    .font(Typography.body)
+                    .foregroundStyle(Theme.inkSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(accessibilityText)
+            .accessibilityAddTraits(.isStaticText)
+            .modifier(OptionalAccessibilityIdentifier(identifier: identifier))
             if let actionTitle, let action {
                 if actionIsPrimary {
                     PrimaryActionButton(title: actionTitle, action: action)
@@ -799,6 +813,10 @@ struct EmptyStateView: View {
         // and the wrapped message then asks for hundreds of points of height.
         .frame(minWidth: 240, maxWidth: 420)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+    }
+
+    private var accessibilityText: String {
+        "\(title), \(message)"
     }
 }
 
