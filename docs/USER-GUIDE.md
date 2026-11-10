@@ -47,6 +47,23 @@ stays available on every destination except Apps and Tweaks.
 
 The status strip appears for limited access, or for four seconds after a scan finishes.
 
+### Partial scans
+
+**Scope…** on the command bar opens the scope sheet. Turn off the categories you do not
+want, add folders with **Choose…**, and start the scan. Chet reads only what you picked.
+
+- No category selected means every category. No folder means your home folders, without
+  Library.
+- The scope narrows what Chet reads. Every protection, the excluded folders list, and the
+  dry-run gate still apply.
+- A folder outside your home needs **Other disks** in Settings.
+- A partial result says so on Home: `Partial scan: 4 categories`. **Scan everything** puts
+  the scope back to the whole Mac.
+- **Remember this scope** keeps the selection for the next launch. It is off by default.
+
+The scope belongs to one scan. Settings holds the permanent opt-outs; the scope sheet holds
+the scan you are about to start.
+
 ## Review and remove
 
 Safe to remove rows are selected after a scan. Check first rows are never selected for you.

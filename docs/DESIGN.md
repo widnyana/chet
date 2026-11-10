@@ -155,7 +155,12 @@ Top to bottom:
 4. Category ledger: monochrome symbol, name, item count, size. Largest first.
    Clicking a row opens the category.
 5. Command bar: `Scan this Mac`, `Scan again`, `Stop scan`, or `Clean selected` with
-   `Scan again` beside it, one primary per state.
+   `Scan again` beside it, one primary per state. `Scope…` opens the scan scope sheet
+   wherever a scan can start.
+
+A scan may be partial. When the scope is narrower than the whole Mac, Home shows
+`Partial scan: <scope>` above the ledger with one `Scan everything` action. A partial
+result never reads as a full one.
 
 No chart. The ledger is the chart. No uninstall card. Apps is in the
 sidebar.

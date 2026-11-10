@@ -98,6 +98,12 @@ destination. `mise.header`, `mise.page`, `mise.refresh`, `mise.empty`,
 `<tool>` and `<version>` are lowercased, and every character outside `[a-z0-9]` becomes `.`.
 The page is read-only: it runs `mise ls --json` and `mise cache path` only, so it needs no
 `DRY_RUN` gate.
+`home.scope` opens the scan scope sheet; `scan.scope` titles it, and
+`scan.scope.category.<category id>`, `scan.scope.add`, `scan.scope.remove.<index>`,
+`scan.scope.remember`, `scan.scope.apply`, `scan.scope.cancel` label the category switches,
+the folder picker, the remove control, the remember switch, and the two buttons.
+`settings.scan.scope` opens the same sheet from Settings; `home.scan.everything` returns a
+partial result to a full scan. A partial scan is still driven under `DRY_RUN=1`.
 
 What costs time:
 

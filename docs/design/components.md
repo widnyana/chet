@@ -587,6 +587,33 @@ The sheet shell every sheet renders through. Measured: 13 call sites in
 - 24 pt padding, an optional fixed height, and the paper body.
 - The system draws the sheet window; the frame supplies the body.
 
+## ScanScopeSheet
+
+The one place a scan scope is chosen. Reached from `Scope…` on Home and from
+Settings; the sheet is never duplicated.
+
+```
+Scan a part of this Mac
+Pick the categories and folders one scan reads. Everything else is left alone.
+
+Safe to remove   [switch] Developer caches
+Check first      [switch] Large files
+Protected        [switch] Nix files
+Folders          ~/Library/Caches              [x]
+                 Choose…
+Next launch      [switch] Remember this scope
+                                  [Cancel] [Scan]
+```
+
+- Categories come from `CategoryCopy.scopeEntries`, in the same section order as
+  Home. Every switch starts on.
+- An empty category set means every category, so turning the last one off scans
+  everything again. The summary line always names the scope that will run.
+- Folders are additive; no folder means the home roots. A folder outside home
+  needs the Other disks opt-in; the engine drops it otherwise.
+- The remember switch is the only path to `UserDefaults`. Without it the scope
+  lives for one scan.
+
 ## AppUninstallSheets
 
 - Confirm and summary sheets for one app and for a bulk selection.
