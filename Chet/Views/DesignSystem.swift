@@ -440,7 +440,9 @@ struct EmptyStateView: View {
             }
         }
         .multilineTextAlignment(.center)
-        .frame(maxWidth: 420)
+        // A floor on the width: the window probes the minimum size with a near-zero width,
+        // and the wrapped message then asks for hundreds of points of height.
+        .frame(minWidth: 240, maxWidth: 420)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 }
