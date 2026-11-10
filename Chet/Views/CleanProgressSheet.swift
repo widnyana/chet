@@ -31,8 +31,7 @@ struct CleanProgressSheet: View {
         SheetFrame {
             VStack(alignment: .leading, spacing: Spacing.s4) {
                 HStack(spacing: Spacing.s3) {
-                    ProgressView()
-                        .controlSize(.small)
+                    ActivitySpinner()
                     VStack(alignment: .leading, spacing: 2) {
                         Text(dryRun ? "Simulating clean" : "Cleaning")
                             .font(Typography.title)

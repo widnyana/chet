@@ -213,8 +213,7 @@ private struct TweakRow: View {
 
     @ViewBuilder private var control: some View {
         if model.busy.contains(reading.id) {
-            ProgressView()
-                .controlSize(.small)
+            ActivitySpinner()
         } else if !reading.isSupported {
             Text(TweakCopy.state(reading.state))
                 .font(Typography.caption)

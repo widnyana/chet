@@ -46,8 +46,7 @@ struct OnboardingView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 HStack(spacing: Spacing.s2) {
-                    ProgressView()
-                        .controlSize(.small)
+                    ActivitySpinner()
                     Text("Checking for access")
                         .font(Typography.caption)
                         .foregroundStyle(Theme.inkSecondary)

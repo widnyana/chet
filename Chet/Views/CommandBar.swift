@@ -45,8 +45,7 @@ struct CommandBar: View {
                         .lineLimit(1)
                 }
                 if isWorking {
-                    ProgressView()
-                        .controlSize(.small)
+                    ActivitySpinner()
                 }
                 if let secondaryTitle, let secondaryAction {
                     SecondaryActionButton(
