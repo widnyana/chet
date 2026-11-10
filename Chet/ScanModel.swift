@@ -143,6 +143,43 @@ final class ScanModel {
         }
     }
     nonisolated static let helperLifetimeKey = "helperLifetimeMinutes"
+    /// Which categories and folders the next scan reads. Session-only unless the user asked
+    /// to remember it.
+    var scope = ScanModel.storedScope() {
+        didSet {
+            guard remembersScope else { return }
+            Self.storeScope(scope)
+        }
+    }
+    /// The user asked the scope to outlive this launch.
+    var remembersScope = UserDefaults.standard.bool(forKey: ScanModel.rememberScopeKey) {
+        didSet {
+            guard oldValue != remembersScope else { return }
+            UserDefaults.standard.set(remembersScope, forKey: ScanModel.rememberScopeKey)
+            if remembersScope {
+                Self.storeScope(scope)
+            } else {
+                UserDefaults.standard.removeObject(forKey: ScanModel.scopeKey)
+            }
+        }
+    }
+    nonisolated static let scopeKey = "scanScope"
+    nonisolated static let rememberScopeKey = "scanScopeRemembered"
+    /// The scope the results on screen came from.
+    private(set) var resultScope = ScanScope.everywhere
+
+    static func storedScope() -> ScanScope {
+        guard UserDefaults.standard.bool(forKey: rememberScopeKey),
+            let data = UserDefaults.standard.data(forKey: scopeKey),
+            let stored = try? JSONDecoder().decode(ScanScope.self, from: data)
+        else { return .everywhere }
+        return stored.normalized()
+    }
+
+    static func storeScope(_ scope: ScanScope) {
+        guard let data = try? JSONEncoder().encode(scope.normalized()) else { return }
+        UserDefaults.standard.set(data, forKey: scopeKey)
+    }
     var categories: [CategoryState] = []
     /// First item per URL (a file can sit in several categories), filled by `record` so no read
     /// rebuilds it.
@@ -295,7 +332,10 @@ final class ScanModel {
         rootsProgress = nil
         didFinishScan = false
         isScanning = true
-        steps = ScanStepState.all
+        let runningScope = scope.normalized()
+        resultScope = runningScope
+        let runningSteps = enabledScanSteps.filter(runningScope.runs)
+        steps = ScanStepState.all.filter { runningSteps.contains($0.id) }
         let gate = ScanPauseGate()
         pauseGate = gate
         isPaused = false
@@ -307,8 +347,8 @@ final class ScanModel {
             gate: gate, scope: includeTempInDuplicates ? .everything : .standard, scanThreads: scanThreads,
             allowOutsideHome: scanOutsideHome, excludedPaths: excludedPaths,
             extraRules: userRules.map(\.rule),
-            enabledSteps: enabledScanSteps, duplicateMinSize: Int64(duplicateMinSizeMB) * 1_000_000,
-            largeFileOldAge: TimeInterval(largeFileOldAgeDays) * 86_400)
+            enabledSteps: runningSteps, duplicateMinSize: Int64(duplicateMinSizeMB) * 1_000_000,
+            largeFileOldAge: TimeInterval(largeFileOldAgeDays) * 86_400, scanScope: runningScope)
         progress = session.progress
         scanTask = Task {
             for await event in session.events() {
@@ -565,6 +605,9 @@ final class ScanModel {
     }
 
     private func merge(_ result: CategoryResult) {
+        // A category outside the scope is never shown, even if a rule slipped through.
+        guard resultScope.categories.isEmpty || resultScope.categories.contains(result.category)
+        else { return }
         // Empty categories are noise; keep them only to show that Full Disk Access is missing.
         guard !result.items.isEmpty || result.needsFullDiskAccess else { return }
         if !categories.contains(where: { $0.id == result.category }) {
@@ -629,6 +672,33 @@ final class ScanModel {
     /// index always run; they feed the sidebar and the disk map.
     var enabledScanSteps: Set<ScanStep> {
         Set(ScanStep.allCases.filter { !disabledSteps.contains($0.rawValue) })
+    }
+
+    /// The scope in words, for the sheet and the partial-scan notice.
+    var scopeSummary: String { Self.summary(for: scope) }
+
+    /// The scope the results on screen came from, in words.
+    var resultScopeSummary: String { Self.summary(for: resultScope) }
+
+    static func summary(for scope: ScanScope) -> String {
+        let scoped = scope.normalized()
+        guard scoped.isPartial else { return "Everything" }
+        let categories = scoped.categories.count
+        let folders = scoped.roots.count
+        switch (categories, folders) {
+        case (let count, 0): return count == 1 ? "1 category" : "\(count) categories"
+        case (0, let count): return count == 1 ? "1 folder" : "\(count) folders"
+        default: return "\(categories) categories in \(folders) folders"
+        }
+    }
+
+    /// True when the results on screen came from a scope narrower than the whole Mac.
+    var isPartialScan: Bool { resultScope.isPartial }
+
+    /// Recovery from any partial scan.
+    func scanEverything() {
+        scope = .everywhere
+        scan()
     }
 
     func isStepEnabled(_ step: ScanStep) -> Bool {
