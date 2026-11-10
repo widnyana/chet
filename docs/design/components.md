@@ -64,6 +64,27 @@ The frame owns:
 Tables, empty, loading and error states use the same margin as the content.
 Settings and About are separate windows; they keep their own fixed margins.
 
+## Table row
+
+A table is `ColumnTable`, and every row in it is `TableRow`. The shell owns the
+things all four tables had written by hand: the 40 pt row height, the inset
+(page margin, or the panel inset for a nested list), the selection wash, the
+pointer shape, and the open gesture (Return and double click).
+
+The row content is columns, built from three parts:
+
+```
+RowCheckbox(width:)   fixed mark column, one AX label, one disabled rule
+name column           first column, maxWidth .infinity
+SizeColumn(width:)    monospaced, right aligned, same everywhere
+other columns         plain Text with its own width
+```
+
+Two rules follow from this:
+
+- A column width lives in the screen's `*Columns` enum, never inline.
+- A row does not set height, padding, wash, or a double click. Only `TableRow` does.
+
 ## RowActionButton
 
 A clickable row, card tile, glyph, or breadcrumb crumb.

@@ -288,9 +288,13 @@ struct PageScreen<Header: View, SubHeader: View, Content: View, Bar: View>: View
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
             } else {
-                content
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    .clipped()
+                // The builder result is a group of views, not a stack. Without the VStack
+                // they lay out against each other and leave the page half empty.
+                VStack(spacing: 0) {
+                    content
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .clipped()
             }
 
             // The frame states the app's mode once, for every destination. No screen repeats
@@ -543,6 +547,106 @@ struct RowActionButton<Label: View>: View {
         .help(help)
         .accessibilityLabel(accessibilityLabel ?? help)
         .modifier(OptionalAccessibilityIdentifier(identifier: identifier))
+    }
+}
+
+/// One row of a table: the height, the inset, the selection wash, the pointer shape, and
+/// the open gesture. Four tables and the storage ledger wrote this by hand, and their
+/// insets had already drifted apart.
+struct TableRow<Content: View>: View {
+    var isHighlighted = false
+    var inset: RowInset = .page
+    var onOpen: (() -> Void)?
+    let content: Content
+
+    init(
+        isHighlighted: Bool = false,
+        inset: RowInset = .page,
+        onOpen: (() -> Void)? = nil,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.isHighlighted = isHighlighted
+        self.inset = inset
+        self.onOpen = onOpen
+        self.content = content()
+    }
+
+    var body: some View {
+        let shell =
+            content
+            .frame(minHeight: Metrics.rowHeight)
+            .modifier(TableRowInset(inset: inset))
+            .background(isHighlighted ? Theme.accentSoft : Color.clear)
+            .contentShape(Rectangle())
+
+        if let onOpen {
+            shell
+                .focusable()
+                .onKeyPress(.return) {
+                    onOpen()
+                    return .handled
+                }
+                .focusRing()
+                .onTapGesture(count: 2) { onOpen() }
+        } else {
+            shell
+        }
+    }
+}
+
+/// Where a row sits: a page table runs to the page margin, a panel table to its own inset.
+enum RowInset {
+    case page
+    case panel
+}
+
+private struct TableRowInset: ViewModifier {
+    let inset: RowInset
+
+    func body(content: Content) -> some View {
+        switch inset {
+        case .page: content.pageHorizontalPadding()
+        case .panel: content.padding(.horizontal, Spacing.s3)
+        }
+    }
+}
+
+/// The remove checkbox a table row starts with: one label, one width, one disabled rule,
+/// and an optional identifier so the selector map keeps working.
+struct RowCheckbox: View {
+    @Binding var isOn: Bool
+    let label: String
+    var width: CGFloat?
+    var isEnabled = true
+    var help: String?
+    var identifier: String?
+
+    var body: some View {
+        Toggle("Remove", isOn: $isOn)
+            .toggleStyle(.checkbox)
+            .labelsHidden()
+            .disabled(!isEnabled)
+            .help(help ?? label)
+            .accessibilityLabel(label)
+            .modifier(OptionalAccessibilityIdentifier(identifier: identifier))
+            .frame(width: width)
+    }
+}
+
+/// A size column: monospaced and right aligned, so the numbers line up from row to row and
+/// from table to table.
+struct SizeColumn: View {
+    let bytes: Int64
+    var width: CGFloat?
+    var foreground: Color = Theme.ink
+
+    var body: some View {
+        Text(bytes.formatted(.byteCount(style: .file)))
+            .font(Typography.row)
+            .monospacedDigit()
+            .foregroundStyle(foreground)
+            .lineLimit(1)
+            .frame(width: width, alignment: .trailing)
     }
 }
 

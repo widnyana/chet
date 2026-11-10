@@ -321,64 +321,58 @@ private struct AppRow: View {
     let app: InstalledApp
 
     var body: some View {
-        HStack(spacing: AppColumns.spacing) {
-            Toggle(
-                "Select to remove",
-                isOn: Binding(
-                    get: { model.markedApps.contains(app.url) },
-                    set: { _ in model.toggleMark(app) })
-            )
-            .toggleStyle(.checkbox)
-            .labelsHidden()
-            .frame(width: AppColumns.mark)
-            .accessibilityLabel("Select \(app.name) to remove")
-            Image(nsImage: IconCache.icon(for: app.url))
-                .resizable()
-                .frame(width: AppColumns.icon, height: AppColumns.icon)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(app.name)
-                    .font(Typography.row)
-                    .foregroundStyle(Theme.ink)
-                    .lineLimit(1)
-                Text(app.bundleID ?? "Unknown")
-                    .font(Typography.caption)
-                    .foregroundStyle(Theme.inkSecondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            Text(model.locationLabel(app))
-                .font(Typography.caption)
-                .foregroundStyle(Theme.inkSecondary)
-                .lineLimit(1)
-                .frame(width: AppColumns.location, alignment: .leading)
-            Text(app.version ?? "Unknown")
-                .font(Typography.caption)
-                .monospacedDigit()
-                .foregroundStyle(Theme.inkSecondary)
-                .lineLimit(1)
-                .frame(width: AppColumns.version, alignment: .leading)
-            Text(model.appSizes[app.url].map { $0.formatted(.byteCount(style: .file)) } ?? "Unknown")
-                .font(Typography.row)
-                .monospacedDigit()
-                .foregroundStyle(Theme.ink)
-                .lineLimit(1)
-                .frame(width: AppColumns.size, alignment: .trailing)
-            status
-                .frame(width: AppColumns.status, alignment: .leading)
-        }
-        .frame(minHeight: Metrics.rowHeight)
-        .pageHorizontalPadding()
-        .background(model.markedApps.contains(app.url) ? Theme.accentSoft : Color.clear)
-        .contentShape(Rectangle())
-        .focusable()
-        .onKeyPress(.return) {
-            model.select(app)
-            return .handled
-        }
-        .focusRing()
-        .onTapGesture(count: 2) { model.select(app) }
-        .contextMenu { appContextMenu(for: app, model: model) }
+        TableRow(
+            isHighlighted: model.markedApps.contains(app.url),
+            onOpen: { model.select(app) },
+            content: {
+                HStack(spacing: AppColumns.spacing) {
+                    RowCheckbox(
+                        isOn: Binding(
+                            get: { model.markedApps.contains(app.url) },
+                            set: { _ in model.toggleMark(app) }),
+                        label: "Select \(app.name) to remove",
+                        width: AppColumns.mark)
+                    Image(nsImage: IconCache.icon(for: app.url))
+                        .resizable()
+                        .frame(width: AppColumns.icon, height: AppColumns.icon)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(app.name)
+                            .font(Typography.row)
+                            .foregroundStyle(Theme.ink)
+                            .lineLimit(1)
+                        Text(app.bundleID ?? "Unknown")
+                            .font(Typography.caption)
+                            .foregroundStyle(Theme.inkSecondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(model.locationLabel(app))
+                        .font(Typography.caption)
+                        .foregroundStyle(Theme.inkSecondary)
+                        .lineLimit(1)
+                        .frame(width: AppColumns.location, alignment: .leading)
+                    Text(app.version ?? "Unknown")
+                        .font(Typography.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.inkSecondary)
+                        .lineLimit(1)
+                        .frame(width: AppColumns.version, alignment: .leading)
+                    if let bytes = model.appSizes[app.url] {
+                        SizeColumn(bytes: bytes, width: AppColumns.size)
+                    } else {
+                        Text("Unknown")
+                            .font(Typography.row)
+                            .monospacedDigit()
+                            .foregroundStyle(Theme.ink)
+                            .lineLimit(1)
+                            .frame(width: AppColumns.size, alignment: .trailing)
+                    }
+                    status
+                        .frame(width: AppColumns.status, alignment: .leading)
+                }
+                .contextMenu { appContextMenu(for: app, model: model) }
+            })
     }
 
     @ViewBuilder private var status: some View {

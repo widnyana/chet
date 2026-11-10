@@ -13,18 +13,20 @@ struct DiskMapView: View {
     /// Sidebar destination, so the metric links can open Home or the large-files category.
     @Binding var destination: String?
 
-    /// Navigation path as URLs, not nodes: the live tree is replaced several times a second
-    /// while scanning, so the current node is re-resolved from the newest tree every render.
-    @State private var stack: [URL] = []
     /// Home tree of the finished scan; nil while the live tree is still growing.
     @State private var finalHome: FolderNode?
     /// Snapshot the UI draws. `liveTree` is replaced several times a second while the
     /// scan runs; feeding every replacement straight to the Metal canvas made the page
     /// flicker. The poll below publishes a 250 ms snapshot instead.
-    @State private var displayTree: FolderNode?
+    @State private var tree: FolderNode?
+    /// Path within `tree` from its root to the folder on screen. Nodes, not URLs, so the
+    /// breadcrumb, canvas, and ledger render one resolved state instead of each
+    /// re-resolving a URL stack against a tree that keeps changing.
+    @State private var crumbs: [FolderNode] = []
     @State private var hovered: FolderNode?
-    /// Name + size labels for the top-tier blocks, published by the Metal view.
-    @State private var labels: [TreemapLabel] = []
+    /// Canvas frame size; the block labels are laid out with the same size the Metal
+    /// tiles use, so a label cannot outlive the tile it names.
+    @State private var canvasSize: CGSize = .zero
     /// Collected children, keyed by URL. Survives drill-down and drill-out.
     @State private var collection: [URL: StorageEntry] = [:]
     @State private var volume: VolumeCapacity?
@@ -40,7 +42,7 @@ struct DiskMapView: View {
 
     private var isDark: Bool { colorScheme == .dark }
     private var palette: TreemapPalette { TreemapPalette(isDark: isDark) }
-    private var current: FolderNode? { pathNodes.last }
+    private var current: FolderNode? { crumbs.last }
     private var collected: [StorageEntry] {
         collection.values.sorted { $0.bytes > $1.bytes }
     }
@@ -54,29 +56,32 @@ struct DiskMapView: View {
             header: { pageHeader },
             subHeader: {
                 StorageLocationBar(
-                    pathNodes: pathNodes,
+                    pathNodes: crumbs,
                     volume: volume,
                     sizeBasis: model.treeSizeBasis,
                     onSelect: { index in
-                        // `pathNodes` is the root plus one node per stack entry: crumb `index`
-                        // means the stack keeps exactly its first `index` entries.
-                        stack = StoragePath.trimmed(stack, to: index)
+                        // `crumbs` starts at the tree root, so crumb `index` keeps its
+                        // first `index + 1` entries.
+                        crumbs = Array(crumbs.prefix(index + 1))
                         hovered = nil
                     })
                 metricsRow
             },
-            content: { bodyContent },
-            bar: {
+            content: {
+                // Scan progress and the trash report are page content, not chrome: the
+                // bar slot carries the command bar and nothing else, like every other
+                // destination.
                 VStack(spacing: 0) {
-                    if let trashReport, !trashReport.moved.isEmpty || !trashReport.failed.isEmpty {
-                        trashNotice(trashReport)
-                    }
+                    bodyContent
                     if model.isScanning {
                         progressPanel
                     }
-                    commandBar
+                    if let trashReport, !trashReport.moved.isEmpty || !trashReport.failed.isEmpty {
+                        trashNotice(trashReport)
+                    }
                 }
-            }
+            },
+            bar: { commandBar }
         )
         .sheet(item: $trashRequest) { request in
             StorageTrashSheet(entries: request.entries, onConfirm: performTrash)
@@ -88,20 +93,24 @@ struct DiskMapView: View {
         .task(id: model.folderTrees) {
             guard !model.folderTrees.isEmpty else { return }
             let kids = model.folderTrees.sorted { $0.size > $1.size }
-            finalHome = FolderNode(
+            let home = FolderNode(
                 url: FileManager.default.homeDirectoryForCurrentUser, size: kids.reduce(0) { $0 + $1.size },
                 children: kids)
-            stack = []
+            finalHome = home
+            tree = home
+            crumbs = [home]
             hovered = nil
         }
-        // Publish a throttled tree snapshot and re-resolve the hover against it, so the
-        // canvas and the path pill see a stable tree instead of every rollup.
+        // Publish a throttled tree snapshot, re-resolving the crumbs and the hover into
+        // it, so the canvas and the breadcrumb read one stable tree instead of every
+        // rollup.
         .task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(250))
                 guard let newest = model.liveTree ?? finalHome else { continue }
-                guard newest != displayTree else { continue }
-                displayTree = newest
+                guard newest != tree else { continue }
+                tree = newest
+                crumbs = Self.reresolve(crumbs, into: newest)
                 hovered = hovered.flatMap { Self.node(with: $0.url, in: newest) }
             }
         }
@@ -200,14 +209,13 @@ struct DiskMapView: View {
             selected: Set(collection.keys),
             onHover: { hovered = $0 },
             onToggle: { toggle($0) },
-            onOpen: { open($0) },
-            onLabels: { labels = $0 }
+            onOpen: { open($0) }
         )
         .overlay {
             // Direct labels on the top tier: the biggest folders read without hovering.
             // Coordinates are the canvas layout's own, top-left origin.
             GeometryReader { _ in
-                ForEach(labels) { label in
+                ForEach(overlayLabels) { label in
                     VStack(alignment: .leading, spacing: 1) {
                         Text(label.title)
                             .font(Typography.row)
@@ -235,6 +243,11 @@ struct DiskMapView: View {
         .accessibilityHint("Click a block to open that folder. Check a row to collect it.")
         .clipShape(.rect(corners: .fixed(Metrics.panelRadius)))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onGeometryChange(for: CGSize.self) { proxy in
+            proxy.size
+        } action: {
+            canvasSize = $0
+        }
         .overlay(alignment: .bottomLeading) {
             if let hovered {
                 HStack(spacing: Spacing.s2) {
@@ -272,8 +285,13 @@ struct DiskMapView: View {
     }
 
     private func open(_ node: FolderNode) {
-        guard !node.children.isEmpty else { return }
-        stack.append(node.url)
+        // The canvas reports the deepest tile under the pointer; a ledger row is already
+        // a direct child. Both resolve onto the direct child of the rendered folder, the
+        // same node the breadcrumb shows.
+        guard let parent = crumbs.last,
+            let child = Self.directChild(of: parent, containing: node), !child.children.isEmpty
+        else { return }
+        crumbs.append(child)
         hovered = nil
     }
 
@@ -366,17 +384,33 @@ struct DiskMapView: View {
         return nil
     }
 
-    /// Home tree first, then children along the navigation stack; the stack is trimmed to the
-    /// prefix that still exists in the newest snapshot.
-    private var pathNodes: [FolderNode] {
-        guard var node = displayTree else { return [] }
-        var nodes = [node]
-        for url in stack {
-            guard let child = node.children.first(where: { $0.url == url }) else { break }
-            nodes.append(child)
-            node = child
+    /// The old path carried into `tree`: keep the crumbs that still resolve, by URL,
+    /// and truncate at the first one the new snapshot dropped.
+    private static func reresolve(_ crumbs: [FolderNode], into tree: FolderNode) -> [FolderNode] {
+        guard !crumbs.isEmpty else { return [tree] }
+        var node = tree
+        var out = [node]
+        for crumb in crumbs.dropFirst() {
+            guard let next = node.children.first(where: { $0.url == crumb.url }) else { break }
+            out.append(next)
+            node = next
         }
-        return nodes
+        return out
+    }
+
+    /// The direct child of the shown folder that contains `node`. A click on a nested
+    /// block resolves to its top-level parent, which is the row the ledger shows.
+    static func directChild(of parent: FolderNode, containing node: FolderNode) -> FolderNode? {
+        parent.children.first { child in
+            child.url == node.url || node.url.path.hasPrefix(child.url.path + "/")
+        }
+    }
+
+    /// Names for the top-tier blocks, from the same layout function the Metal tiles use
+    /// and the same canvas size, so a label cannot outlive the tile it names.
+    private var overlayLabels: [TreemapLabel] {
+        guard let node = crumbs.last, canvasSize.width > 0, canvasSize.height > 0 else { return [] }
+        return TreemapMTKView.labels(for: node, in: CGRect(origin: .zero, size: canvasSize), palette: palette)
     }
 
     // MARK: - Scan progress
@@ -384,55 +418,58 @@ struct DiskMapView: View {
     /// Bottom section: everything the scan is doing right now, in one strip. Text-only,
     /// so its per-tick updates never relayout the Metal canvas above.
     private var progressPanel: some View {
-        VStack(alignment: .leading, spacing: Spacing.s2) {
-            HStack(spacing: Spacing.s2) {
-                if let activity = model.activity {
-                    Text(headline(activity))
-                        .font(Typography.section)
-                        .monospacedDigit()
-                        .foregroundStyle(Theme.ink)
-                        .lineLimit(1)
-                    Spacer()
-                    if let snap = model.rootsProgress {
-                        Text("\(snap.files) files · \(snap.bytes.formatted(.byteCount(style: .file)))")
-                            .font(Typography.caption)
+        VStack(spacing: 0) {
+            Hairline()
+            VStack(alignment: .leading, spacing: Spacing.s2) {
+                HStack(spacing: Spacing.s2) {
+                    if let activity = model.activity {
+                        Text(headline(activity))
+                            .font(Typography.section)
                             .monospacedDigit()
-                            .foregroundStyle(Theme.inkSecondary)
-                    }
-                } else {
-                    ActivitySpinner()
-                    Text(model.currentStep.map { ScanStepCopy.title($0) } ?? "Starting scan")
-                        .font(Typography.section)
-                        .foregroundStyle(Theme.ink)
-                }
-            }
-            if let activity = model.activity {
-                Group {
-                    if activity.total > activity.done, activity.total > 0 {
-                        ProgressView(value: Double(activity.done), total: Double(activity.total))
+                            .foregroundStyle(Theme.ink)
+                            .lineLimit(1)
+                        Spacer()
+                        if let snap = model.rootsProgress {
+                            Text("\(snap.files) files · \(snap.bytes.formatted(.byteCount(style: .file)))")
+                                .font(Typography.caption)
+                                .monospacedDigit()
+                                .foregroundStyle(Theme.inkSecondary)
+                        }
                     } else {
-                        ProgressView()
+                        ActivitySpinner()
+                        Text(model.currentStep.map { ScanStepCopy.title($0) } ?? "Starting scan")
+                            .font(Typography.section)
+                            .foregroundStyle(Theme.ink)
                     }
                 }
-                .progressViewStyle(.linear)
-                .tint(Theme.accent)
+                if let activity = model.activity {
+                    Group {
+                        if activity.total > activity.done, activity.total > 0 {
+                            ProgressView(value: Double(activity.done), total: Double(activity.total))
+                        } else {
+                            ProgressView()
+                        }
+                    }
+                    .progressViewStyle(.linear)
+                    .tint(Theme.accent)
+                }
+                HStack(spacing: Spacing.s2) {
+                    Spacer()
+                    SecondaryActionButton(
+                        title: "Pause", isEnabled: !model.isPaused,
+                        action: { model.togglePause() }
+                    )
+                    .accessibilityIdentifier("storage.pause")
+                    SecondaryActionButton(
+                        title: "Resume", isEnabled: model.isPaused,
+                        action: { model.togglePause() }
+                    )
+                    .accessibilityIdentifier("storage.resume")
+                }
             }
-            HStack(spacing: Spacing.s2) {
-                Spacer()
-                SecondaryActionButton(
-                    title: "Pause", isEnabled: !model.isPaused,
-                    action: { model.togglePause() }
-                )
-                .accessibilityIdentifier("storage.pause")
-                SecondaryActionButton(
-                    title: "Resume", isEnabled: model.isPaused,
-                    action: { model.togglePause() }
-                )
-                .accessibilityIdentifier("storage.resume")
-            }
+            .pageHorizontalPadding()
+            .padding(.vertical, Spacing.s2)
         }
-        .pageHorizontalPadding()
-        .padding(.vertical, Spacing.s2)
     }
 
     /// "<phase title>" plus its fraction when the phase knows one.
@@ -453,7 +490,6 @@ struct TreemapCanvas: NSViewRepresentable {
     let onHover: (FolderNode?) -> Void
     let onToggle: (FolderNode) -> Void
     let onOpen: (FolderNode) -> Void
-    let onLabels: ([TreemapLabel]) -> Void
 
     func makeNSView(context: Context) -> TreemapMTKView {
         let view = TreemapMTKView(frame: .zero, device: GPUContext.shared?.device)
@@ -466,7 +502,6 @@ struct TreemapCanvas: NSViewRepresentable {
         view.onHover = onHover
         view.onToggle = onToggle
         view.onOpen = onOpen
-        view.onLabels = onLabels
         let appearanceChanged = view.isDark != isDark
         view.isDark = isDark
         // FolderNode is Equatable: relayout on any structural change (sizes grow live
@@ -509,10 +544,9 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
     var onHover: (FolderNode?) -> Void = { _ in }
     /// Collects the top-level child under the pointer, from the context menu.
     var onToggle: (FolderNode) -> Void = { _ in }
-    /// A click opens the top-level child under the pointer when it has children.
+    /// A click opens the folder of the deepest tile under the pointer; DiskMapView
+    /// resolves it to the direct child of the rendered folder.
     var onOpen: (FolderNode) -> Void = { _ in }
-    /// Publishes the top-tier labels (name + size on big blocks) to the SwiftUI layer.
-    var onLabels: ([TreemapLabel]) -> Void = { _ in }
     private var tiles: [TreemapTile] = []
     private var instances: MTLBuffer?
     private var pipeline: MTLRenderPipelineState?
@@ -545,11 +579,9 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
 
     func relayout() {
         guard let node, bounds.width > 0, bounds.height > 0 else { return }
-        NSLog("TMAP relayout node=%@ bounds=%.0fx%.0f", node.url.lastPathComponent, bounds.width, bounds.height)
         let palette = TreemapPalette(isDark: isDark)
         tiles = Self.tiles(for: node, in: CGRect(origin: .zero, size: bounds.size), palette: palette)
         rebuildInstances(palette: palette)
-        onLabels(Self.labels(for: node, in: bounds, palette: palette))
     }
 
     private func rebuildInstances(palette supplied: TreemapPalette? = nil) {
@@ -668,9 +700,7 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
     /// block collects its top-level parent, which is the row the ledger shows.
     private func directChild(containing node: FolderNode) -> FolderNode? {
         guard let root = self.node else { return nil }
-        return root.children.first { child in
-            child.url == node.url || node.url.path.hasPrefix(child.url.path + "/")
-        }
+        return DiskMapView.directChild(of: root, containing: node)
     }
 
     override func mouseMoved(with event: NSEvent) {
@@ -695,23 +725,15 @@ final class TreemapMTKView: MTKView, MTKViewDelegate {
     private var lastOpen = Date.distantPast
 
     override func mouseDown(with event: NSEvent) {
-        let hit = tile(at: convert(event.locationInWindow, from: nil))?.node
-        let child = hit.flatMap { directChild(containing: $0) }
-        NSLog(
-            "TMAP mousedown viewnode=%@ hit=%@ child=%@ childKids=%d clickCount=%d",
-            self.node?.url.lastPathComponent ?? "nil", hit?.url.lastPathComponent ?? "nil",
-            child?.url.lastPathComponent ?? "nil", child?.children.isEmpty == false ? child!.children.count : -1,
-            event.clickCount)
-        guard event.clickCount == 1 else { return }
-        guard let hit,
-            // Open the block the user sees at this level, not a nested grandchild the
-            // breadcrumb cannot resolve.
-            let child, !child.children.isEmpty
+        // One click opens; the guard keeps the second click of a double click from
+        // drilling another level in the folder that just appeared.
+        guard event.clickCount == 1,
+            let hit = tile(at: convert(event.locationInWindow, from: nil))?.node
         else { return }
         let now = Date()
         guard now.timeIntervalSince(lastOpen) > 0.3 else { return }
         lastOpen = now
-        onOpen(child)
+        onOpen(hit)
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {

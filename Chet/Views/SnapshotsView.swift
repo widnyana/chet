@@ -86,28 +86,28 @@ struct SnapshotsView: View {
 
     private func row(_ snapshot: LocalSnapshot) -> some View {
         let selected = model.selectedSnapshots.contains(snapshot)
-        return HStack(spacing: Spacing.s3) {
-            Toggle("Remove the snapshot", isOn: model.isSelected(snapshot))
-                .toggleStyle(.checkbox)
-                .labelsHidden()
-                .accessibilityLabel("Remove the snapshot from \(Self.label(snapshot.date))")
-                .frame(width: SnapshotColumns.mark)
-            Text(Self.label(snapshot.date))
-                .font(Typography.row)
-                .monospacedDigit()
-                .foregroundStyle(Theme.ink)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            ageCell(snapshot)
-                .frame(width: SnapshotColumns.age, alignment: .trailing)
-            Text("Local")
-                .font(Typography.caption)
-                .foregroundStyle(Theme.inkSecondary)
-                .frame(width: SnapshotColumns.local, alignment: .trailing)
-        }
-        .frame(minHeight: Metrics.rowHeight)
-        .pageHorizontalPadding()
-        .background(selected ? Theme.accentSoft : Color.clear)
+        return TableRow(
+            isHighlighted: selected,
+            content: {
+                HStack(spacing: Spacing.s3) {
+                    RowCheckbox(
+                        isOn: model.isSelected(snapshot),
+                        label: "Remove the snapshot from \(Self.label(snapshot.date))",
+                        width: SnapshotColumns.mark)
+                    Text(Self.label(snapshot.date))
+                        .font(Typography.row)
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.ink)
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    ageCell(snapshot)
+                        .frame(width: SnapshotColumns.age, alignment: .trailing)
+                    Text("Local")
+                        .font(Typography.caption)
+                        .foregroundStyle(Theme.inkSecondary)
+                        .frame(width: SnapshotColumns.local, alignment: .trailing)
+                }
+            })
     }
 
     @ViewBuilder private func ageCell(_ snapshot: LocalSnapshot) -> some View {

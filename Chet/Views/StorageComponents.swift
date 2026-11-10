@@ -309,14 +309,11 @@ struct StorageLedgerRow: View {
 
     var body: some View {
         HStack(spacing: Spacing.s2) {
-            Toggle(
-                "", isOn: Binding(get: { isSelected }, set: { _ in onToggle() })
-            )
-            .toggleStyle(.checkbox)
-            .labelsHidden()
-            .disabled(!isEnabled)
-            .accessibilityLabel("Collect \(child.url.lastPathComponent)")
-            .accessibilityIdentifier("storage.row.\(child.url.lastPathComponent)")
+            RowCheckbox(
+                isOn: Binding(get: { isSelected }, set: { _ in onToggle() }),
+                label: "Collect \(child.url.lastPathComponent)",
+                isEnabled: isEnabled,
+                identifier: "storage.row.\(child.url.lastPathComponent)")
             Rectangle()
                 .fill(palette.colorShare(share))
                 .frame(width: 10, height: 10)
@@ -327,11 +324,7 @@ struct StorageLedgerRow: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
             Spacer(minLength: Spacing.s2)
-            Text(child.size.formatted(.byteCount(style: .file)))
-                .font(Typography.row)
-                .monospacedDigit()
-                .foregroundStyle(Theme.inkSecondary)
-                .lineLimit(1)
+            SizeColumn(bytes: child.size, foreground: Theme.inkSecondary)
             if child.children.isEmpty {
                 Color.clear.frame(width: 16, height: 1)
             } else {

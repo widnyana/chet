@@ -240,45 +240,40 @@ private struct HomebrewRow: View {
     let package: BrewPackage
 
     var body: some View {
-        HStack(spacing: HomebrewColumns.spacing) {
-            Toggle(
-                "",
-                isOn: Binding(
-                    get: { model.marked.contains(package.id) },
-                    set: { model.setMark(package, on: $0) })
-            )
-            .labelsHidden()
-            .toggleStyle(.checkbox)
-            .frame(width: HomebrewColumns.mark)
-            .accessibilityLabel("Select \(package.title) to uninstall")
-            .accessibilityIdentifier("homebrew.select.\(package.id)")
-            Image(systemName: package.kind == .cask ? "shippingbox.fill" : "shippingbox")
-                .font(Typography.iconRow)
-                .foregroundStyle(Theme.inkSecondary)
-                .frame(width: HomebrewColumns.icon)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(package.title).font(Typography.row).foregroundStyle(Theme.ink).lineLimit(1)
-                if !package.desc.isEmpty {
-                    Text(package.desc)
-                        .font(Typography.caption).foregroundStyle(Theme.inkSecondary).lineLimit(1)
+        TableRow(
+            isHighlighted: model.marked.contains(package.id),
+            content: {
+                HStack(spacing: HomebrewColumns.spacing) {
+                    RowCheckbox(
+                        isOn: Binding(
+                            get: { model.marked.contains(package.id) },
+                            set: { model.setMark(package, on: $0) }),
+                        label: "Select \(package.title) to uninstall",
+                        width: HomebrewColumns.mark,
+                        identifier: "homebrew.select.\(package.id)")
+                    Image(systemName: package.kind == .cask ? "shippingbox.fill" : "shippingbox")
+                        .font(Typography.iconRow)
+                        .foregroundStyle(Theme.inkSecondary)
+                        .frame(width: HomebrewColumns.icon)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(package.title).font(Typography.row).foregroundStyle(Theme.ink).lineLimit(1)
+                        if !package.desc.isEmpty {
+                            Text(package.desc)
+                                .font(Typography.caption).foregroundStyle(Theme.inkSecondary).lineLimit(1)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(package.kindLabel)
+                        .font(Typography.caption).foregroundStyle(Theme.inkSecondary)
+                        .frame(width: HomebrewColumns.kind, alignment: .leading)
+                    Text(package.version)
+                        .font(Typography.caption).monospacedDigit().foregroundStyle(Theme.inkSecondary)
+                        .lineLimit(1).frame(width: HomebrewColumns.version, alignment: .leading)
+                    SizeColumn(bytes: package.size, width: HomebrewColumns.size)
+                    statusLabel.frame(width: HomebrewColumns.status, alignment: .leading)
                 }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            Text(package.kindLabel)
-                .font(Typography.caption).foregroundStyle(Theme.inkSecondary)
-                .frame(width: HomebrewColumns.kind, alignment: .leading)
-            Text(package.version)
-                .font(Typography.caption).monospacedDigit().foregroundStyle(Theme.inkSecondary)
-                .lineLimit(1).frame(width: HomebrewColumns.version, alignment: .leading)
-            Text(package.size.formatted(.byteCount(style: .file)))
-                .font(Typography.row).monospacedDigit().foregroundStyle(Theme.ink)
-                .frame(width: HomebrewColumns.size, alignment: .trailing)
-            statusLabel.frame(width: HomebrewColumns.status, alignment: .leading)
-        }
-        .frame(minHeight: Metrics.rowHeight)
-        .pageHorizontalPadding()
-        .background(model.marked.contains(package.id) ? Theme.accentSoft : Color.clear)
+            })
     }
 
     @ViewBuilder private var statusLabel: some View {

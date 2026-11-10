@@ -170,6 +170,9 @@ Use these before writing a view:
 | Primary, secondary, destructive action | `PrimaryActionButton`, `SecondaryActionButton`, `DestructiveActionButton` |
 | Icon action | `IconActionButton` |
 | Clickable row, tile, glyph, or crumb | `RowActionButton` |
+| Table row shell: height, inset, wash, open gesture | `TableRow` |
+| Row remove checkbox | `RowCheckbox` |
+| Size column | `SizeColumn` |
 | Sheet shell | `SheetFrame` |
 | Capacity bar | `CapacityBarView` |
 | Page margin | `pageHorizontalPadding()` |

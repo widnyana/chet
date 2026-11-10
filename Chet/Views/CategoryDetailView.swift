@@ -164,52 +164,45 @@ struct CategoryDetailView: View {
     private func row(_ item: ScanItem) -> some View {
         let canSelect = model.canSelect(item) && item.risk != .informational
         let selected = canSelect && model.selected.contains(item.url)
-        return HStack(spacing: Spacing.s3) {
-            if item.risk == .informational {
-                Color.clear.frame(width: CategoryColumns.mark)
-            } else {
-                Toggle("Remove", isOn: model.isSelected(item.url))
-                    .toggleStyle(.checkbox)
-                    .labelsHidden()
-                    .disabled(!model.canSelect(item))
-                    .help(
-                        model.canSelect(item)
-                            ? "Remove" : "Turn on Administrator cleanup in Settings to remove this"
-                    )
-                    .accessibilityLabel("Remove \(item.url.lastPathComponent)")
-                    .frame(width: CategoryColumns.mark)
-            }
-            ItemNameCell(item: item)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Text(item.reclaimableBytes.formatted(.byteCount(style: .file)))
-                .font(Typography.row)
-                .monospacedDigit()
-                .foregroundStyle(Theme.ink)
-                .lineLimit(1)
-                .frame(width: CategoryColumns.size, alignment: .trailing)
-            Text(item.stamp.modified, format: .relative(presentation: .named))
-                .font(Typography.row)
-                .foregroundStyle(Theme.inkSecondary)
-                .lineLimit(1)
-                .help(item.stamp.modified.formatted(date: .long, time: .shortened))
-                .frame(width: CategoryColumns.modified, alignment: .trailing)
-            riskLabel(item)
-                .frame(width: CategoryColumns.risk, alignment: .trailing)
-        }
-        .frame(minHeight: Metrics.rowHeight)
-        .pageHorizontalPadding()
-        .background(selected ? Theme.accentSoft : Color.clear)
-        .contentShape(Rectangle())
-        .contextMenu {
-            Button("Reveal in Finder") {
-                NSWorkspace.shared.activateFileViewerSelecting([item.url])
-            }
-            Button("Quick Look") { preview = item.url }
-            Button("Copy Path") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(item.url.path, forType: .string)
-            }
-        }
+        return TableRow(
+            isHighlighted: selected,
+            content: {
+                HStack(spacing: Spacing.s3) {
+                    if item.risk == .informational {
+                        Color.clear.frame(width: CategoryColumns.mark)
+                    } else {
+                        RowCheckbox(
+                            isOn: model.isSelected(item.url),
+                            label: "Remove \(item.url.lastPathComponent)",
+                            width: CategoryColumns.mark,
+                            isEnabled: model.canSelect(item),
+                            help: model.canSelect(item)
+                                ? "Remove"
+                                : "Turn on Administrator cleanup in Settings to remove this")
+                    }
+                    ItemNameCell(item: item)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    SizeColumn(bytes: item.reclaimableBytes, width: CategoryColumns.size)
+                    Text(item.stamp.modified, format: .relative(presentation: .named))
+                        .font(Typography.row)
+                        .foregroundStyle(Theme.inkSecondary)
+                        .lineLimit(1)
+                        .help(item.stamp.modified.formatted(date: .long, time: .shortened))
+                        .frame(width: CategoryColumns.modified, alignment: .trailing)
+                    riskLabel(item)
+                        .frame(width: CategoryColumns.risk, alignment: .trailing)
+                }
+                .contextMenu {
+                    Button("Reveal in Finder") {
+                        NSWorkspace.shared.activateFileViewerSelecting([item.url])
+                    }
+                    Button("Quick Look") { preview = item.url }
+                    Button("Copy Path") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(item.url.path, forType: .string)
+                    }
+                }
+            })
     }
 
     @ViewBuilder private func riskLabel(_ item: ScanItem) -> some View {
