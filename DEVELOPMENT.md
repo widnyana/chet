@@ -174,6 +174,11 @@ anything. `--skip-build` reuses the files in `dist/` and skips the build and the
 it can install one. That task is for a checkout: the installer is a standalone script, and end
 users need bash, curl, and the macOS tools, not mise.
 
+While the repository is private, both the script download and the release asset need a token:
+`curl -H "Authorization: Bearer $GITHUB_TOKEN" ...` for the raw file, and
+`GITHUB_TOKEN=... bash scripts/install-chet.sh` for the installer. Without it the API answers
+404 and the installer reports no published release.
+
 The app is ad-hoc signed and not notarized, and the image is unsigned for the same reason. The
 helper needs a Team ID: `SMAppService` records an ad-hoc daemon and then refuses to start it,
 so Settings reports the build as unsupported and disables the administrator switch. The

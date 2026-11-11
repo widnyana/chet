@@ -155,7 +155,11 @@ elif mode == "asset":
     for rule in rules:
         for asset in assets:
             if rule(name_of(asset)):
-                print("%s\t%s" % (asset.get("name"), asset.get("browser_download_url") or ""))
+                print("%s\t%s\t%s" % (
+                    asset.get("name"),
+                    asset.get("browser_download_url") or "",
+                    asset.get("url") or "",
+                ))
                 sys.exit(0)
     sys.exit(1)
 PYCODE
@@ -207,6 +211,7 @@ fi
 
 asset_name=""
 asset_url=""
+asset_api=""
 
 if [ -n "$archive" ]; then
   if [ ! -f "$archive" ]; then
@@ -230,7 +235,9 @@ EOF
     exit 3
   fi
   asset_name=${picked%%$'\t'*}
-  asset_url=${picked#*$'\t'}
+  asset_rest=${picked#*$'\t'}
+  asset_url=${asset_rest%%$'\t'*}
+  asset_api=${asset_rest#*$'\t'}
 fi
 
 lower_name=$(printf '%s' "$asset_name" | tr '[:upper:]' '[:lower:]')
@@ -265,7 +272,11 @@ if [ -n "$archive" ]; then
   file=$archive
 else
   file="$tmp/$asset_name"
-  if ! curl "${curl_args[@]}" -o "$file" "$asset_url"; then
+  asset_curl_args=(-fsSL --retry 2 -H 'Accept: application/octet-stream')
+  if [ -n "${GITHUB_TOKEN:-}" ]; then
+    asset_curl_args+=(-H "Authorization: Bearer $GITHUB_TOKEN")
+  fi
+  if ! curl "${asset_curl_args[@]}" -o "$file" "${asset_api:-$asset_url}"; then
     printf 'Download failed: %s\n' "$asset_name" >&2
     exit 4
   fi
