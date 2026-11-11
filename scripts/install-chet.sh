@@ -167,7 +167,7 @@ PYCODE
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/chet-install.XXXXXX")
 
-curl_args=(-fsSL -H 'Accept: application/vnd.github+json')
+curl_args=(-sSL -H 'Accept: application/vnd.github+json')
 if [ -n "${GITHUB_TOKEN:-}" ]; then
   curl_args+=(-H "Authorization: Bearer $GITHUB_TOKEN")
 fi
@@ -189,11 +189,26 @@ else
     if [ -n "$tag_arg" ]; then
       api_url="$api_base/tags/$tag_arg"
     fi
-    if ! curl "${curl_args[@]}" -o "$json_file" "$api_url"; then
-      printf 'No published release yet.\n' >&2
-      printf 'Releases: %s\n' "$releases_url" >&2
-      exit 2
-    fi
+    status=$(curl "${curl_args[@]}" -o "$json_file" -w '%{http_code}' "$api_url" || true)
+    case "$status" in
+      200|201) ;;
+      404)
+        if [ -n "${GITHUB_TOKEN:-}" ]; then
+          printf 'The release API answered 404 for the token in GITHUB_TOKEN.\n' >&2
+          printf 'A private repository needs a token with repo access, or gh auth without that variable.\n' >&2
+          printf 'Try: GITHUB_TOKEN=$(env -u GITHUB_TOKEN gh auth token) bash %s\n' "$0" >&2
+          printf 'Or install a local build: bash %s --archive dist/chet.zip\n' "$0" >&2
+        else
+          printf 'No published release yet.\n' >&2
+        fi
+        printf 'Releases: %s\n' "$releases_url" >&2
+        exit 2
+        ;;
+      *)
+        printf 'The release API returned HTTP %s.\n' "$status" >&2
+        exit 4
+        ;;
+    esac
     if [ ! -s "$json_file" ]; then
       printf 'No published release yet.\n' >&2
       printf 'Releases: %s\n' "$releases_url" >&2
