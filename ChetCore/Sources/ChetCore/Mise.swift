@@ -58,24 +58,28 @@ public enum Mise {
 
     public struct Tool: Identifiable, Hashable, Sendable {
         public let name: String
+        public let version: String
         public let requested: String
         public let resolved: String?
         public let installPath: String?
         public let active: Bool
         public let installed: Bool
+        public let declared: Bool
 
-        public var id: String { "\(name)@\(requested)" }
+        public var id: String { "\(name)@\(version)" }
 
         public init(
-            name: String, requested: String, resolved: String?, installPath: String?,
-            active: Bool, installed: Bool
+            name: String, version: String = "", requested: String, resolved: String? = nil,
+            installPath: String?, active: Bool, installed: Bool, declared: Bool = false
         ) {
             self.name = name
+            self.version = version
             self.requested = requested
             self.resolved = resolved
             self.installPath = installPath
             self.active = active
             self.installed = installed
+            self.declared = declared
         }
     }
 
@@ -169,7 +173,7 @@ public enum Mise {
         let configPath = detection.configPath.path
         guard let executable = detection.executable else {
             return Snapshot(
-                tools: merge(declared: detection.declared, resolved: [:]),
+                tools: rows(declared: detection.declared, resolved: [:]),
                 configPath: configPath, cachePath: nil, error: nil)
         }
 
@@ -196,7 +200,7 @@ public enum Mise {
         }
 
         return Snapshot(
-            tools: merge(declared: detection.declared, resolved: resolved),
+            tools: rows(declared: detection.declared, resolved: resolved),
             configPath: configPath, cachePath: cachePath.isEmpty ? nil : cachePath, error: error)
     }
 
@@ -220,19 +224,69 @@ public enum Mise {
         return try? JSONDecoder().decode([String: [Resolved]].self, from: data)
     }
 
-    public static func merge(declared: [Declared], resolved: [String: [Resolved]]) -> [Tool] {
-        let tools = declared.map { row -> Tool in
-            let candidates = (resolved[row.name] ?? []).filter(\.installed)
-            let match =
-                candidates.first { $0.version == row.version }
-                ?? candidates.first(where: \.active)
-                ?? candidates.first
-            return Tool(
-                name: row.name, requested: row.version, resolved: match?.version,
-                installPath: match?.installPath, active: match?.active ?? false,
-                installed: match != nil)
+    public static func rows(declared: [Declared], resolved: [String: [Resolved]]) -> [Tool] {
+        var requestedVersions: [String: [String]] = [:]
+        for item in declared where !(requestedVersions[item.name] ?? []).contains(item.version) {
+            requestedVersions[item.name, default: []].append(item.version)
         }
-        return tools.sorted { ($0.name, $0.requested) < ($1.name, $1.requested) }
+
+        let names = Set(requestedVersions.keys).union(resolved.keys)
+        var tools: [Tool] = []
+        for name in names {
+            let versions = requestedVersions[name] ?? []
+            let requested = versions.first ?? ""
+            var installed = (resolved[name] ?? []).filter(\.installed).map { entry in
+                Tool(
+                    name: name, version: entry.version, requested: requested,
+                    resolved: entry.version, installPath: entry.installPath,
+                    active: entry.active, installed: true)
+            }
+
+            for version in versions {
+                let match =
+                    version == "latest"
+                    ? installed.firstIndex(where: \.active) ?? installed.indices.first
+                    : installed.firstIndex { $0.version == version }
+                if let match {
+                    let row = installed[match]
+                    installed[match] = Tool(
+                        name: row.name, version: row.version, requested: row.requested,
+                        resolved: row.resolved, installPath: row.installPath,
+                        active: row.active, installed: true, declared: true)
+                } else {
+                    tools.append(
+                        Tool(
+                            name: name, version: version, requested: requested,
+                            installPath: nil, active: false, installed: false, declared: true))
+                }
+            }
+
+            tools.append(contentsOf: installed)
+        }
+
+        return tools.sorted { lhs, rhs in
+            if lhs.name != rhs.name { return lhs.name < rhs.name }
+            if lhs.declared != rhs.declared { return lhs.declared }
+            let order = versionOrder(lhs.version, rhs.version)
+            if order != 0 { return order > 0 }
+            return lhs.version > rhs.version
+        }
+    }
+
+    private static func versionOrder(_ lhs: String, _ rhs: String) -> Int {
+        let left = lhs.split(separator: ".", omittingEmptySubsequences: false)
+        let right = rhs.split(separator: ".", omittingEmptySubsequences: false)
+        for index in 0..<min(left.count, right.count) {
+            let lhsPart = String(left[index])
+            let rhsPart = String(right[index])
+            if let lhsNumber = Int(lhsPart), let rhsNumber = Int(rhsPart) {
+                if lhsNumber != rhsNumber { return lhsNumber > rhsNumber ? 1 : -1 }
+            } else if lhsPart != rhsPart {
+                return lhsPart > rhsPart ? 1 : -1
+            }
+        }
+        if left.count == right.count { return 0 }
+        return left.count > right.count ? 1 : -1
     }
 
     private static func invocationEnvironment(

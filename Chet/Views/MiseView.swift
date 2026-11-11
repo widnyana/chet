@@ -11,7 +11,7 @@ struct MiseView: View {
                 PageHeader(
                     title: "mise",
                     subtitle:
-                        "Tool versions declared in your mise config. Chet reads them; it does not change them."
+                        "Every installed tool version, and what your mise config declares. Chet reads them; it does not change them."
                 )
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("mise")
@@ -93,7 +93,7 @@ struct MiseView: View {
             HStack(spacing: ColumnRegistry.spacing) {
                 Text("Tool")
                     .frame(maxWidth: .infinity, alignment: .leading)
-                Text("Requested")
+                Text("Version")
                     .frame(width: ColumnRegistry.spec(.version).width, alignment: .leading)
                 Text("Status")
                     .frame(width: ColumnRegistry.spec(.status).width, alignment: .leading)
@@ -116,7 +116,13 @@ struct MiseView: View {
                         .lineLimit(1)
                         .accessibilityLabel(tool.name)
                         .accessibilityIdentifier(toolIdentifier(tool))
-                    if let installPath = tool.installPath {
+                    if tool.declared {
+                        Text("declared")
+                            .font(Typography.caption)
+                            .foregroundStyle(Theme.inkSecondary)
+                            .lineLimit(1)
+                    }
+                    if tool.installed, let installPath = tool.installPath {
                         Text(installPath)
                             .font(Typography.caption)
                             .foregroundStyle(Theme.inkSecondary)
@@ -125,7 +131,7 @@ struct MiseView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                Text(tool.requested)
+                Text(tool.version)
                     .font(Typography.caption)
                     .monospacedDigit()
                     .foregroundStyle(Theme.inkSecondary)
@@ -170,7 +176,7 @@ struct MiseView: View {
     }
 
     private func toolIdentifier(_ tool: Mise.Tool) -> String {
-        "mise.tool.\(Self.slug(tool.name)).\(Self.slug(tool.requested))"
+        "mise.tool.\(Self.slug(tool.name)).\(Self.slug(tool.version))"
     }
 
     private static func slug(_ value: String) -> String {

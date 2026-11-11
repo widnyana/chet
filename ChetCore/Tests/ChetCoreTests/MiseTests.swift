@@ -123,65 +123,126 @@ struct MiseTests {
         #expect(aws.installed && aws.active)
         #expect(parsed["npm:biome"]?.first?.installed == false)
 
-        let tools = Mise.merge(
+        let tools = Mise.rows(
             declared: [Mise.Declared(name: "npm:biome", version: "1.9.4")], resolved: parsed)
 
-        #expect(tools.count == 1)
-        #expect(tools[0].resolved == nil)
-        #expect(!tools[0].installed)
+        #expect(tools.count == 2)
+        let biome = try #require(tools.first { $0.name == "npm:biome" })
+        #expect(biome.version == "1.9.4")
+        #expect(biome.resolved == nil)
+        #expect(!biome.installed)
+        #expect(biome.declared)
+
+        let awsRow = try #require(tools.first { $0.name == "aqua:awscli" })
+        #expect(awsRow.requested.isEmpty)
+        #expect(!awsRow.declared)
+        #expect(awsRow.installed)
     }
 
-    @Test func mergeResolvesExactAndLatestAgainstInstalledEntries() throws {
+    @Test func rowsKeepEveryInstalledVersionAndMarkTheDeclaredOne() throws {
+        let resolved: [String: [Mise.Resolved]] = [
+            "terragrunt": [
+                Mise.Resolved(
+                    version: "1.1.3", installPath: "/t/1.1.3", installed: true, active: false),
+                Mise.Resolved(
+                    version: "1.1.5", installPath: "/t/1.1.5", installed: true, active: false),
+                Mise.Resolved(
+                    version: "1.2.1", installPath: "/t/1.2.1", installed: true, active: true),
+            ],
+            "uv": [
+                Mise.Resolved(
+                    version: "0.12.15", installPath: "/u/0.12.15", installed: true, active: false),
+                Mise.Resolved(
+                    version: "0.12.17", installPath: "/u/0.12.17", installed: true, active: false),
+                Mise.Resolved(
+                    version: "0.13.6", installPath: "/u/0.13.6", installed: true, active: false),
+                Mise.Resolved(
+                    version: "0.13.7", installPath: "/u/0.13.7", installed: true, active: true),
+            ],
+        ]
+        let declared = [
+            Mise.Declared(name: "terragrunt", version: "latest"),
+            Mise.Declared(name: "uv", version: "0.13.7"),
+        ]
+
+        let tools = Mise.rows(declared: declared, resolved: resolved)
+
+        let terragrunt = tools.filter { $0.name == "terragrunt" }
+        #expect(terragrunt.count == 3)
+        #expect(terragrunt.map(\.version) == ["1.2.1", "1.1.5", "1.1.3"])
+        #expect(terragrunt.filter(\.declared).map(\.version) == ["1.2.1"])
+        #expect(terragrunt.allSatisfy { $0.installed })
+        #expect(terragrunt.allSatisfy { $0.requested == "latest" })
+        #expect(terragrunt.filter(\.active).map(\.version) == ["1.2.1"])
+
+        let uv = tools.filter { $0.name == "uv" }
+        #expect(uv.count == 4)
+        #expect(uv.map(\.version) == ["0.13.7", "0.13.6", "0.12.17", "0.12.15"])
+        #expect(uv.filter(\.declared).map(\.version) == ["0.13.7"])
+        #expect(uv.allSatisfy { $0.installed })
+        #expect(uv.allSatisfy { $0.requested == "0.13.7" })
+        #expect(Set(tools.map(\.id)).count == tools.count)
+    }
+
+    @Test func rowsMarkOnlyTheActiveInstalledVersionForLatest() throws {
         let resolved: [String: [Mise.Resolved]] = [
             "node": [
                 Mise.Resolved(
                     version: "20.10.0", installPath: "/n/20.10.0", installed: true, active: true),
                 Mise.Resolved(
                     version: "20.11.0", installPath: "/n/20.11.0", installed: true, active: false),
-                Mise.Resolved(
-                    version: "22.0.0", installPath: nil, installed: false, active: false),
-            ],
-            "python": [
-                Mise.Resolved(
-                    version: "3.11.0", installPath: "/p/3.11.0", installed: true, active: false),
-                Mise.Resolved(
-                    version: "3.12.0", installPath: "/p/3.12.0", installed: true, active: true),
-            ],
-            "aqua:awscli": [
-                Mise.Resolved(
-                    version: "2.15.0", installPath: "/a/2.15.0", installed: true, active: true)
-            ],
-            "npm:biome": [
-                Mise.Resolved(
-                    version: "1.9.4", installPath: nil, installed: true, active: false)
-            ],
-        ]
-        let declared = [
-            Mise.Declared(name: "node", version: "20.11.0"),
-            Mise.Declared(name: "python", version: "latest"),
-            Mise.Declared(name: "terraform", version: "1.7.5"),
-            Mise.Declared(name: "aqua:awscli", version: "2.15.0"),
-            Mise.Declared(name: "npm:biome", version: "1.9.4"),
+            ]
         ]
 
-        let tools = Mise.merge(declared: declared, resolved: resolved)
+        let tools = Mise.rows(
+            declared: [Mise.Declared(name: "node", version: "latest")], resolved: resolved)
 
-        let node = try #require(tools.first { $0.name == "node" })
-        #expect(node.resolved == "20.11.0")
-        #expect(node.active == false)
+        #expect(tools.count == 2)
+        #expect(tools.filter(\.declared).map(\.version) == ["20.10.0"])
+        #expect(tools.first { $0.version == "20.11.0" }?.declared == false)
+        #expect(tools.first { $0.version == "20.10.0" }?.active == true)
+    }
 
-        let python = try #require(tools.first { $0.name == "python" })
-        #expect(python.resolved == "3.12.0")
-        #expect(python.active)
+    @Test func rowsKeepADeclaredVersionWithoutAnInstall() throws {
+        let resolved: [String: [Mise.Resolved]] = [
+            "node": [
+                Mise.Resolved(
+                    version: "20.11.0", installPath: "/n/20.11.0", installed: true, active: true)
+            ]
+        ]
 
-        let terraform = try #require(tools.first { $0.name == "terraform" })
-        #expect(terraform.resolved == nil)
-        #expect(terraform.installPath == nil)
-        #expect(!terraform.installed)
+        let tools = Mise.rows(
+            declared: [Mise.Declared(name: "node", version: "18.20.0")], resolved: resolved)
 
-        #expect(tools.first { $0.name == "aqua:awscli" }?.installed == true)
-        #expect(tools.first { $0.name == "npm:biome" }?.installed == true)
-        #expect(tools.count == 5)
+        #expect(tools.count == 2)
+        #expect(tools[0].version == "18.20.0")
+        #expect(tools[0].declared)
+        #expect(!tools[0].installed)
+        #expect(tools[0].resolved == nil)
+        #expect(tools[0].installPath == nil)
+        #expect(tools[0].requested == "18.20.0")
+        #expect(tools[1].version == "20.11.0")
+        #expect(!tools[1].declared)
+        #expect(tools[1].installed)
+    }
+
+    @Test func rowsOrderVersionsNumericallyDescending() {
+        let resolved: [String: [Mise.Resolved]] = [
+            "node": [
+                Mise.Resolved(
+                    version: "1.27.9", installPath: "/n/1.27.9", installed: true, active: false),
+                Mise.Resolved(
+                    version: "1.27.10", installPath: "/n/1.27.10", installed: true, active: false),
+                Mise.Resolved(
+                    version: "1.27.2", installPath: "/n/1.27.2", installed: true, active: false),
+            ]
+        ]
+
+        let tools = Mise.rows(declared: [], resolved: resolved)
+
+        #expect(tools.map(\.version) == ["1.27.10", "1.27.9", "1.27.2"])
+        #expect(tools.allSatisfy { $0.requested.isEmpty })
+        #expect(tools.allSatisfy { !$0.declared })
     }
 
     @Test func dataDirectoryPrefersTheEnvironment() throws {

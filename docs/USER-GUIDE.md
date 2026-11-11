@@ -144,10 +144,12 @@ nothing.
 
 ## mise tools
 
-The **mise** page lists the tools declared in `~/.config/mise/config.toml`. Each row names a
-tool, the version the config requests, and whether that version is active, inactive, or not
-installed. A tool that mise has installed shows its install path. **Locations** shows the
-config file and mise's cache folder.
+The **mise** page lists every installed version of every tool, plus any version the config
+declares that is not installed. Each row names the tool and one version, and whether that
+version is active, inactive, or not installed. The version the config requests carries a
+`declared` mark, so a tool with several installed versions shows all of them and you can see
+which one is in use. A tool that is installed but not declared still appears. Installed rows
+show their install path. **Locations** shows the config file and mise's cache folder.
 
 The page only reads. Chet asks mise for its tool list and cache path, and never installs,
 removes, switches, or prunes a version. Nothing on the page changes your setup.

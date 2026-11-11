@@ -722,8 +722,10 @@ Cache    ~/.local/share/mise
 - `PageScreen(scrolls: false)`: page header, a toolbar with `Read again` and
   the tool count, the declared tool table, and a `Locations` section. No
   command bar and no glass on the content.
-- The table is the config, not the installed list. One row per declared tool
-  and version, sorted by name and then requested version. The name takes the
+- One row per installed version, plus a row for a declared version that is
+  not installed. A declared row carries a `declared` caption under the tool
+  name. Ordering is tool name ascending, declared first, then version
+  descending with numeric comparison. The name takes the
   remaining width; `version` uses the shared 80 pt column and `status` the
   shared 118 pt column.
 - `Active` is an accent checkmark, `Inactive` a neutral minus, and
