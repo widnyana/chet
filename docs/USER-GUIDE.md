@@ -133,6 +133,13 @@ Project build files follow strict rules so a folder name alone is never enough:
   `Gradle`, `Xcode DerivedData`, `CocoaPods`, `Vite`, `Next.js`, `Turborepo`, `Build output`,
   `Dart tool`, `Terraform`, `Terragrunt cache`, or `Python venv`.
 
+Similar photos groups only images that are alike. Two images join a group when their hashes and
+their shapes agree, a group never chains past that bound, and a flat or blank image never joins one.
+The largest image in a group is kept. Similar videos follows the same tile layout.
+
+Similar photos and Similar videos show each image in a square card: the image fits inside the box
+instead of being cropped, cards keep a visible gap, and the grid holds a gutter from the divider.
+
 ## Settings
 
 Settings holds the scan toggles, size limits, folder rules, tweak preferences, and the

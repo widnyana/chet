@@ -522,6 +522,11 @@ Grid cell:
   card passes nil.
 - The card's structure (thumbnail, label, actions) stays its own. It is not absorbed
   into a shared component.
+- The thumbnail box is square: the column width less `Spacing.s2` on each side, image
+  fitted and centred, never cropped. QuickLook is asked for the measured box side.
+- The shell is `Spacing.s2` padding on the raised paper, `Metrics.controlRadius`, one
+  hairline border. Grid gap and the pane gutter come from `Spacing.s4` and `Spacing.s2`;
+  no literal sizes live in the view.
 
 ## AppRow
 

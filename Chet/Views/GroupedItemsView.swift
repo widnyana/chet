@@ -85,10 +85,19 @@ struct GroupedItemsView: View {
             LazyVStack(alignment: .leading, spacing: Spacing.s6) {
                 ForEach(sorted) { group in
                     VStack(alignment: .leading, spacing: Spacing.s3) {
-                        groupHeader(group)
+                        VStack(alignment: .leading, spacing: Spacing.s2) {
+                            groupHeader(group)
+                            Hairline()
+                        }
                         LazyVGrid(
-                            columns: [GridItem(.adaptive(minimum: 150, maximum: 210), spacing: Spacing.s3)],
-                            spacing: Spacing.s3
+                            columns: [
+                                GridItem(
+                                    .adaptive(
+                                        minimum: Metrics.gridCellMinWidth,
+                                        maximum: Metrics.gridCellMaxWidth),
+                                    spacing: Spacing.s4)
+                            ],
+                            spacing: Spacing.s4
                         ) {
                             MediaCard(url: group.keeper, bytes: nil, isOn: nil)
                             ForEach(group.items) { item in
@@ -103,6 +112,7 @@ struct GroupedItemsView: View {
             }
             .padding(.vertical, Spacing.s6)
             .pageHorizontalPadding()
+            .padding(.horizontal, Spacing.s2)
         }
     }
 
@@ -200,10 +210,11 @@ struct MediaCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s1) {
-            Thumbnail(url: url, side: 150)
-                .frame(maxWidth: .infinity)
-                .frame(height: 150)
-                .clipShape(.rect(corners: .fixed(Metrics.panelRadius)))
+            GeometryReader { proxy in
+                Thumbnail(url: url, side: proxy.size.width)
+            }
+            .aspectRatio(1, contentMode: .fit)
+            .clipShape(.rect(corners: .fixed(Metrics.panelRadius)))
             HStack(spacing: Spacing.s2) {
                 if let isOn {
                     RowCheckbox(
@@ -226,6 +237,12 @@ struct MediaCard: View {
                 }
             }
         }
+        .padding(Spacing.s2)
+        .background(Theme.paperRaised, in: .rect(corners: .fixed(Metrics.controlRadius)))
+        .overlay {
+            RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous)
+                .strokeBorder(Theme.hairline, lineWidth: 1)
+        }
         .help(url.path)
         .contextMenu {
             Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
@@ -236,12 +253,15 @@ struct MediaCard: View {
 struct Thumbnail: View {
     let url: URL
     var side: CGFloat = 40
+    var contentMode: ContentMode = .fit
     @State private var image: NSImage?
 
     var body: some View {
         Group {
             if let image {
-                Image(nsImage: image).resizable().scaledToFill()
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: contentMode)
             } else {
                 Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
                     .resizable()
@@ -249,7 +269,8 @@ struct Thumbnail: View {
                     .padding(side / 5)
             }
         }
-        .task(id: url) {
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task(id: ThumbnailRequest(url: url, side: side)) {
             image = await Self.load(url, side: side)
         }
     }
@@ -259,4 +280,9 @@ struct Thumbnail: View {
             fileAt: url, size: CGSize(width: side, height: side), scale: 2, representationTypes: .thumbnail)
         return try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request).nsImage
     }
+}
+
+private struct ThumbnailRequest: Hashable {
+    let url: URL
+    let side: CGFloat
 }

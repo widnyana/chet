@@ -3,8 +3,10 @@ import Metal
 
 public struct PhotoInfo: Sendable {
     public let entry: WalkEntry
-    public let pixels: Int
+    public let width: Int
+    public let height: Int
     public let features: PerceptualHash.Features
+    public var pixels: Int { width * height }
 }
 
 public struct PhotoCluster: Sendable {
@@ -19,14 +21,14 @@ public struct PhotoScanResult: Sendable {
     public let blurry: [PhotoInfo]
 }
 
-/// Near-duplicate and blurry photos. Hashing and pair matching run on the GPU when available.
+/// Near-duplicate and blurry photos. Hashing runs on the GPU when available.
 public struct SimilarPhotos: Sendable {
     public static let extensions: Set<String> = [
         "jpg", "jpeg", "png", "heic", "heif", "tif", "tiff", "gif", "bmp", "webp",
     ]
 
     public let policy: SafetyPolicy
-    public var maxDistance = 10
+    public var maxDistance = 6
     /// Laplacian variance below this counts as blurry. Tune on real photo sets.
     public var blurThreshold = 60.0
     public var useGPU = true
@@ -47,16 +49,16 @@ public struct SimilarPhotos: Sendable {
     }
 
     /// One decoded image ready for hashing.
-    private struct Decoded: Sendable {
+    private struct Row: Sendable {
         let entry: WalkEntry
-        let pixels: Int
+        let size: PerceptualHash.Decoded
     }
 
     /// Raw pointers handed to the decode workers. Each worker writes disjoint slots, so no
     /// lock is needed.
     private struct DecodeTargets: @unchecked Sendable {
         let bitmap: UnsafeMutableRawPointer
-        let slots: UnsafeMutablePointer<Decoded?>
+        let slots: UnsafeMutablePointer<Row?>
     }
 
     /// Decodes a batch on `workers` threads straight into the shared buffer, so the CPU never
@@ -64,9 +66,9 @@ public struct SimilarPhotos: Sendable {
     private func decode(
         _ entries: [WalkEntry], _ start: Int, _ count: Int, into input: MTLBuffer,
         _ imageBytes: Int, _ workers: Int
-    ) -> [Decoded] {
+    ) -> [Row] {
         let base = input.contents()
-        var slots = [Decoded?](repeating: nil, count: count)
+        var slots = [Row?](repeating: nil, count: count)
         slots.withUnsafeMutableBufferPointer { buffer in
             guard let output = buffer.baseAddress else { return }
             let targets = DecodeTargets(bitmap: base, slots: output)
@@ -75,16 +77,16 @@ public struct SimilarPhotos: Sendable {
                 var index = worker
                 while index < count {
                     let entry = entries[start + index]
-                    if let pixels = PerceptualHash.bitmap(
+                    if let size = PerceptualHash.bitmap(
                         entry.url, into: targets.bitmap.advanced(by: index * imageBytes))
                     {
-                        targets.slots[index] = Decoded(entry: entry, pixels: pixels)
+                        targets.slots[index] = Row(entry: entry, size: size)
                     }
                     index += stride
                 }
             }
         }
-        var compact: [Decoded] = []
+        var compact: [Row] = []
         compact.reserveCapacity(count)
         for index in 0..<count {
             guard let slot = slots[index] else { continue }
@@ -96,6 +98,10 @@ public struct SimilarPhotos: Sendable {
             compact.append(slot)
         }
         return compact
+    }
+
+    private func photo(_ row: Row, _ features: PerceptualHash.Features) -> PhotoInfo {
+        PhotoInfo(entry: row.entry, width: row.size.width, height: row.size.height, features: features)
     }
 
     /// Finds similar and blurry photos among files that were already walked (non-images are ignored).
@@ -130,50 +136,82 @@ public struct SimilarPhotos: Sendable {
                     }
                 }
                 for (item, feature) in zip(decoded, features) {
-                    photos.append(PhotoInfo(entry: item.entry, pixels: item.pixels, features: feature))
+                    photos.append(photo(item, feature))
                 }
                 continue
             }
             // No GPU: decode into arrays and hash on the CPU.
-            var rgba: [(Decoded, [UInt8])] = []
+            var rgba: [(Row, [UInt8])] = []
             rgba.reserveCapacity(count)
             for index in 0..<count {
                 guard let image = PerceptualHash.bitmap(entries[start + index].url) else { continue }
-                rgba.append((Decoded(entry: entries[start + index], pixels: image.pixels), image.rgba))
+                rgba.append((Row(entry: entries[start + index], size: image.size), image.rgba))
             }
             features = rgba.map { PerceptualHash.cpu($0.1) }
             for (item, feature) in zip(rgba.map(\.0), features) {
-                photos.append(PhotoInfo(entry: item.entry, pixels: item.pixels, features: feature))
+                photos.append(photo(item, feature))
             }
         }
 
         PerceptualHash.releaseFreePages()
 
-        let hashes = photos.map(\.features.hash)
-        let pairs =
-            try gpu.map { try PerceptualHash.gpuPairs(hashes, maxDistance: maxDistance, context: $0) }
-            ?? PerceptualHash.cpuPairs(hashes, maxDistance: maxDistance)
-        var parent = Array(photos.indices)
-        func root(_ i: Int) -> Int {
-            var i = i
-            while parent[i] != i {
-                parent[i] = parent[parent[i]]
-                i = parent[i]
-            }
-            return i
-        }
-        for (a, b) in pairs { parent[root(a)] = root(b) }
-        var members: [Int: [PhotoInfo]] = [:]
-        for index in photos.indices { members[root(index), default: []].append(photos[index]) }
+        return PhotoScanResult(
+            clusters: Self.clusters(photos, maxDistance: maxDistance),
+            blurry: photos.filter { $0.features.variance < blurThreshold })
+    }
 
-        let clusters = members.values.filter { $0.count > 1 }.map { group -> PhotoCluster in
+    static func leaderGroups(_ photos: [PhotoInfo], maxDistance: Int) -> [[PhotoInfo]] {
+        let order = photos.indices.sorted { lhs, rhs in
+            if photos[lhs].pixels != photos[rhs].pixels {
+                return photos[lhs].pixels > photos[rhs].pixels
+            }
+            return photos[lhs].entry.stamp.modified > photos[rhs].entry.stamp.modified
+        }
+        var claimed = [Bool](repeating: false, count: photos.count)
+        var groups: [[PhotoInfo]] = []
+        for index in order {
+            guard !claimed[index], hasInformation(photos[index]) else { continue }
+            let leader = photos[index]
+            var group = [leader]
+            for candidateIndex in order where candidateIndex != index && !claimed[candidateIndex] {
+                let candidate = photos[candidateIndex]
+                guard hasInformation(candidate), shapeMatches(leader, candidate) else { continue }
+                guard
+                    group.allSatisfy({
+                        PerceptualHash.hamming($0.features.hash, candidate.features.hash) <= maxDistance
+                    })
+                else { continue }
+                group.append(candidate)
+                claimed[candidateIndex] = true
+            }
+            claimed[index] = true
+            groups.append(group)
+        }
+        return groups
+    }
+
+    static func clusters(_ photos: [PhotoInfo], maxDistance: Int) -> [PhotoCluster] {
+        let clusters = leaderGroups(photos, maxDistance: maxDistance).filter { $0.count > 1 }.map {
+            group -> PhotoCluster in
             let keeper = group.max {
                 ($0.pixels, $1.entry.stamp.modified) < ($1.pixels, $0.entry.stamp.modified)
             }!
             return PhotoCluster(keeper: keeper, others: group.filter { $0.entry.url != keeper.entry.url })
         }
-        return PhotoScanResult(
-            clusters: clusters.sorted { $0.reclaimableBytes > $1.reclaimableBytes },
-            blurry: photos.filter { $0.features.variance < blurThreshold })
+        return clusters.sorted { $0.reclaimableBytes > $1.reclaimableBytes }
+    }
+
+    private static func hasInformation(_ photo: PhotoInfo) -> Bool {
+        photo.features.hash.nonzeroBitCount >= 8 && photo.features.variance >= 4.0
+    }
+
+    private static func shapeMatches(_ leader: PhotoInfo, _ candidate: PhotoInfo) -> Bool {
+        guard leader.height > 0, candidate.height > 0 else { return false }
+        let leaderRatio = Double(leader.width) / Double(leader.height)
+        let candidateRatio = Double(candidate.width) / Double(candidate.height)
+        if abs(leaderRatio - candidateRatio) <= 0.05 * max(leaderRatio, candidateRatio) { return true }
+        let leaderPixels = Double(leader.pixels)
+        let candidatePixels = Double(candidate.pixels)
+        return abs(leaderPixels - candidatePixels) <= 0.10 * max(leaderPixels, candidatePixels)
     }
 }

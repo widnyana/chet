@@ -21,25 +21,41 @@ public enum PerceptualHash {
         }
     }
 
+    /// Original pixel size of a decoded image.
+    public struct Decoded: Equatable, Sendable {
+        public let width: Int
+        public let height: Int
+
+        public init(width: Int, height: Int) {
+            self.width = width
+            self.height = height
+        }
+    }
+
+    /// Opaque white. Every bitmap is cleared to it before drawing, so a flat image hashed on white
+    /// equals a transparent export of the same artwork on white.
+    static let background: UInt8 = 255
+
     /// cos((2x + 1) u pi / 64) * 1024, rounded, for u in 0..<8 and x in 0..<32 (index u * 32 + x).
     static let cosTable: [Int32] = (0..<8).flatMap { u in
         (0..<32).map { x in Int32((cos(Double((2 * x + 1) * u) * .pi / 64) * 1024).rounded()) }
     }
 
-    /// Decodes an image file into a side x side RGBA bitmap (stretched). Also returns the original pixel count.
+    /// Decodes an image file into a side x side RGBA bitmap: the image is aspect-fit and centred
+    /// on white. Also returns the original pixel size.
     /// Nil when the file is not a decodable image.
-    public static func bitmap(_ url: URL) -> (rgba: [UInt8], pixels: Int)? {
+    public static func bitmap(_ url: URL) -> (rgba: [UInt8], size: Decoded)? {
         var rgba = [UInt8](repeating: 0, count: side * side * 4)
-        let pixels = rgba.withUnsafeMutableBytes { buffer in
+        let size = rgba.withUnsafeMutableBytes { buffer in
             bitmap(url, into: buffer.baseAddress!)
         }
-        guard let pixels else { return nil }
-        return (rgba, pixels)
+        guard let size else { return nil }
+        return (rgba, size)
     }
 
-    /// Decodes into caller memory of `side * side * 4` bytes and returns the original pixel count.
+    /// Decodes into caller memory of `side * side * 4` bytes and returns the original pixel size.
     /// Callers hand this a Metal buffer, so a bitmap is never copied after decoding.
-    public static func bitmap(_ url: URL, into rgba: UnsafeMutableRawPointer) -> Int? {
+    public static func bitmap(_ url: URL, into rgba: UnsafeMutableRawPointer) -> Decoded? {
         // ImageIO keeps its decoded buffers and file data in the caller's autorelease pool. One
         // pool per image releases them now instead of at the end of the whole photo step.
         autoreleasepool {
@@ -58,14 +74,14 @@ public enum PerceptualHash {
             guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary),
                 bitmap(thumbnail, into: rgba)
             else { return nil }
-            return width * height
+            return Decoded(width: width, height: height)
         }
     }
 
     /// sRGB once: a color space per image is a per-image allocation with no benefit.
     private static let sRGB = CGColorSpace(name: CGColorSpace.sRGB)
 
-    /// Draws an image into a side x side RGBA bitmap (stretched).
+    /// Draws an image into a side x side RGBA bitmap: aspect-fit, centred on white.
     public static func bitmap(_ image: CGImage) -> [UInt8]? {
         var rgba = [UInt8](repeating: 0, count: side * side * 4)
         let drawn = rgba.withUnsafeMutableBytes { buffer in
@@ -74,15 +90,23 @@ public enum PerceptualHash {
         return drawn ? rgba : nil
     }
 
-    /// Draws an image into caller memory of `side * side * 4` bytes.
+    /// Draws an image into caller memory of `side * side * 4` bytes: aspect-fit, centred on white.
     public static func bitmap(_ image: CGImage, into rgba: UnsafeMutableRawPointer) -> Bool {
         guard let space = sRGB,
             let context = CGContext(
                 data: rgba, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4,
                 space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
         else { return false }
+        memset(rgba, Int32(background), side * side * 4)
         context.interpolationQuality = .high
-        context.draw(image, in: CGRect(x: 0, y: 0, width: side, height: side))
+        let box = CGFloat(side)
+        let scale = min(box / CGFloat(image.width), box / CGFloat(image.height))
+        let fitted = CGSize(width: CGFloat(image.width) * scale, height: CGFloat(image.height) * scale)
+        context.draw(
+            image,
+            in: CGRect(
+                x: (box - fitted.width) / 2, y: (box - fitted.height) / 2, width: fitted.width,
+                height: fitted.height))
         return true
     }
 

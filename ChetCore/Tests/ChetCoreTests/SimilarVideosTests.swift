@@ -47,3 +47,18 @@ struct SimilarVideosTests {
         #expect(try await SimilarVideos(policy: dir.policy).scan([dir.url]).isEmpty)
     }
 }
+
+struct MediaGridTests {
+    @Test func cardSideIsTheColumnLessTheShellPadding() {
+        #expect(MediaGrid.cellMinWidth - MediaGrid.inset * 2 == 148)
+        #expect(MediaGrid.cellMaxWidth - MediaGrid.inset * 2 == 204)
+        #expect(MediaGrid.cellMaxWidth - MediaGrid.cellMinWidth > MediaGrid.gap)
+    }
+
+    @Test func gridRhythmMatchesTheTokens() {
+        #expect(MediaGrid.cellMinWidth == 164)
+        #expect(MediaGrid.cellMaxWidth == 220)
+        #expect(MediaGrid.gap == 16)
+        #expect(MediaGrid.inset == 8)
+    }
+}

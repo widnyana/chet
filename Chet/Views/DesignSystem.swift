@@ -32,9 +32,9 @@ enum Typography {
 
 enum Spacing {
     static let s1: CGFloat = 4
-    static let s2: CGFloat = 8
+    static let s2: CGFloat = MediaGrid.inset
     static let s3: CGFloat = 12
-    static let s4: CGFloat = 16
+    static let s4: CGFloat = MediaGrid.gap
     static let s6: CGFloat = 24
     static let s8: CGFloat = 32
     static let s12: CGFloat = 48
@@ -43,7 +43,8 @@ enum Spacing {
 enum Metrics {
     static let pageMargin: CGFloat = 24
     static let widePageMargin: CGFloat = 32
-    static let gridCellMinWidth: CGFloat = 164
+    static let gridCellMinWidth: CGFloat = MediaGrid.cellMinWidth
+    static let gridCellMaxWidth: CGFloat = MediaGrid.cellMaxWidth
     static let rowHeight: CGFloat = 40
     static let aboutIconSize: CGFloat = 88
     static let aboutLabelWidth: CGFloat = 136
