@@ -11,7 +11,7 @@ depends = ["gen"]
 run = [
   "if [ -z \"${CHET_NO_BUMP:-}\" ]; then sh scripts/bump-build.sh; fi",
   "xcodebuild -project chet.xcodeproj -scheme chet-helper -configuration Debug -destination 'platform=macOS' -derivedDataPath .build/xc -quiet build",
-  "xcodebuild -project chet.xcodeproj -scheme chet -configuration Debug -destination 'platform=macOS' -derivedDataPath .build/xc -quiet build",
+  "xcodebuild -project chet.xcodeproj -scheme chet -configuration Debug -destination 'platform=macOS' -derivedDataPath .build/xc -quiet build CHET_GIT_COMMIT=$(git rev-parse --short HEAD) CHET_BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)",
 ]
 
 [tasks.dev]
@@ -66,7 +66,7 @@ depends = ["gen"]
 run = [
   "if [ -z \"${CHET_NO_BUMP:-}\" ]; then sh scripts/bump-build.sh; fi",
   "xcodebuild -project chet.xcodeproj -scheme chet-helper -configuration Release -destination 'platform=macOS' -derivedDataPath .build/xc -quiet build",
-  "xcodebuild -project chet.xcodeproj -scheme chet -configuration Release -destination 'platform=macOS' -derivedDataPath .build/xc -quiet build",
+  "xcodebuild -project chet.xcodeproj -scheme chet -configuration Release -destination 'platform=macOS' -derivedDataPath .build/xc -quiet build CHET_GIT_COMMIT=$(git rev-parse --short HEAD) CHET_BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "test \"$(lipo -archs .build/xc/Build/Products/Release/chet.app/Contents/MacOS/chet)\" = arm64",
   "test \"$(lipo -archs .build/xc/Build/Products/Release/chet.app/Contents/MacOS/chet-helper)\" = arm64",
   "mkdir -p dist && rm -f dist/chet.zip && ditto -c -k --keepParent .build/xc/Build/Products/Release/chet.app dist/chet.zip",

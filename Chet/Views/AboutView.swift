@@ -87,6 +87,15 @@ struct AboutView: View {
             AboutRow(label: "Minimum macOS") {
                 valueText(build.minimumOS ?? "Unknown")
             }
+            AboutRow(label: "Built") {
+                valueText(
+                    build.builtDate?.formatted(date: .abbreviated, time: .shortened)
+                        ?? build.builtAt ?? "Unknown")
+            }
+            AboutRow(label: "Commit") {
+                valueText(build.shortCommit ?? "Unknown")
+                    .monospaced()
+            }
             AboutRow(
                 label: "Full Disk Access",
                 actionTitle: model.access == .granted ? nil : "Open Settings",
