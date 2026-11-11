@@ -86,7 +86,7 @@ run = [
   "cp -R .build/xc/Build/Products/Release/chet.app .build/dmg/",
   "ln -s /Applications .build/dmg/Applications",
   "mkdir -p dist && rm -f dist/chet.dmg",
-  "hdiutil create -volname Chet -srcfolder .build/dmg -ov -format UDZO dist/chet.dmg",
+  "diskutil image create from --format UDZO --volumeName Chet .build/dmg dist/chet.dmg",
   "hdiutil verify dist/chet.dmg",
   "echo dist/chet.dmg",
 ]
