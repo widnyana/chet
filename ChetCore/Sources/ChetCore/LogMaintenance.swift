@@ -21,17 +21,40 @@ public enum LogMaintenance {
         return rename(crash.path, rotated.path) == 0
     }
 
-    /// Keeps the newest `kept` `crash-<timestamp>.txt` files, deletes older ones.
-    public static func pruneCrashHistory(in directory: URL, kept: Int = 5) {
-        let contents = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
-        let history =
-            contents
-            .filter { $0.hasPrefix("crash-") && $0.hasSuffix(".txt") }
-            .sorted()
-        guard history.count > kept else { return }
-        for name in history.prefix(history.count - kept) {
-            try? FileManager.default.removeItem(at: directory.appendingPathComponent(name))
+    /// Keeps the newest `kept` rotated names matching `prefix` and `suffix` by modification
+    /// date, deletes the rest, and returns how many rotated names survive. The live
+    /// `application-debug.log` is never deleted or counted.
+    public static func pruneLogs(in directory: URL, prefix: String, suffix: String, kept: Int) -> Int {
+        let liveName = "application-debug.log"
+        let contents =
+            (try? FileManager.default.contentsOfDirectory(
+                at: directory, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+        var rotated: [(url: URL, modified: Date)] = []
+        for url in contents {
+            let name = url.lastPathComponent
+            guard name != liveName, name.hasPrefix(prefix), name.hasSuffix(suffix) else { continue }
+            let values = try? url.resourceValues(forKeys: [.contentModificationDateKey])
+            if let modified = values?.contentModificationDate {
+                rotated.append((url: url, modified: modified))
+            } else {
+                rotated.append((url: url, modified: Date.distantPast))
+            }
         }
+        rotated.sort { lhs, rhs in
+            if lhs.modified != rhs.modified { return lhs.modified > rhs.modified }
+            return lhs.url.lastPathComponent > rhs.url.lastPathComponent
+        }
+        let survivors = min(max(kept, 0), rotated.count)
+        for candidate in rotated.dropFirst(survivors) {
+            try? FileManager.default.removeItem(at: candidate.url)
+        }
+        return survivors
+    }
+
+    /// Keeps the newest `kept` `crash-<timestamp>.txt` files by modification date, deletes
+    /// older ones.
+    public static func pruneCrashHistory(in directory: URL, kept: Int = 5) {
+        _ = pruneLogs(in: directory, prefix: "crash-", suffix: ".txt", kept: kept)
     }
 
     /// The full launch sequence: rotate a stale crash report aside, prune history, and report
