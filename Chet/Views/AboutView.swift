@@ -168,7 +168,7 @@ struct AboutView: View {
         if model.isScanning { return ("Scanning", nil) }
         guard let date = model.lastScan else { return ("No scan yet", nil) }
         return (
-            model.totalBytes.formatted(.byteCount(style: .file)),
+            model.lastScanBytes.formatted(.byteCount(style: .file)),
             date.formatted(date: .abbreviated, time: .shortened)
         )
     }

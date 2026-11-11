@@ -268,7 +268,13 @@ final class ScanModel {
     /// Items staged for the confirm sheet: a category's selection, or all selected items.
     var confirmItems: [ScanItem] = []
     var confirmSnapshots: [LocalSnapshot] = []
-    var lastScan: Date?
+    var lastScan: Date? = UserDefaults.standard.object(forKey: ScanModel.lastScanKey) as? Date
+    /// Bytes the last finished scan measured; kept beside `lastScan` so a relaunch still shows
+    /// the last result instead of a zero.
+    private(set) var lastScanBytes: Int64 = Int64(
+        UserDefaults.standard.integer(forKey: ScanModel.lastScanBytesKey))
+    nonisolated static let lastScanKey = "lastScanDate"
+    nonisolated static let lastScanBytesKey = "lastScanBytes"
     /// True after a scan ended by finishing, not by Stop.
     var didFinishScan = false
     /// Bumped on every scan start and stop; events from stale sessions are dropped.
@@ -681,7 +687,11 @@ final class ScanModel {
             markDone(step)
         case .done:
             didFinishScan = true
-            lastScan = Date()
+            let finishedAt = Date()
+            lastScan = finishedAt
+            lastScanBytes = totalBytes
+            UserDefaults.standard.set(finishedAt, forKey: Self.lastScanKey)
+            UserDefaults.standard.set(Int(totalBytes), forKey: Self.lastScanBytesKey)
             if !snapshots.isEmpty {
                 categories.append(CategoryState(id: "snapshots", title: Self.titles["snapshots"] ?? "Snapshots"))
             }
