@@ -142,11 +142,13 @@ public struct RuleScanner: Sendable {
                 guard bytes > 0 else { continue }
                 // A tool dir holding Terraform state is never safe: the cleaner refuses it.
                 let holdsState = TerraformState.holdsLocalState(child)
+                let demoted = rule.reviewNames.contains(name) || rule.reviewPrefixes.contains { name.hasPrefix($0) }
+                let owner = rule.childNamesAreBundleIDs && Self.isReverseDNSIdentifier(name) ? name : nil
                 found.append(
                     ScanItem(
-                        url: child, categoryID: rule.category, risk: holdsState ? .review : rule.risk,
-                        mode: holdsState ? .trash : rule.mode,
-                        reclaimableBytes: bytes, stamp: stamp, ownerBundleID: rule.owningBundleID,
+                        url: child, categoryID: rule.category, risk: holdsState || demoted ? .review : rule.risk,
+                        mode: holdsState || demoted ? .trash : rule.mode,
+                        reclaimableBytes: bytes, stamp: stamp, ownerBundleID: owner ?? rule.owningBundleID,
                         requiresAdmin: rule.requiresAdmin, kind: kind))
             }
             if rule.keepNewest, let newest = found.max(by: { $0.stamp.modified < $1.stamp.modified }) {
@@ -199,6 +201,10 @@ public struct RuleScanner: Sendable {
         if venvs, BuildArtifact.isVirtualEnvironment(url) { return true }
         guard let artifacts else { return false }
         return BuildArtifact.label(for: url, in: artifacts) != nil
+    }
+
+    private static func isReverseDNSIdentifier(_ name: String) -> Bool {
+        !name.contains(where: \.isWhitespace) && name.filter { $0 == "." }.count >= 2
     }
 
     /// Tool label for a matched build directory, nil outside the build-artifact rules.

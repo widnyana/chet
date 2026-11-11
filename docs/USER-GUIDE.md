@@ -121,6 +121,15 @@ Delete means the item is removed permanently; Move to Trash means it can be rest
 | System caches | `/Library/Caches`, one item per folder | Check first | Delete with administrator |
 | System logs | `/Library/Logs`, one item per folder | Check first | Delete with administrator |
 
+App caches holds one folder per app under `~/Library/Caches`. Most are derived data and are
+pre-selected for permanent deletion. Folders that hold account, purchase, wallet, pass, or session
+state are shown as Review and are never pre-selected: App Store, StoreKit, PassKit, GameKit, Screen
+Time, Family, Apple Account, and their siblings. A cache folder whose name is a running app's bundle
+identifier is skipped while that app runs.
+
+A folder that appears on more than one page is judged once, by the stricter verdict, and every page
+shows that verdict.
+
 Project build files follow strict rules so a folder name alone is never enough:
 
 - `vendor` counts only when its parent holds `composer.json`; a vendor folder of hand-written

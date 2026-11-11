@@ -20,6 +20,12 @@ public struct Rule: Sendable, Identifiable {
     public let extensions: Set<String>?
     /// Child names never listed.
     public let excluded: Set<String>
+    /// Children emitted as review/Trash instead of the rule's default risk and mode.
+    public let reviewNames: Set<String>
+    /// Name prefixes of children emitted as review/Trash.
+    public let reviewPrefixes: [String]
+    /// Take a child's own reverse-DNS name as its owning bundle ID.
+    public let childNamesAreBundleIDs: Bool
     /// Keep the most recently modified child of each root (for example the newest device support files).
     public let keepNewest: Bool
     /// Each root folder becomes one item instead of its children (for tool caches full of hash-named folders).
@@ -55,7 +61,8 @@ public struct Rule: Sendable, Identifiable {
     public init(
         id: String, category: String? = nil, title: String, roots: [String], risk: Risk, mode: DeleteMode,
         owningBundleID: String? = nil, minAge: TimeInterval? = nil, extensions: Set<String>? = nil,
-        excluded: Set<String> = [], keepNewest: Bool = false, wholeRoots: Bool = false,
+        excluded: Set<String> = [], reviewNames: Set<String> = [], reviewPrefixes: [String] = [],
+        childNamesAreBundleIDs: Bool = false, keepNewest: Bool = false, wholeRoots: Bool = false,
         recursiveNames: Set<String>? = nil, recursiveArtifacts: [BuildArtifact]? = nil,
         prunedNames: Set<String> = [], discovery: Discovery? = nil,
         listOnly: Bool = false, requiresAdmin: Bool = false, matchesVirtualEnvironments: Bool = false
@@ -70,6 +77,9 @@ public struct Rule: Sendable, Identifiable {
         self.minAge = minAge
         self.extensions = extensions
         self.excluded = excluded
+        self.reviewNames = reviewNames
+        self.reviewPrefixes = reviewPrefixes
+        self.childNamesAreBundleIDs = childNamesAreBundleIDs
         self.keepNewest = keepNewest
         self.wholeRoots = wholeRoots
         self.recursiveNames = recursiveNames
@@ -89,7 +99,14 @@ extension Rule {
         Rule(id: "trash", title: "Trash", roots: [".Trash"], risk: .safe, mode: .permanent),
         Rule(
             id: "caches", title: "User caches", roots: ["Library/Caches"], risk: .safe, mode: .permanent,
-            excluded: ["com.apple.bird", "CloudKit", "com.apple.akd", "id.web.widnyana.chet"]),
+            excluded: ["com.apple.bird", "CloudKit", "com.apple.akd", "id.web.widnyana.chet"],
+            reviewNames: [
+                "com.apple.appstoreagent", "com.apple.CommerceKit.TransactionService", "PassKit", "GameKit",
+                "com.apple.ScreenTimeSettingsAgent", "familycircled", "com.apple.Family-Settings.extension",
+                "com.apple.appleaccountd", "com.apple.amsaccountsd", "com.apple.storekitagent",
+                "com.apple.managedappdistributionagent", "com.apple.amsengagementd", "com.apple.itunescloudd",
+                "com.apple.ap.adprivacyd", "com.apple.icloudmailagent",
+            ], reviewPrefixes: ["com.apple.ams", "com.apple.storekit"], childNamesAreBundleIDs: true),
         Rule(
             id: "logs", title: "Logs and crash reports", roots: ["Library/Logs"], risk: .safe, mode: .permanent,
             excluded: ["chet", "DiagnosticReports"]),

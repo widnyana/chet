@@ -341,4 +341,49 @@ struct ScanSessionTests {
         }
         #expect(restored)
     }
+
+    @Test func mergedRecordKeepsTheConservativeVerdictOnce() throws {
+        let dir = try TempDir()
+        let url = try dir.file("Library/Caches/com.example/blob", bytes: 128)
+        let stamp = try #require(FileStamp.read(url))
+        let safe = ScanItem(
+            url: url, categoryID: "caches", risk: .safe, mode: .permanent,
+            reclaimableBytes: 4_096, stamp: stamp)
+        let review = ScanItem(
+            url: url, categoryID: "leftovers", risk: .review, mode: .trash,
+            reclaimableBytes: 4_096, stamp: stamp)
+        var ledger = ScanLedger()
+        ledger.record(safe)
+        ledger.selectIfSafe(url)
+        #expect(ledger.selected == [url])
+
+        ledger.record(review)
+        ledger.selectIfSafe(url)
+
+        #expect(ledger.itemsByURL.count == 1)
+        #expect(ledger.itemsByURL[url]?.risk == .review)
+        #expect(ledger.itemsByURL[url]?.mode == .trash)
+        #expect(ledger.selected.isEmpty)
+        #expect(ledger.totalBytes == 4_096)
+    }
+
+    @Test func repeatingTheSameVerdictLeavesTheRecordUnchanged() throws {
+        let dir = try TempDir()
+        let url = try dir.file("Library/Caches/com.example/blob", bytes: 128)
+        let stamp = try #require(FileStamp.read(url))
+        let item = ScanItem(
+            url: url, categoryID: "caches", risk: .safe, mode: .permanent,
+            reclaimableBytes: 4_096, stamp: stamp)
+        var ledger = ScanLedger()
+        ledger.record(item)
+        ledger.selectIfSafe(url)
+        let first = ledger.itemsByURL[url]
+
+        ledger.record(item)
+        ledger.selectIfSafe(url)
+
+        #expect(ledger.itemsByURL[url] == first)
+        #expect(ledger.selected == [url])
+        #expect(ledger.totalBytes == 4_096)
+    }
 }

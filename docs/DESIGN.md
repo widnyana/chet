@@ -263,6 +263,13 @@ The bundle follows the two paths the sentence names: the Trash when macOS
 allows the move, and permanent removal by the helper when macOS refuses. The
 report keeps `Moved to the Trash` and `Removed permanently` as its wording.
 
+### Removal risk
+
+One URL has one verdict. When two categories claim it, the stricter risk wins (informational, then
+review, then safe) and, on a tie, Trash beats permanent. Auto-selection reads the resolved item, so a
+folder that may hold account or purchase state is never pre-selected, and every page shows the same
+risk and size.
+
 ### Project build files
 
 A directory appears in one category. When a build rule and a cache marker both claim it, the

@@ -37,6 +37,30 @@ struct RuleScannerTests {
         #expect(result.items.map(\.url.lastPathComponent) == ["blob"])
     }
 
+    @Test func demotedCacheChildIsReviewTrashWhileSiblingStaysSafe() async throws {
+        let dir = try TempDir()
+        let demotedURL = try dir.file("Library/Caches/com.apple.appstoreagent/storeSystem.db", bytes: 2_000_000)
+        try dir.file("Library/Caches/com.example.plain/x", bytes: 1_000_000)
+        let items = try await RuleScanner(home: dir.url).scan(try rule("caches")).items
+        let demoted = try #require(items.first { $0.url.lastPathComponent == "com.apple.appstoreagent" })
+        let sibling = try #require(items.first { $0.url.lastPathComponent == "com.example.plain" })
+        #expect(demoted.risk == .review && demoted.mode == .trash)
+        #expect(sibling.risk == .safe && sibling.mode == .permanent)
+        let bytes = await FileIndexBuilder.allocatedSize(of: demotedURL)
+        #expect(demoted.reclaimableBytes == bytes)
+    }
+
+    @Test func cacheChildBundleIDBecomesOwner() async throws {
+        let dir = try TempDir()
+        try dir.file("Library/Caches/com.apple.appstoreagent/x", bytes: 100)
+        try dir.file("Library/Caches/PassKit/x", bytes: 100)
+        let items = try await RuleScanner(home: dir.url).scan(try rule("caches")).items
+        let appstore = try #require(items.first { $0.url.lastPathComponent == "com.apple.appstoreagent" })
+        let passkit = try #require(items.first { $0.url.lastPathComponent == "PassKit" })
+        #expect(appstore.ownerBundleID == "com.apple.appstoreagent")
+        #expect(passkit.ownerBundleID == nil)
+    }
+
     @Test func devGarbageFindsProjectBuildDirsOnce() async throws {
         let dir = try TempDir()
         try dir.file("Development/repos/app/node_modules/express/index.js", bytes: 1_000_000)

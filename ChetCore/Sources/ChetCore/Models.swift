@@ -75,4 +75,91 @@ public struct ScanItem: Identifiable, Hashable, Sendable {
         self.requiresAdmin = requiresAdmin
         self.kind = kind
     }
+
+    public func resolved(with other: ScanItem) -> ScanItem {
+        guard url == other.url else { return self }
+        if other.conservation != conservation {
+            return other.conservation > conservation ? other : self
+        }
+        if other.mode != mode {
+            return other.mode == .trash ? other : self
+        }
+        return self
+    }
+
+    private var conservation: Int {
+        switch risk {
+        case .safe: 0
+        case .review: 1
+        case .informational: 2
+        }
+    }
+}
+
+public struct ScanLedger: Sendable {
+    public private(set) var itemsByURL: [URL: ScanItem] = [:]
+    public private(set) var totalBytes: Int64
+    public private(set) var selected: Set<URL> = []
+    public private(set) var selectedBytes: Int64 = 0
+    private var bytesByURL: [URL: Int64] = [:]
+
+    public init(totalBytes: Int64 = 0) {
+        self.totalBytes = totalBytes
+    }
+
+    public func item(for url: URL) -> ScanItem? {
+        itemsByURL[url]
+    }
+
+    public mutating func record(_ item: ScanItem) {
+        guard let existing = itemsByURL[item.url] else {
+            itemsByURL[item.url] = item
+            bytesByURL[item.url] = item.reclaimableBytes
+            totalBytes += item.reclaimableBytes
+            return
+        }
+        let resolved = existing.resolved(with: item)
+        guard resolved != existing else { return }
+        let previous = bytesByURL[item.url] ?? existing.reclaimableBytes
+        let delta = resolved.reclaimableBytes - previous
+        bytesByURL[item.url] = resolved.reclaimableBytes
+        totalBytes += delta
+        if selected.contains(item.url) { selectedBytes += delta }
+        itemsByURL[item.url] = resolved
+    }
+
+    public mutating func selectIfSafe(_ url: URL) {
+        if item(for: url)?.risk == .safe {
+            select(url)
+        } else {
+            deselect(url)
+        }
+    }
+
+    public mutating func select(_ url: URL) {
+        guard selected.insert(url).inserted, let bytes = bytesByURL[url] else { return }
+        selectedBytes += bytes
+    }
+
+    public mutating func deselect(_ url: URL) {
+        guard selected.remove(url) != nil, let bytes = bytesByURL[url] else { return }
+        selectedBytes -= bytes
+    }
+
+    @discardableResult
+    public mutating func remove(_ url: URL) -> Int64? {
+        guard let item = itemsByURL.removeValue(forKey: url) else { return nil }
+        let bytes = bytesByURL.removeValue(forKey: url) ?? item.reclaimableBytes
+        totalBytes -= bytes
+        if selected.remove(url) != nil { selectedBytes -= bytes }
+        return bytes
+    }
+
+    public mutating func removeAll() {
+        itemsByURL.removeAll()
+        bytesByURL.removeAll()
+        totalBytes = 0
+        selected.removeAll()
+        selectedBytes = 0
+    }
 }

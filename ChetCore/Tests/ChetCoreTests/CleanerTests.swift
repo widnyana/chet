@@ -149,6 +149,20 @@ struct CleanerTests {
         #expect(FileManager.default.fileExists(atPath: file.path))
     }
 
+    @Test func runningBundleIDOwnerSkipsCacheItem() throws {
+        let dir = try TempDir()
+        let file = try dir.file("Library/Caches/com.apple.appstoreagent/storeSystem.db", bytes: 1000)
+        let stamp = try #require(FileStamp.read(file))
+        let cacheItem = ScanItem(
+            url: file, categoryID: "caches", risk: .review, mode: .trash,
+            reclaimableBytes: stamp.size, stamp: stamp, ownerBundleID: "com.apple.appstoreagent")
+        var cleaner = cleaner(dir)
+        cleaner.owner = { $0.ownerBundleID }
+        cleaner.isRunning = { $0 == "com.apple.appstoreagent" }
+        #expect(cleaner.clean([cacheItem]).results.first?.outcome == .skipped(.appRunning))
+        #expect(FileManager.default.fileExists(atPath: file.path))
+    }
+
     @Test func dryRunPermanentReportsRemovedButKeepsFile() throws {
         let dir = try TempDir()
         let file = try dir.file("cache/x", bytes: 1000)

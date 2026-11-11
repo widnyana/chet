@@ -211,16 +211,13 @@ final class ScanModel {
         UserDefaults.standard.set(data, forKey: scopeKey)
     }
     var categories: [CategoryState] = []
+    private var ledger = ScanLedger(
+        totalBytes: Int64(UserDefaults.standard.integer(forKey: ScanModel.lastScanBytesKey)))
     /// First item per URL (a file can sit in several categories), filled by `record` so no read
     /// rebuilds it.
-    private(set) var itemsByURL: [URL: ScanItem] = [:]
-    /// Every URL already counted in `totalBytes`, so duplicates across categories count once.
-    @ObservationIgnored private var countedURLs: Set<URL> = []
-    /// Reclaimable bytes per counted URL. `selectedBytes` reads this on selection changes.
-    @ObservationIgnored private var bytesByURL: [URL: Int64] = [:]
-    private(set) var totalBytes: Int64 = Int64(
-        UserDefaults.standard.integer(forKey: ScanModel.lastScanBytesKey))
-    private(set) var selectedBytes: Int64 = 0
+    var itemsByURL: [URL: ScanItem] { ledger.itemsByURL }
+    var totalBytes: Int64 { ledger.totalBytes }
+    var selectedBytes: Int64 { ledger.selectedBytes }
     /// Category id -> groups, for duplicates and similar media.
     var groups: [String: [ItemGroup]] = [:]
     var snapshots: [LocalSnapshot] = []
@@ -231,7 +228,7 @@ final class ScanModel {
     /// Snapshot deletions in the current clean pass; the progress box names them.
     var cleanSnapshotCount = 0
     /// URLs of the items that will be cleaned. Safe items are preselected, review items never are.
-    var selected: Set<URL> = []
+    var selected: Set<URL> { ledger.selected }
     var selectedSnapshots: Set<LocalSnapshot> = []
     var report: CleanReport?
     var snapshotErrors: [String] = []
@@ -302,20 +299,15 @@ final class ScanModel {
 
     /// Counts an item's bytes once, so a URL in two categories adds to the total a single time.
     private func record(_ item: ScanItem) {
-        guard countedURLs.insert(item.url).inserted else { return }
-        bytesByURL[item.url] = item.reclaimableBytes
-        totalBytes += item.reclaimableBytes
-        itemsByURL[item.url] = item
+        ledger.record(item)
     }
 
     func select(_ url: URL) {
-        guard selected.insert(url).inserted, let bytes = bytesByURL[url] else { return }
-        selectedBytes += bytes
+        ledger.select(url)
     }
 
     func deselect(_ url: URL) {
-        guard selected.remove(url) != nil, let bytes = bytesByURL[url] else { return }
-        selectedBytes -= bytes
+        ledger.deselect(url)
     }
 
     func refreshAccess() {
@@ -352,12 +344,7 @@ final class ScanModel {
         categories = []
         groups = [:]
         snapshots = []
-        selected = []
-        countedURLs.removeAll()
-        bytesByURL.removeAll()
-        itemsByURL.removeAll()
-        totalBytes = 0
-        selectedBytes = 0
+        ledger.removeAll()
         selectedSnapshots = []
         folderTrees = []
         readErrors = []
@@ -520,13 +507,7 @@ final class ScanModel {
                 list.map { ItemGroup(keeper: $0.keeper, items: $0.items.filter { !gone.contains($0.url) }) }
                     .filter { !$0.items.isEmpty }
             }
-            for url in gone {
-                if selected.contains(url) { deselect(url) }
-                if countedURLs.remove(url) != nil {
-                    self.totalBytes -= bytesByURL.removeValue(forKey: url) ?? 0
-                }
-                itemsByURL.removeValue(forKey: url)
-            }
+            for url in gone { ledger.remove(url) }
             snapshots.removeAll { deleted.contains($0) }
             selectedSnapshots.subtract(deleted)
             snapshotErrors = errors
@@ -724,11 +705,8 @@ final class ScanModel {
     }
 
     private func unrecord(_ item: ScanItem) {
-        guard countedURLs.remove(item.url) != nil else { return }
-        let bytes = bytesByURL.removeValue(forKey: item.url) ?? 0
-        totalBytes -= bytes
-        if selected.remove(item.url) != nil { selectedBytes -= bytes }
-        if itemsByURL[item.url] == item { itemsByURL.removeValue(forKey: item.url) }
+        guard itemsByURL[item.url] == item else { return }
+        ledger.remove(item.url)
     }
 
     private func merge(_ result: CategoryResult) {
@@ -754,7 +732,7 @@ final class ScanModel {
         if Self.buildCategories.contains(result.category) {
             dropTaggedCachesShadowed(by: buildItems)
         }
-        for item in result.items where item.risk == .safe { select(item.url) }
+        for item in result.items { ledger.selectIfSafe(item.url) }
         categories = categories.map { ($0.bytes, $0) }.sorted { $0.0 > $1.0 }.map(\.1)
     }
 

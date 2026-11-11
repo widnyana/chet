@@ -191,22 +191,27 @@ struct CategoryDetailView: View {
         }
     }
 
+    private func resolved(_ item: ScanItem) -> ScanItem {
+        model.itemsByURL[item.url] ?? item
+    }
+
     private func row(_ item: ScanItem) -> some View {
-        let canSelect = model.canSelect(item) && item.risk != .informational
+        let shown = resolved(item)
+        let canSelect = model.canSelect(item.url) && shown.risk != .informational
         let selected = canSelect && model.selected.contains(item.url)
         return TableRow(
             isHighlighted: selected,
             content: {
                 HStack(spacing: Spacing.s3) {
-                    if item.risk == .informational {
+                    if shown.risk == .informational {
                         Color.clear.frame(width: ColumnRegistry.spec(.mark).width)
                     } else {
                         RowCheckbox(
                             isOn: model.isSelected(item.url),
                             label: "Remove \(item.url.lastPathComponent)",
                             width: ColumnRegistry.spec(.mark).width,
-                            isEnabled: model.canSelect(item),
-                            help: model.canSelect(item)
+                            isEnabled: model.canSelect(item.url),
+                            help: model.canSelect(item.url)
                                 ? "Remove"
                                 : "Turn on Administrator cleanup in Settings to remove this")
                     }
@@ -219,14 +224,14 @@ struct CategoryDetailView: View {
                             .lineLimit(1)
                             .frame(width: ColumnRegistry.spec(.kind).width, alignment: .leading)
                     }
-                    SizeColumn(bytes: item.reclaimableBytes, width: ColumnRegistry.spec(.size).width)
+                    SizeColumn(bytes: shown.reclaimableBytes, width: ColumnRegistry.spec(.size).width)
                     Text(item.stamp.modified, format: .relative(presentation: .named))
                         .font(Typography.row)
                         .foregroundStyle(Theme.inkSecondary)
                         .lineLimit(1)
                         .help(item.stamp.modified.formatted(date: .long, time: .shortened))
                         .frame(width: ColumnRegistry.spec(.modified).width, alignment: .trailing)
-                    riskLabel(item)
+                    riskLabel(shown)
                         .frame(width: ColumnRegistry.spec(.risk).width, alignment: .trailing)
                 }
             }
