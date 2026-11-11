@@ -248,7 +248,16 @@ USER_PATHS=(
 snapshot() {
     git -c safe.directory="$REPO_DIR" status --porcelain=v1 -uall
     for path in "${USER_PATHS[@]}"; do
-        stat -f '%m %z %N' "$path" 2>/dev/null || printf 'missing %s\n' "$path"
+        case "$path" in
+            */Library/Preferences)
+                find "$path" -maxdepth 1 -type f -print0 2>/dev/null |
+                    xargs -0 stat -f '%m %z %N' 2>/dev/null | sort ||
+                    printf 'missing %s\n' "$path"
+                ;;
+            *)
+                stat -f '%m %z %N' "$path" 2>/dev/null || printf 'missing %s\n' "$path"
+                ;;
+        esac
     done
 }
 
