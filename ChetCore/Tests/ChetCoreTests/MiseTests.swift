@@ -184,6 +184,112 @@ struct MiseTests {
         #expect(tools.count == 5)
     }
 
+    @Test func dataDirectoryPrefersTheEnvironment() throws {
+        let home = try TempDir()
+        let environmentDir = try installedDirectory(home.url, "env-mise")
+        let configDir = try installedDirectory(home.url, "config-mise")
+        try home.text(
+            ".config/mise/config.toml", "[settings]\ndata_dir = \"\(configDir.path)\"\n")
+
+        let resolved = Mise.dataDirectory(
+            home: home.url, path: "", environment: ["MISE_DATA_DIR": environmentDir.path])
+
+        #expect(resolved?.path == environmentDir.path)
+    }
+
+    @Test func dataDirectoryPrefersConfigSettingsOverSettingsFile() throws {
+        let home = try TempDir()
+        let configDir = try installedDirectory(home.url, "config-mise")
+        let settingsDir = try installedDirectory(home.url, "settings-mise")
+        try home.text(
+            ".config/mise/config.toml", "[settings]\ndata_dir = \"\(configDir.path)\"\n")
+        try home.text(
+            ".config/mise/settings.toml", "data_dir = \"\(settingsDir.path)\"\n")
+
+        let resolved = Mise.dataDirectory(home: home.url, path: "", environment: [:])
+
+        #expect(resolved?.path == configDir.path)
+    }
+
+    @Test func dataDirectoryPrefersSettingsFileOverShellExport() throws {
+        let home = try TempDir()
+        let settingsDir = try installedDirectory(home.url, "settings-mise")
+        let shellDir = try installedDirectory(home.url, "shell-mise")
+        try home.text(
+            ".config/mise/settings.toml", "data_dir = \"\(settingsDir.path)\"\n")
+        try home.text(".zshrc", "export MISE_DATA_DIR=\"\(shellDir.path)\"\n")
+
+        let resolved = Mise.dataDirectory(home: home.url, path: "", environment: [:])
+
+        #expect(resolved?.path == settingsDir.path)
+    }
+
+    @Test func dataDirectoryIgnoresACommentedExport() throws {
+        let home = try TempDir()
+        let shellDir = try installedDirectory(home.url, "shell-mise")
+        try home.text(".zshrc", "# export MISE_DATA_DIR=\"\(shellDir.path)\"\n")
+
+        let resolved = Mise.dataDirectory(home: home.url, path: "", environment: [:])
+
+        #expect(resolved == nil)
+    }
+
+    @Test func dataDirectoryExpandsHomeInShellExports() throws {
+        let home = try TempDir()
+        let first = try installedDirectory(home.url, "one")
+        let second = try installedDirectory(home.url, "two")
+        try home.text(".zshrc", "export MISE_DATA_DIR=\"$HOME/one\"\n")
+
+        let expanded = Mise.dataDirectory(home: home.url, path: "", environment: [:])
+
+        #expect(expanded?.path == first.path)
+
+        try home.text(".zshrc", "export MISE_DATA_DIR=\"${HOME}/two\"\n")
+
+        let braced = Mise.dataDirectory(home: home.url, path: "", environment: [:])
+
+        #expect(braced?.path == second.path)
+    }
+
+    @Test func dataDirectoryScanFindsDevelopmentSDKsOnlyWithInstalls() throws {
+        let home = try TempDir()
+        let development = home.url.appendingPathComponent("Development/sdks/mise")
+        try FileManager.default.createDirectory(at: development, withIntermediateDirectories: true)
+
+        #expect(Mise.dataDirectory(home: home.url, path: "", environment: [:]) == nil)
+
+        try FileManager.default.createDirectory(
+            at: development.appendingPathComponent("installs"), withIntermediateDirectories: true)
+
+        let resolved = Mise.dataDirectory(home: home.url, path: "", environment: [:])
+
+        #expect(resolved?.path == development.path)
+    }
+
+    @Test func dataDirectoryFallsBackToTheDefault() throws {
+        let home = try TempDir()
+        let fallback = try installedDirectory(home.url, ".local/share/mise")
+
+        let resolved = Mise.dataDirectory(home: home.url, path: "", environment: [:])
+
+        #expect(resolved?.path == fallback.path)
+    }
+
+    @Test func dataDirectoryReturnsNilWhenNothingIsInstalledAndSnapshotKeepsDeclaredRows() throws {
+        let home = try TempDir()
+        try home.text(".config/mise/config.toml", "[tools]\nnode = \"20.11.0\"\n")
+
+        #expect(Mise.dataDirectory(home: home.url, path: "", environment: [:]) == nil)
+
+        let detection = Mise.detect(home: home.url, path: "")
+        let snapshot = Mise.snapshot(detection)
+
+        #expect(snapshot.tools.count == 1)
+        #expect(snapshot.tools.first?.name == "node")
+        #expect(snapshot.tools.first?.requested == "20.11.0")
+        #expect(snapshot.tools.first?.installed == false)
+    }
+
     @Test func parseResolvedRejectsNonObjectAndMalformedJSON() {
         #expect(Mise.parseResolved("") == nil)
         #expect(Mise.parseResolved("not json") == nil)
@@ -191,6 +297,13 @@ struct MiseTests {
         #expect(Mise.parseResolved(#"[{"version":"1.0.0"}]"#) == nil)
         #expect(Mise.parseResolved(#"{"node":"20.11.0"}"#) == nil)
     }
+}
+
+private func installedDirectory(_ home: URL, _ relative: String) throws -> URL {
+    let directory = home.appendingPathComponent(relative)
+    try FileManager.default.createDirectory(
+        at: directory.appendingPathComponent("installs"), withIntermediateDirectories: true)
+    return directory
 }
 
 private func makeExecutable(_ url: URL) throws {

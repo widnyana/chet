@@ -31,7 +31,8 @@ public enum GoModules {
         environment: [String: String] = ProcessInfo.processInfo.environment,
         exists: (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) },
         run: (String, [String]) -> Subprocess.Result = { Subprocess.run($0, $1, timeout: 10) },
-        miseTools: [Mise.Tool]? = nil
+        miseTools: [Mise.Tool]? = nil,
+        dataDirectory: URL? = Mise.dataDirectory()
     ) -> Location? {
         let home = environment["HOME"] ?? NSHomeDirectory()
         let directories = (environment["PATH"] ?? "")
@@ -58,6 +59,9 @@ public enum GoModules {
         }
 
         var installRoots: [String] = []
+        if let dataDirectory {
+            installRoots.append(dataDirectory.appendingPathComponent("installs/go").path)
+        }
         if let dataDirectory = environment["MISE_DATA_DIR"], !dataDirectory.isEmpty {
             installRoots.append(dataDirectory + "/installs/go")
         }
@@ -209,14 +213,20 @@ public enum GoModules {
     }
 
     private static func compareVersions(_ lhs: String, _ rhs: String) -> Int {
-        let left = lhs.split(separator: ".")
-        let right = rhs.split(separator: ".")
-        for index in 0..<max(left.count, right.count) {
-            let a = index < left.count ? numericPrefix(left[index]) : 0
-            let b = index < right.count ? numericPrefix(right[index]) : 0
+        let left = versionComponents(lhs)
+        let right = versionComponents(rhs)
+        if left.0 != right.0 { return left.0 ? 1 : -1 }
+        for index in 0..<max(left.1.count, right.1.count) {
+            let a = index < left.1.count ? left.1[index] : 0
+            let b = index < right.1.count ? right.1[index] : 0
             if a != b { return a < b ? -1 : 1 }
         }
         return 0
+    }
+
+    private static func versionComponents(_ version: String) -> (Bool, [Int]) {
+        let numeric = version.contains(where: \.isNumber)
+        return (numeric, version.split(separator: ".").map(numericPrefix))
     }
 
     private static func numericPrefix(_ component: Substring) -> Int {

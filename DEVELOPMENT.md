@@ -170,6 +170,12 @@ the annotated tag, and runs `gh release create` with `dist/chet.dmg` and `dist/c
 `--dry-run` prints the version, the tag, the artifacts, and every command instead of changing
 anything. `--skip-build` reuses the files in `dist/` and skips the build and the plist commit.
 
+Both the mise page and Go detection need the mise data directory. A Finder launch has no shell
+environment, so `Mise.dataDirectory` resolves it in this order: `MISE_DATA_DIR`,
+`[settings] data_dir` in the mise config, `data_dir` in settings.toml, an uncommented `export` in
+the zsh or bash startup files, a bounded scan of likely bases containing `installs/`, then
+`~/.local/share/mise`. Every mise call receives it, and Go looks under `installs/go/*/bin/go`.
+
 `mise run install-chet` reads the latest GitHub release, so a release must be published before
 it can install one. That task is for a checkout: the installer is a standalone script, and end
 users need bash, curl, and the macOS tools, not mise.

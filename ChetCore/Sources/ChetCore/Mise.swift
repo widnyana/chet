@@ -124,6 +124,47 @@ public enum Mise {
         return declared
     }
 
+    public static func dataDirectory(
+        home: URL = FileManager.default.homeDirectoryForCurrentUser,
+        path: String = ProcessInfo.processInfo.environment["PATH"] ?? "",
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> URL? {
+        if let raw = environment["MISE_DATA_DIR"], let url = dataCandidate(raw, home: home) {
+            return url
+        }
+
+        let configDirectory = home.appendingPathComponent(".config/mise")
+        if let raw = settingsValue(
+            "data_dir", at: configDirectory.appendingPathComponent("config.toml"),
+            underSettings: true),
+            let url = dataCandidate(raw, home: home)
+        {
+            return url
+        }
+        if let raw = settingsValue(
+            "data_dir", at: configDirectory.appendingPathComponent("settings.toml"),
+            underSettings: false),
+            let url = dataCandidate(raw, home: home)
+        {
+            return url
+        }
+
+        for name in [".zshrc", ".zprofile", ".bashrc", ".bash_profile"] {
+            for raw in shellValues(
+                "MISE_DATA_DIR", at: home.appendingPathComponent(name), home: home)
+            {
+                if let url = dataCandidate(raw, home: home) { return url }
+            }
+        }
+
+        if let scanned = scannedDataDirectory(home: home, environment: environment) {
+            return scanned
+        }
+
+        let fallback = home.appendingPathComponent(".local/share/mise")
+        return isDataDirectory(fallback) ? fallback : nil
+    }
+
     public static func snapshot(_ detection: Detection) -> Snapshot {
         let configPath = detection.configPath.path
         guard let executable = detection.executable else {
@@ -132,16 +173,23 @@ public enum Mise {
                 configPath: configPath, cachePath: nil, error: nil)
         }
 
+        let home = detection.configPath
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let environment = invocationEnvironment(
+            home: home, environment: ProcessInfo.processInfo.environment)
+
         var error: String?
         var resolved: [String: [Resolved]] = [:]
-        let listing = runLogged(executable, ["ls", "--json"], timeout: 20)
+        let listing = runLogged(executable, ["ls", "--json"], env: environment, timeout: 20)
         if listing.ok, let parsed = parseResolved(listing.out) {
             resolved = parsed
         } else {
             error = listing.ok ? "Couldn't read mise's tool list." : "mise couldn't list its tools."
         }
 
-        let cache = runLogged(executable, ["cache", "path"], timeout: 20)
+        let cache = runLogged(executable, ["cache", "path"], env: environment, timeout: 20)
         let cachePath = cache.ok ? cache.out.trimmingCharacters(in: .whitespacesAndNewlines) : ""
         if cachePath.isEmpty, error == nil {
             error = "mise couldn't report its cache directory."
@@ -153,10 +201,11 @@ public enum Mise {
     }
 
     private static func runLogged(
-        _ executable: String, _ arguments: [String], timeout: TimeInterval
+        _ executable: String, _ arguments: [String], env: [String: String],
+        timeout: TimeInterval
     ) -> Subprocess.Result {
         let started = Date()
-        let result = Subprocess.run(executable, arguments, timeout: timeout)
+        let result = Subprocess.run(executable, arguments, env: env, timeout: timeout)
         VerboseLog.event(
             .info, .process, .processRun,
             .basename(.executable, Basename(path: executable)),
@@ -184,6 +233,120 @@ public enum Mise {
                 installed: match != nil)
         }
         return tools.sorted { ($0.name, $0.requested) < ($1.name, $1.requested) }
+    }
+
+    private static func invocationEnvironment(
+        home: URL, environment: [String: String]
+    ) -> [String: String] {
+        var env = environment
+        let configDirectory = home.appendingPathComponent(".config/mise")
+        if directoryExists(configDirectory) {
+            env["MISE_CONFIG_DIR"] = configDirectory.path
+        }
+        if let data = dataDirectory(home: home, path: env["PATH"] ?? "", environment: env) {
+            env["MISE_DATA_DIR"] = data.path
+        }
+        return env
+    }
+
+    private static func dataCandidate(_ raw: String, home: URL) -> URL? {
+        let expanded = expandHome(raw, home: home).trimmingCharacters(in: .whitespaces)
+        guard !expanded.isEmpty else { return nil }
+        let url =
+            expanded.hasPrefix("/")
+            ? URL(fileURLWithPath: expanded)
+            : home.appendingPathComponent(expanded)
+        return isDataDirectory(url) ? url : nil
+    }
+
+    private static func isDataDirectory(_ url: URL) -> Bool {
+        directoryExists(url.appendingPathComponent("installs"))
+    }
+
+    private static func directoryExists(_ url: URL) -> Bool {
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) else {
+            return false
+        }
+        return isDirectory.boolValue
+    }
+
+    private static func settingsValue(
+        _ key: String, at url: URL, underSettings: Bool
+    ) -> String? {
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+        var inSettings = false
+        var loose: String?
+        for statement in statements(text) {
+            let line = statement.trimmingCharacters(in: .whitespaces)
+            guard !line.isEmpty else { continue }
+            if line.hasPrefix("[") {
+                inSettings = tableName(line) == "settings"
+                continue
+            }
+            guard let (name, value) = assignment(line), name == key,
+                let raw = unquote(value)
+            else { continue }
+            if inSettings { return raw }
+            if !underSettings, loose == nil { loose = raw }
+        }
+        return loose
+    }
+
+    private static func shellValues(_ key: String, at url: URL, home: URL) -> [String] {
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
+        var values: [String] = []
+        for statement in statements(text) {
+            var line = statement.trimmingCharacters(in: .whitespaces)
+            guard !line.isEmpty else { continue }
+            if line.hasPrefix("export ") {
+                line = String(line.dropFirst("export ".count))
+                    .trimmingCharacters(in: .whitespaces)
+            }
+            guard let (name, value) = assignment(line), name == key,
+                let text = shellWord(value)
+            else { continue }
+            values.append(expandHome(text, home: home))
+        }
+        return values
+    }
+
+    private static func shellWord(_ text: String) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        if let quoted = unquote(trimmed) { return quoted }
+        let word = trimmed.prefix { !$0.isWhitespace }
+        return word.isEmpty ? nil : String(word)
+    }
+
+    private static func expandHome(_ value: String, home: URL) -> String {
+        value
+            .replacingOccurrences(of: "${HOME}", with: home.path)
+            .replacingOccurrences(of: "$HOME", with: home.path)
+    }
+
+    private static func scannedDataDirectory(
+        home: URL, environment: [String: String]
+    ) -> URL? {
+        var candidates: [URL] = [
+            home.appendingPathComponent("Development/sdks/mise"),
+            home.appendingPathComponent("sdks/mise"),
+            home.appendingPathComponent("mise"),
+            home.appendingPathComponent(".mise"),
+            home.appendingPathComponent("Library/Application Support/mise"),
+        ]
+        if let xdg = environment["XDG_DATA_HOME"], !xdg.isEmpty {
+            candidates.append(URL(fileURLWithPath: xdg).appendingPathComponent("mise"))
+        }
+        let children =
+            (try? FileManager.default.contentsOfDirectory(
+                at: home, includingPropertiesForKeys: nil, options: [])) ?? []
+        for child in children where directoryExists(child) {
+            candidates.append(child.appendingPathComponent("mise"))
+        }
+        for candidate in candidates {
+            if isDataDirectory(candidate) { return candidate }
+        }
+        return nil
     }
 
     private static func resolveExecutable(home: URL, path: String) -> String? {

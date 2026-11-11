@@ -128,6 +128,70 @@ struct GoModulesTests {
         #expect(location?.source == .mise)
     }
 
+    @Test func locateUsesInjectedDataDirectory() throws {
+        let dir = try TempDir()
+        try dir.file("installs/go/1.27.3/bin/go", bytes: 1)
+        let go = dir.url.appendingPathComponent("installs/go/1.27.3/bin/go").path
+
+        let location = GoModules.locate(
+            environment: ["PATH": "", "HOME": dir.url.path],
+            exists: existing(go),
+            run: { _, _ in Subprocess.Result(status: 1, out: "", err: "") },
+            miseTools: [],
+            dataDirectory: dir.url)
+
+        #expect(location == GoModules.Location(executable: go, source: .mise))
+    }
+
+    @Test func dataDirectoryPicksHighestNumericVersion() throws {
+        let dir = try TempDir()
+        try dir.file("installs/go/1.27.9/bin/go", bytes: 1)
+        try dir.file("installs/go/1.27.10/bin/go", bytes: 1)
+        try dir.file("installs/go/latest/bin/go", bytes: 1)
+        let newer = dir.url.appendingPathComponent("installs/go/1.27.10/bin/go").path
+        let older = dir.url.appendingPathComponent("installs/go/1.27.9/bin/go").path
+        let latest = dir.url.appendingPathComponent("installs/go/latest/bin/go").path
+
+        let location = GoModules.locate(
+            environment: ["PATH": "", "HOME": dir.url.path],
+            exists: existing(newer, older, latest),
+            run: { _, _ in Subprocess.Result(status: 1, out: "", err: "") },
+            miseTools: [],
+            dataDirectory: dir.url)
+
+        #expect(location?.executable == newer)
+        #expect(location?.source == .mise)
+    }
+
+    @Test func dataDirectoryWithoutGoFallsThrough() throws {
+        let dir = try TempDir()
+        try dir.file("installs/node/22.0.0/bin/node", bytes: 1)
+
+        let location = GoModules.locate(
+            environment: ["PATH": "", "HOME": dir.url.path],
+            exists: existing("/opt/homebrew/bin/go"),
+            run: { _, _ in Subprocess.Result(status: 1, out: "", err: "") },
+            miseTools: [],
+            dataDirectory: dir.url)
+
+        #expect(location?.executable == "/opt/homebrew/bin/go")
+        #expect(location?.source == .homebrew)
+    }
+
+    @Test func nilDataDirectoryFallsThroughToFixedRoots() throws {
+        let dir = try TempDir()
+
+        let location = GoModules.locate(
+            environment: ["PATH": "", "HOME": dir.url.path],
+            exists: existing("/usr/local/go/bin/go"),
+            run: { _, _ in Subprocess.Result(status: 1, out: "", err: "") },
+            miseTools: [],
+            dataDirectory: nil)
+
+        #expect(location?.executable == "/usr/local/go/bin/go")
+        #expect(location?.source == .native)
+    }
+
     @Test func concreteGVmInstallBeatsShim() throws {
         let dir = try TempDir()
         try dir.file(".gvm/gos/go1.22.5/bin/go", bytes: 1)

@@ -124,7 +124,8 @@ folder to look inside. Pause and resume the scan from the page while it builds t
 The **Go** page shows the module cache that Go keeps for downloaded dependencies. The cache
 lives at the path Go reports for `GOMODCACHE`, usually `~/go/pkg/mod`. The page shows its
 location, size, module count, and the Go toolchain it found. Chet hides the page when it cannot
-find Go.
+find Go. A Go installed by mise is found through the same data folder, so the page works when
+Chet is opened from Finder.
 
 **Remove module cache…** runs `go clean -modcache`. The next build downloads the modules
 again, so the first build after removal is slower and needs network access. Chet runs the Go
@@ -146,6 +147,11 @@ removes, switches, or prunes a version. Nothing on the page changes your setup.
 Chet shows the page only when the config declares at least one tool and a mise binary is
 available at `~/.local/bin/mise` or on your `PATH`. Without both, the page stays out of the
 sidebar.
+
+Opened from Finder, Chet finds your mise data folder the way your shell does: the
+`MISE_DATA_DIR` variable, a `data_dir` setting in the mise config, or an `export` in
+`~/.zshrc`, `~/.zprofile`, `~/.bashrc`, or `~/.bash_profile`. Installed tools therefore read as
+installed without launching Chet from a terminal.
 
 ## Tweaks
 
