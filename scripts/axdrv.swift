@@ -418,9 +418,29 @@ func press(_ node: Node) -> Bool {
     AXUIElementPerformAction(node.element, kAXPressAction as CFString) == .success
 }
 
-func click(_ node: Node) -> Bool {
+func pointIsInsideTargetWindow(_ point: CGPoint, pid: pid_t) -> Bool {
+    let list =
+        CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+        as? [[String: Any]] ?? []
+    for window in list {
+        guard (window[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == pid else { continue }
+        guard let bounds = window[kCGWindowBounds as String] as? [String: CGFloat] else { continue }
+        let rect = CGRect(
+            x: bounds["X"] ?? 0, y: bounds["Y"] ?? 0,
+            width: bounds["Width"] ?? 0, height: bounds["Height"] ?? 0)
+        if rect.contains(point) { return true }
+    }
+    return false
+}
+
+func click(_ node: Node, pid: pid_t) -> Bool {
     guard let frame = node.frame else { return false }
     let center = CGPoint(x: frame.midX, y: frame.midY)
+    guard center.y > 26, pointIsInsideTargetWindow(center, pid: pid) else {
+        FileHandle.standardError.write(
+            Data("refused: point outside the target window\n".utf8))
+        return false
+    }
     guard
         let down = CGEvent(
             mouseEventSource: nil, mouseType: .leftMouseDown, mouseCursorPosition: center,
@@ -809,7 +829,7 @@ case "select":
 case "click":
     guard !selector.isEmpty else { usage() }
     let node = resolve(selector, in: nodes)
-    print(click(node) ? "clicked \(describe(node))" : "click failed \(describe(node))")
+    print(click(node, pid: target.pid) ? "clicked \(describe(node))" : "click failed \(describe(node))")
 
 case "frame":
     guard !selector.isEmpty else { usage() }
