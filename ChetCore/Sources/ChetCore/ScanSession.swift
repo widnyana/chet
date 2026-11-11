@@ -26,6 +26,16 @@ public enum SizeBasis: Sendable, Equatable {
     case allocated
 }
 
+/// Closed mapping from a rule catalog label to the numeric code a log record carries.
+public func ruleCategoryCode(_ category: String) -> LogCode {
+    switch category {
+    case "browser": .categoryBrowser
+    case "dev-garbage": .categoryDevGarbage
+    case "xcode": .categoryXcode
+    default: .categoryOther
+    }
+}
+
 public enum ScanEvent: Sendable {
     case started(ScanStep)
     case rootMeasured(FolderNode)
@@ -185,7 +195,17 @@ public final class ScanSession: Sendable {
             }
             for await result in group {
                 rulesDone += 1
-                if let result { emit(.rules(result)) }
+                if let result {
+                    emit(.rules(result))
+                    VerboseLog.event(
+                        .debug, .rules, .rulesProgress,
+                        .count(.done, rulesDone), .count(.total, ruleTotal),
+                        .code(.category, ruleCategoryCode(result.category)))
+                    VerboseLog.event(
+                        .info, .rules, .rulesResult,
+                        .count(.items, result.items.count), .bytes(.bytes, result.totalBytes),
+                        .flag(.needsFullDiskAccess, result.needsFullDiskAccess))
+                }
                 emit(
                     .stepActivity(
                         .rules, done: rulesDone, total: ruleTotal,
@@ -216,6 +236,16 @@ public final class ScanSession: Sendable {
             setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_PROCESS, IOPOL_THROTTLE)
             guard !Task.isCancelled else { return }
             if let built = index {
+                VerboseLog.event(
+                    .info, .index, .indexFinished,
+                    .count(.trees, built.trees.count), .count(.readErrors, built.readErrors.count),
+                    .code(.sizeBasis, .sizeBasisAllocated))
+                for error in built.readErrors {
+                    VerboseLog.event(
+                        .warn, .index, .indexUnreadable,
+                        .basename(.folder, Basename(path: error.url.path)),
+                        .status(.errno, error.errno))
+                }
                 emit(.folderTrees(built.trees, built.treeSizeBasis))
                 emit(.readErrors(built.readErrors))
                 if scanScope.categories.isEmpty || scanScope.categories.contains("tagged-caches") {

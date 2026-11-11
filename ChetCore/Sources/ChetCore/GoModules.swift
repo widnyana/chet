@@ -132,9 +132,23 @@ public enum GoModules {
         return home(environment) + "/go/pkg/mod"
     }
 
+    private static func runLogged(
+        _ executable: String, _ arguments: [String], timeout: TimeInterval
+    ) -> Subprocess.Result {
+        let started = Date()
+        let result = Subprocess.run(executable, arguments, timeout: timeout)
+        VerboseLog.event(
+            .info, .process, .processRun,
+            .basename(.executable, Basename(path: executable)),
+            .count(.argCount, arguments.count),
+            .durationMS(.durationMS, Int(Date().timeIntervalSince(started) * 1_000)),
+            .status(.status, result.status))
+        return result
+    }
+
     /// Runs `go version`, resolves the cache path, then measures the cache in one walk.
     public static func measure(_ location: Location) -> Info {
-        let versionResult = Subprocess.run(location.executable, ["version"], timeout: 10)
+        let versionResult = runLogged(location.executable, ["version"], timeout: 10)
         let reported = versionResult.out.trimmingCharacters(in: .whitespacesAndNewlines)
         let version = versionResult.ok && !reported.isEmpty ? reported : "Go"
         let cache = cachePath(for: location.executable)
@@ -151,7 +165,7 @@ public enum GoModules {
             return Subprocess.Result(
                 status: 0, out: "Would run: \(location.executable) clean -modcache", err: "")
         }
-        return Subprocess.run(location.executable, ["clean", "-modcache"], timeout: 600)
+        return runLogged(location.executable, ["clean", "-modcache"], timeout: 600)
     }
 
     private struct Totals {

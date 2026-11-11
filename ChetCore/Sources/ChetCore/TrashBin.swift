@@ -35,6 +35,12 @@ public enum TrashBin {
                 result.failed.append(name)
             }
         }
+        VerboseLog.event(
+            .info, .storage, .storageEmptyTrash,
+            .count(.items, result.removed + result.failed.count),
+            .bytes(.bytes, result.freed),
+            .code(.outcome, result.failed.isEmpty ? .outcomeOk : .outcomeFailed),
+            .flag(.dryRun, dryRun))
         return result
     }
 }

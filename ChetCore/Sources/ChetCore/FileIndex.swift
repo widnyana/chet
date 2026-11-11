@@ -764,6 +764,10 @@ extension FileIndexBuilder {
                 return rollupGate.allow(now: DispatchTime.now().uptimeNanoseconds)
             })
         for snapshot in rollups {
+            VerboseLog.event(
+                .debug, .index, .indexRollup,
+                .basename(.folder, Basename(path: snapshot.node.url.path)),
+                .bytes(.bytes, snapshot.node.size), .count(.depth, snapshot.depth))
             if snapshot.isRoot { builder.onRootMeasured?(snapshot.node) }
             builder.onRollup?(snapshot.node)
         }
@@ -778,13 +782,17 @@ extension FileIndexBuilder {
         folder: String, rootsDone: Int, rootsTotal: Int,
         runningRootURL: URL?, runningRootBytes: Int64
     ) {
-        guard let onProgress else { return }
         let now = DispatchTime.now().uptimeNanoseconds
         guard progressTick.take(now: now, interval: 250_000_000) else { return }
-        onProgress(
-            ProgressSnapshot(
-                files: progress.files, bytes: progress.bytes, currentFolder: folder,
-                rootsDone: rootsDone, rootsTotal: rootsTotal,
-                runningRootURL: runningRootURL, runningRootBytes: runningRootBytes))
+        let snapshot = ProgressSnapshot(
+            files: progress.files, bytes: progress.bytes, currentFolder: folder,
+            rootsDone: rootsDone, rootsTotal: rootsTotal,
+            runningRootURL: runningRootURL, runningRootBytes: runningRootBytes)
+        VerboseLog.event(
+            .debug, .index, .indexProgress,
+            .count(.files, snapshot.files), .bytes(.bytes, snapshot.bytes),
+            .basename(.folder, Basename(path: snapshot.currentFolder)),
+            .count(.rootsDone, snapshot.rootsDone), .count(.rootsTotal, snapshot.rootsTotal))
+        onProgress?(snapshot)
     }
 }

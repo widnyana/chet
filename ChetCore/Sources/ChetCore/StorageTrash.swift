@@ -111,6 +111,8 @@ public struct StorageTrasher: Sendable {
 
     public func trash(_ entries: [StorageEntry]) -> StorageTrashResult {
         var result = StorageTrashResult(dryRun: dryRun)
+        var failureErrno: Int32?
+        VerboseLog.flush()
         // A parent and its child cannot both be moved. Keep the shallowest entry and
         // let the child go with it.
         for entry in Self.pruned(entries) {
@@ -127,11 +129,19 @@ public struct StorageTrasher: Sendable {
                     result.moved.append(entry)
                     result.freedBytes += max(0, entry.bytes)
                 } catch {
+                    let failure = error as NSError
+                    if failure.domain == NSPOSIXErrorDomain { failureErrno = Int32(failure.code) }
                     result.failed.append(
                         .init(url: entry.url, name: entry.name, reason: error.localizedDescription))
                 }
             }
         }
+        VerboseLog.event(
+            .info, .storage, .storageTrashMove,
+            .count(.entries, result.moved.count),
+            .bytes(.bytes, result.freedBytes),
+            .code(.outcome, .outcomeMoved),
+            failureErrno.map { LogField.status(.errno, $0) })
         return result
     }
 

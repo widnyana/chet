@@ -19,7 +19,28 @@ struct LogTypesTests {
         #expect(LogCode.outcomeCancelled.rawValue == 305)
         #expect(LogCode.sizeBasisAllocated.rawValue == 400)
         #expect(LogCode.settingsKeyUserRules.rawValue == 503)
-        #expect(LogCode.verificationFailed.rawValue == 601)
+        #expect(LogCode.settingsKeyLargeFileMinSize.rawValue == 509)
+        #expect(LogCode.replyOk.rawValue == 600)
+        #expect(LogCode.verificationOk.rawValue == 700)
+        #expect(LogCode.verificationMismatch.rawValue == 701)
+        #expect(LogCode.viewHome.rawValue == 800)
+        #expect(LogCode.sheetScanScope.rawValue == 905)
+    }
+
+    @Test func ruleCategoriesMapToTheirCodes() {
+        #expect(ruleCategoryCode("browser") == .categoryBrowser)
+        #expect(ruleCategoryCode("dev-garbage") == .categoryDevGarbage)
+        #expect(ruleCategoryCode("xcode") == .categoryXcode)
+        #expect(ruleCategoryCode("tagged-caches") == .categoryOther)
+    }
+
+    @Test func flagEncodesAsStatusCode() throws {
+        #expect(
+            try encoded(LogField.flag(.dryRun, true))
+                == #"{"key":"dryRun","value":{"status":1}}"#)
+        #expect(
+            try encoded(LogField.flag(.sawCrash, false))
+                == #"{"key":"sawCrash","value":{"status":0}}"#)
     }
 
     @Test func basenameAccepts128BytesOnly() {

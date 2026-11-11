@@ -424,7 +424,16 @@ public enum TweakEngine {
     static let killallTool = "/usr/bin/killall"
 
     public static func readAll(_ tweaks: [Tweak]) -> [TweakReading] {
-        tweaks.map(read)
+        let readings = tweaks.map(read)
+        var gated = 0
+        for reading in readings where !reading.isSupported {
+            gated += 1
+        }
+        VerboseLog.event(
+            .debug, .tweaks, .tweakRead,
+            .count(.readings, readings.count),
+            .count(.gated, gated))
+        return readings
     }
 
     public static func read(_ tweak: Tweak) -> TweakReading {
@@ -468,7 +477,8 @@ public enum TweakEngine {
         _ tweak: Tweak, to value: TweakValue?, confirmed: Bool = false,
         history: TweakHistory = TweakHistory(), dryRun: Bool = DryRun.enabled
     ) -> TweakChange {
-        apply(tweak, plan(tweak, value), nil, confirmed: confirmed, history: history, dryRun: dryRun)
+        VerboseLog.flush()
+        return apply(tweak, plan(tweak, value), nil, confirmed: confirmed, history: history, dryRun: dryRun)
     }
 
     /// The value written to the primary target and to every companion.
@@ -487,33 +497,69 @@ public enum TweakEngine {
         _ tweak: Tweak, _ plan: TweakPlan, _ action: TweakRecord.Action?, confirmed: Bool,
         history: TweakHistory, dryRun: Bool
     ) -> TweakChange {
+        let outcome = applyCore(
+            tweak, plan, action, confirmed: confirmed, history: history, dryRun: dryRun)
+        logChange(
+            outcome.change, verification: outcome.verification, action: action, dryRun: dryRun)
+        return outcome.change
+    }
+
+    private static func logChange(
+        _ change: TweakChange, verification: LogCode, action: TweakRecord.Action?, dryRun: Bool
+    ) {
+        let identifier = LogField.redacted(.tweakID, .tweakID)
+        let recorded = LogField.flag(.recorded, change.recorded)
+        let code = LogField.code(.verification, verification)
+        switch (dryRun, action) {
+        case (true, _):
+            VerboseLog.event(.info, .tweaks, .tweakPreview, identifier, recorded, code)
+        case (false, .rollback):
+            VerboseLog.event(.info, .tweaks, .tweakRevert, identifier, recorded, code)
+        default:
+            VerboseLog.event(.info, .tweaks, .tweakApply, identifier, recorded, code)
+        }
+    }
+
+    private static func applyCore(
+        _ tweak: Tweak, _ plan: TweakPlan, _ action: TweakRecord.Action?, confirmed: Bool,
+        history: TweakHistory, dryRun: Bool
+    ) -> (change: TweakChange, verification: LogCode) {
         let before = read(tweak)
         // The DRY_RUN gate refuses the write and records nothing: it precedes every history
         // write, including the unsupported and unknown failures below.
         if dryRun {
-            return TweakChange(
-                record: TweakRecord(
-                    tweakID: tweak.id, action: action ?? (plan.primary == nil ? .reset : .set),
-                    before: before.current, after: nil, error: TweakError.gated.message),
-                reading: before)
+            return (
+                TweakChange(
+                    record: TweakRecord(
+                        tweakID: tweak.id, action: action ?? (plan.primary == nil ? .reset : .set),
+                        before: before.current, after: nil, error: TweakError.gated.message),
+                    reading: before),
+                .verificationSkipped
+            )
         }
         if case .probe = tweak.target {
-            return refused(tweak, before, .inspectionOnly, action)
+            return (refused(tweak, before, .inspectionOnly, action), .verificationSkipped)
         }
         if case .unsupported(let reason) = before.state {
-            return failed(tweak, before, .unsupported(reason), action, history)
+            return (failed(tweak, before, .unsupported(reason), action, history), .verificationSkipped)
         }
         if case .unknown(let reason) = before.state {
-            return failed(tweak, before, .unknownState(reason), action, history)
+            return (
+                failed(tweak, before, .unknownState(reason), action, history),
+                .verificationSkipped
+            )
         }
         if tweak.risk >= .medium, !confirmed {
-            return TweakChange(
-                record: TweakRecord(
-                    tweakID: tweak.id, action: action ?? (plan.primary == nil ? .reset : .set),
-                    before: before.current, after: nil,
-                    error: TweakError.confirmationRequired("\(tweak.name) needs a confirmation before it changes.")
-                        .message),
-                reading: before, needsConfirmation: true)
+            return (
+                TweakChange(
+                    record: TweakRecord(
+                        tweakID: tweak.id, action: action ?? (plan.primary == nil ? .reset : .set),
+                        before: before.current, after: nil,
+                        error: TweakError.confirmationRequired("\(tweak.name) needs a confirmation before it changes.")
+                            .message),
+                    reading: before, needsConfirmation: true),
+                .verificationSkipped
+            )
         }
 
         let beforeCompanions = companionValues(tweak)
@@ -525,7 +571,10 @@ public enum TweakEngine {
                 tweakID: tweak.id, action: action ?? (plan.primary == nil ? .reset : .set),
                 before: before.current, after: before.current,
                 beforeCompanions: beforeCompanions)
-            return TweakChange(record: record, reading: before, unchanged: true)
+            return (
+                TweakChange(record: record, reading: before, unchanged: true),
+                .verificationSkipped
+            )
         }
 
         do {
@@ -535,11 +584,14 @@ public enum TweakEngine {
             }
         } catch let error as TweakError {
             restore(tweak, before: before.current, companions: beforeCompanions)
-            return failed(tweak, read(tweak), error, action, history)
+            return (failed(tweak, read(tweak), error, action, history), .verificationSkipped)
         } catch {
             restore(tweak, before: before.current, companions: beforeCompanions)
-            return failed(
-                tweak, read(tweak), .commandFailed(error.localizedDescription), action, history)
+            return (
+                failed(
+                    tweak, read(tweak), .commandFailed(error.localizedDescription), action, history),
+                .verificationSkipped
+            )
         }
 
         let after = read(tweak)
@@ -553,7 +605,10 @@ public enum TweakEngine {
             let detail =
                 "Expected \(plan.primary?.display ?? "the system default") but read "
                 + "\(after.current?.display ?? "nothing"). Restored the earlier value."
-            return failed(tweak, restored, .verificationFailed(detail), action, history)
+            return (
+                failed(tweak, restored, .verificationFailed(detail), action, history),
+                .verificationMismatch
+            )
         }
 
         let record = TweakRecord(
@@ -561,7 +616,7 @@ public enum TweakEngine {
             before: before.current, after: after.current,
             beforeCompanions: beforeCompanions)
         history.append(record)
-        return TweakChange(record: record, reading: after, recorded: true)
+        return (TweakChange(record: record, reading: after, recorded: true), .verificationOk)
     }
 
     /// Removes the key, or clears the hidden flag for a file tweak, then verifies.
@@ -598,6 +653,7 @@ public enum TweakEngine {
                 .verificationFailed("The record does not match this tweak. Nothing was restored."),
                 .rollback)
         }
+        VerboseLog.flush()
         return apply(
             tweak, TweakPlan(primary: record.before, companions: companions), .rollback,
             confirmed: true, history: history, dryRun: dryRun)

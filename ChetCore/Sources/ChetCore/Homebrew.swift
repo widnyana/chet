@@ -57,7 +57,15 @@ public enum Homebrew {
         guard let executable else {
             return Subprocess.Result(status: -1, out: "", err: "Homebrew not found")
         }
-        return Subprocess.run(executable, args, env: env, timeout: timeout)
+        let started = Date()
+        let result = Subprocess.run(executable, args, env: env, timeout: timeout)
+        VerboseLog.event(
+            .info, .process, .processRun,
+            .basename(.executable, Basename(path: executable)),
+            .count(.argCount, args.count),
+            .durationMS(.durationMS, Int(Date().timeIntervalSince(started) * 1_000)),
+            .status(.status, result.status))
+        return result
     }
 
     /// One result from several brew invocations: the first failure's status, every stdout

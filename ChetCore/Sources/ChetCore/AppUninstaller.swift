@@ -798,6 +798,24 @@ public struct AppUninstaller: Sendable {
             }
         }
 
+        var succeeded = 0
+        var failed = 0
+        var skipped = 0
+        for row in report.results {
+            switch row.outcome {
+            case .trashed, .removed: succeeded += 1
+            case .failed: failed += 1
+            case .skipped: skipped += 1
+            }
+        }
+        VerboseLog.event(
+            .info, .uninstall, .uninstallFinished,
+            .count(.components, plan.components.count),
+            .redacted(.bundleID, .bundleID),
+            .count(.ok, succeeded),
+            .count(.failed, failed),
+            .count(.skipped, skipped))
+
         if Task.isCancelled {
             if plan.includeApp {
                 report.results.append(appResult(plan, outcome: .skipped(.cancelled), dryRun: dryRun))

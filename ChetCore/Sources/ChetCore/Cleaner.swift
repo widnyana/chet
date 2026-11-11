@@ -145,6 +145,16 @@ public struct Cleaner: Sendable {
         var freedBytes: Int64 = 0
         var skipped = 0
         var failed = 0
+        var removed = 0
+        var trashed = 0
+        var dryRunCount = 0
+        let started = Date()
+
+        VerboseLog.event(
+            .info, .clean, .cleanStarted,
+            .count(.items, items.count), .bytes(.bytes, totalBytes),
+            .code(.mode, .modePermanent), .flag(.dryRun, dryRun))
+        VerboseLog.flush()
 
         for (index, item) in items.enumerated() {
             progress?(
@@ -157,8 +167,14 @@ public struct Cleaner: Sendable {
             log.append(item, outcome, dryRun: dryRun)
             report.results.append(CleanResult(item: item, outcome: outcome, dryRun: dryRun))
             switch outcome {
-            case .removed(let bytes), .trashed(let bytes):
+            case .removed(let bytes):
                 freedBytes += bytes
+                removed += 1
+                if dryRun { dryRunCount += 1 }
+            case .trashed(let bytes):
+                freedBytes += bytes
+                trashed += 1
+                if dryRun { dryRunCount += 1 }
             case .skipped:
                 skipped += 1
             case .failed:
@@ -176,6 +192,19 @@ public struct Cleaner: Sendable {
                 totalBytes: totalBytes, freedBytes: freedBytes, skipped: skipped, failed: failed,
                 currentPath: "", currentBytes: 0, currentMode: .permanent, isFinal: true))
 
+        VerboseLog.event(
+            .info, .clean, .cleanFinished,
+            .count(.removed, removed), .count(.trashed, trashed),
+            .count(.skipped, skipped), .count(.failed, failed),
+            .count(.dryRunCount, dryRunCount),
+            .count(.errnoSamples, 0))
+        VerboseLog.flush()
+        VerboseLog.event(
+            .info, .clean, .cleanSummary,
+            .count(.items, report.results.count), .bytes(.freed, report.freedBytes),
+            .flag(.dryRun, dryRun),
+            .durationMS(.durationMS, Int(Date().timeIntervalSince(started) * 1_000)))
+
         if let recorder {
             recorder.record(
                 step: "clean",
@@ -191,7 +220,13 @@ public struct Cleaner: Sendable {
         guard !current.isSymlink, current.inode == item.stamp.inode, current.size == item.stamp.size,
             current.modified == item.stamp.modified
         else { return .skipped(.changed) }
-        guard policy.isDeletable(item.url) == .allowed else { return .skipped(.policy) }
+        let allowed = policy.isDeletable(item.url) == .allowed
+        guard allowed else {
+            VerboseLog.event(
+                .warn, .clean, .cleanRefused,
+                .basename(.item, Basename(path: item.url.path)), .flag(.allowed, allowed))
+            return .skipped(.policy)
+        }
         // Local Terraform state is user data: providers re-download, state does not. Refused in
         // both modes so a Trash sweep cannot lose it either.
         if TerraformState.holdsLocalState(item.url) { return .skipped(.localState) }

@@ -134,14 +134,14 @@ public enum Mise {
 
         var error: String?
         var resolved: [String: [Resolved]] = [:]
-        let listing = Subprocess.run(executable, ["ls", "--json"], timeout: 20)
+        let listing = runLogged(executable, ["ls", "--json"], timeout: 20)
         if listing.ok, let parsed = parseResolved(listing.out) {
             resolved = parsed
         } else {
             error = listing.ok ? "Couldn't read mise's tool list." : "mise couldn't list its tools."
         }
 
-        let cache = Subprocess.run(executable, ["cache", "path"], timeout: 20)
+        let cache = runLogged(executable, ["cache", "path"], timeout: 20)
         let cachePath = cache.ok ? cache.out.trimmingCharacters(in: .whitespacesAndNewlines) : ""
         if cachePath.isEmpty, error == nil {
             error = "mise couldn't report its cache directory."
@@ -150,6 +150,20 @@ public enum Mise {
         return Snapshot(
             tools: merge(declared: detection.declared, resolved: resolved),
             configPath: configPath, cachePath: cachePath.isEmpty ? nil : cachePath, error: error)
+    }
+
+    private static func runLogged(
+        _ executable: String, _ arguments: [String], timeout: TimeInterval
+    ) -> Subprocess.Result {
+        let started = Date()
+        let result = Subprocess.run(executable, arguments, timeout: timeout)
+        VerboseLog.event(
+            .info, .process, .processRun,
+            .basename(.executable, Basename(path: executable)),
+            .count(.argCount, arguments.count),
+            .durationMS(.durationMS, Int(Date().timeIntervalSince(started) * 1_000)),
+            .status(.status, result.status))
+        return result
     }
 
     public static func parseResolved(_ json: String) -> [String: [Resolved]]? {

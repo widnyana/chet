@@ -151,8 +151,12 @@ public struct LogField: Sendable, Equatable, Encodable {
         LogField(key: key, value: .durationMS(value))
     }
 
-    public static func init(_ key: LogFieldKey, _ value: LogFieldValue) -> LogField {
-        LogField(key: key, value: value)
+    public static func status(_ key: LogFieldKey, _ value: Int32) -> LogField {
+        LogField(key: key, value: .status(value))
+    }
+
+    public init(_ key: LogFieldKey, _ value: LogFieldValue) {
+        self.init(key: key, value: value)
     }
 
     public static func flag(_ key: LogFieldKey, _ value: Bool) -> LogField {
@@ -251,9 +255,38 @@ public enum LogCode: Int32, Sendable {
     case settingsKeyScanScope = 501
     case settingsKeyExcludedPaths = 502
     case settingsKeyUserRules = 503
+    case settingsKeyDuplicateMinSize = 504
+    case settingsKeyLargeFileMinAge = 505
+    case settingsKeyIncludeTemp = 506
+    case settingsKeyScanOutsideHome = 507
+    case settingsKeyTweakPreview = 508
+    case settingsKeyLargeFileMinSize = 509
 
-    case verificationPassed = 600
-    case verificationFailed = 601
+    case replyOk = 600
+    case replyRefused = 601
+    case replyFailed = 602
+
+    case verificationOk = 700
+    case verificationMismatch = 701
+    case verificationSkipped = 702
+
+    case viewHome = 800
+    case viewApps = 801
+    case viewHomebrew = 802
+    case viewStorage = 803
+    case viewTweaks = 804
+    case viewSettings = 805
+    case viewSnapshots = 806
+    case viewMise = 807
+    case viewGo = 808
+    case viewAbout = 809
+
+    case sheetClean = 900
+    case sheetConfirm = 901
+    case sheetTrash = 902
+    case sheetUninstall = 903
+    case sheetInstaller = 904
+    case sheetScanScope = 905
 }
 
 public enum RedactionTag: String, Sendable, Encodable {
@@ -333,8 +366,8 @@ public final class ActivityLog: Sendable {
     private let maxBytes: Int64
     private let state: Mutex<WriterState>
 
-    private final class WriterState: @unchecked Sendable {
-        enum Role {
+    private struct WriterState: Sendable {
+        enum Role: Sendable {
             case owner
             case nonOwner
         }
@@ -357,9 +390,7 @@ public final class ActivityLog: Sendable {
     private static let logger = Logger(subsystem: "id.web.widnyana.chet", category: "devlog")
 
     public init(
-        url: URL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Logs/chet")
-            .appendingPathComponent(ActivityLogLimits.baseName),
+        url: URL = FlightRecorder.defaultDirectory.appendingPathComponent(ActivityLogLimits.baseName),
         clock: @escaping @Sendable () -> Date = { Date() },
         maxBytes: Int64 = ActivityLogLimits.maxFileBytes,
         kept: Int = ActivityLogLimits.keptFiles
@@ -508,24 +539,31 @@ public final class ActivityLog: Sendable {
         guard s.role == .owner else { return nil }
         flushLocked(&s)
         guard s.isAvailable else { return nil }
-        if s.fd >= 0 {
-            _ = Darwin.close(s.fd)
-            s.fd = -1
-        }
+        let previous = s.fd
         let rotated = url.deletingLastPathComponent().appendingPathComponent(ActivityLogLimits.rotatedName)
         guard rename(url.path, rotated.path) == 0 else { return .rotateFailed(errno: errno) }
         let fd = open(url.path, O_WRONLY | O_CREAT | O_APPEND, 0o644)
-        guard fd >= 0 else { return .rotateFailed(errno: errno) }
-        guard flock(fd, LOCK_EX | LOCK_NB) == 0 else {
-            _ = Darwin.close(fd)
-            return .rotateFailed(errno: errno)
+        guard fd >= 0 else {
+            let code = errno
+            if previous >= 0 { _ = Darwin.close(previous) }
+            s.fd = -1
+            return .rotateFailed(errno: code)
         }
+        guard flock(fd, LOCK_EX | LOCK_NB) == 0 else {
+            let code = errno
+            _ = Darwin.close(fd)
+            if previous >= 0 { _ = Darwin.close(previous) }
+            s.fd = -1
+            return .rotateFailed(errno: code)
+        }
+        if previous >= 0 { _ = Darwin.close(previous) }
         s.fd = fd
         var info = stat()
         guard fstat(fd, &info) == 0 else {
+            let code = errno
             _ = Darwin.close(fd)
             s.fd = -1
-            return .rotateFailed(errno: errno)
+            return .rotateFailed(errno: code)
         }
         s.liveBytes = Int64(info.st_size)
         s.inode = UInt64(info.st_ino)
@@ -579,17 +617,20 @@ public final class ActivityLog: Sendable {
         s.lastFlush = clock()
     }
 
-    private func degrade(_ s: inout WriterState, _: ActivityLogFailure) {
+    private func degrade(_ s: inout WriterState, _ failure: ActivityLogFailure) {
+        let wasAvailable = s.isAvailable
         s.isAvailable = false
         s.pending.removeAll(keepingCapacity: true)
         if s.fd >= 0 {
             _ = Darwin.close(s.fd)
             s.fd = -1
         }
+        if wasAvailable {
+            Self.logger.notice("activity log unavailable: \(String(describing: failure), privacy: .public)")
+        }
     }
 
     private func fail(_ failure: ActivityLogFailure) {
         state.withLock { s in degrade(&s, failure) }
-        Self.logger.notice("activity log unavailable: \(String(describing: failure), privacy: .public)")
     }
 }

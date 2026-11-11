@@ -28,13 +28,26 @@ public enum Snapshots {
     }
 
     public static func list() throws -> [LocalSnapshot] {
-        parse(try tmutil(["listlocalsnapshots", "/"]))
+        let snapshots = parse(try tmutil(["listlocalsnapshots", "/"]))
+        for snapshot in snapshots {
+            VerboseLog.event(
+                .info, .storage, .storageSnapshotCreated,
+                .basename(.snapshot, Basename(snapshot.name)), .flag(.ok, true))
+        }
+        return snapshots
     }
 
     /// Deletes a local snapshot with `tmutil`. A dry run runs no `tmutil` call at all.
     public static func delete(_ snapshot: LocalSnapshot, dryRun: Bool) throws {
         guard !dryRun else { return }
+        var ok = false
+        defer {
+            VerboseLog.event(
+                .info, .storage, .storageSnapshotDeleted,
+                .basename(.snapshot, Basename(snapshot.name)), .flag(.ok, ok))
+        }
         _ = try tmutil(["deletelocalsnapshots", snapshot.date])
+        ok = true
     }
 
     static func tmutil(_ arguments: [String]) throws -> String {
