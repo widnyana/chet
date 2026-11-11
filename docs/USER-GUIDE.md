@@ -205,6 +205,9 @@ reset them all to their original values.
 Tweaks reports these states: supported, unknown, unsupported, unchanged, changed, failed,
 pending restart, and pending confirmation.
 
+Each tweak row states the value macOS ships with. Rows that differ from it carry a tinted body, so a
+changed setting is visible without opening it. `Not set` means the key is absent by default.
+
 ## Uninstall apps
 
 Pick **Apps** in the sidebar, search for an app, and select it. Chet reads the app bundle, then
@@ -250,6 +253,15 @@ path applies before you act.
   is checked again right before it moves.
 - Every cleanup is written to `~/Library/Logs/chet/clean.log`.
 - Every tweak write is read back and verified, then recorded in the tweak log.
+
+Each app row states when you last used it, from Spotlight. Apps Spotlight has not seen launch read
+`Last used: not recorded`. Sort by last used to bring the newest to the top.
+
+Outdated Homebrew packages can be upgraded one at a time from their row, or all at once from the
+toolbar. Both ask for the same confirmation, and a dry run prints the command instead of running it.
+
+About states the build date and the commit the build came from. `Unknown` means the build did not
+stamp them.
 
 ## Administrator cleanup
 

@@ -540,6 +540,8 @@ Grid cell:
 - The row is not a button; a double click or the context menu opens the detail.
   The checkbox marks it for bulk removal. The context menu carries Open and Reveal.
 - Running and admin states are `StatusLabel` text, never unlabeled dots.
+- The name cell carries the bundle ID and `Last used <relative>`, measured once per app
+  on demand from Spotlight; absence renders `Last used: not recorded`.
 
 ## OwnershipRow
 
