@@ -71,7 +71,9 @@ class UITestCase: XCTestCase {
         let root = URL(fileURLWithPath: String(decoding: bytes, as: UTF8.self), isDirectory: true)
         let path = root.standardizedFileURL.path
         let temporaryPrefixes = ["/var/folders/", "/private/var/folders/", "/tmp/", "/private/tmp/"]
-        guard temporaryPrefixes.contains(where: path.hasPrefix) else {
+        let containerTemporary =
+            path.contains("/Library/Containers/") && path.contains("/Data/tmp/")
+        guard containerTemporary || temporaryPrefixes.contains(where: path.hasPrefix) else {
             try? FileManager.default.removeItem(at: root)
             throw UITestError.scratchRootOutsideTemporaryDirectory(path)
         }

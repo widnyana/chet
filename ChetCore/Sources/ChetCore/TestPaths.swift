@@ -52,7 +52,8 @@ public struct TestPaths: Sendable, Equatable {
         {
             return nil
         }
-        let temporary = isContainerTemporary(canonical)
+        let temporary =
+            isContainerTemporary(canonical)
             || temporaryBases.contains(where: { isDescendant(canonical, of: $0) })
         guard temporary else { return nil }
         return TestPaths(root: URL(fileURLWithPath: canonical, isDirectory: true))
