@@ -47,14 +47,15 @@ public struct TestPaths: Sendable, Equatable {
         let components = raw.split(separator: "/")
         guard !components.isEmpty, components.allSatisfy({ $0 != "." && $0 != ".." }) else { return nil }
         guard let canonical = canonicalPath(raw) else { return nil }
-        if let home = canonicalPath(FileManager.default.homeDirectoryForCurrentUser.path),
+        let container = isContainerTemporary(canonical)
+        if !container,
+            let home = canonicalPath(FileManager.default.homeDirectoryForCurrentUser.path),
             isWithin(canonical, home)
         {
             return nil
         }
         let temporary =
-            isContainerTemporary(canonical)
-            || temporaryBases.contains(where: { isDescendant(canonical, of: $0) })
+            container || temporaryBases.contains(where: { isDescendant(canonical, of: $0) })
         guard temporary else { return nil }
         return TestPaths(root: URL(fileURLWithPath: canonical, isDirectory: true))
     }

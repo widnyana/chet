@@ -66,4 +66,16 @@ struct TestPathsTests {
         let path = url.path.withCString { realpath($0, nil) }.map { String(cString: $0) } ?? url.path
         return URL(fileURLWithPath: path, isDirectory: true)
     }
+
+    @Test func containerTemporaryInsideHomeIsAccepted() throws {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let container = home.appendingPathComponent(
+            "Library/Containers/id.web.widnyana.chet.uitest.xctrunner/Data/tmp", isDirectory: true)
+        try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: container) }
+        let root = container.appendingPathComponent("chet-uitest-probe", isDirectory: true)
+        let resolved = TestPaths.resolve(environment: [TestPaths.rootVariable: root.path])
+        #expect(resolved != nil)
+        #expect(resolved?.root.standardizedFileURL.path == root.standardizedFileURL.path)
+    }
 }
