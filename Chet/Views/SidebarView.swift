@@ -94,7 +94,9 @@ struct SidebarView: View {
                     .font(Typography.sidebar)
                     .lineLimit(1)
                     .modifier(
-                        SidebarInk(isSelected: isSelected, tone: Theme.ink))
+                        SidebarInk(isSelected: isSelected, tone: Theme.ink)
+                    )
+                    .accessibilityIdentifier("sidebar.\(id)")
                 if locked {
                     Image(systemName: "lock.fill")
                         .font(Typography.caption)
@@ -123,7 +125,6 @@ struct SidebarView: View {
                 .modifier(SidebarInk(isSelected: isSelected, tone: Theme.inkSecondary))
         }
         .tag(id)
-        .accessibilityIdentifier("sidebar.\(id)")
     }
 }
 
