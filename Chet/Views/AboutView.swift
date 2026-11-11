@@ -14,7 +14,7 @@ struct AboutView: View {
 
     private let auditLog = AuditLog()
     private var logsDirectory: URL { FlightRecorder.defaultDirectory }
-    private let productSentence = "Shows what takes space, and removes only what you pick."
+    private let productSentence = "Clean up, fine-tune, and take control of your Mac."
     private let accessSentence = "Some folders stay hidden until you grant access."
 
     var body: some View {
