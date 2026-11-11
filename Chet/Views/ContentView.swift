@@ -77,6 +77,31 @@ struct ContentView: View {
                 goModules.detect()
             }
         }
+        .onChange(of: selection) { _, newValue in
+            guard let code = Self.viewCode(for: newValue) else { return }
+            VerboseLog.event(.debug, .ui, .uiNavigationChanged, .code(.view, code))
+        }
+        .onChange(of: confirming) { _, showing in
+            if showing {
+                VerboseLog.event(.debug, .ui, .uiSheetPresented, .code(.sheet, .sheetConfirm))
+            }
+        }
+    }
+
+    static func viewCode(for selection: String?) -> LogCode? {
+        switch selection {
+        case "overview": .viewHome
+        case "applications": .viewApps
+        case "homebrew": .viewHomebrew
+        case "disk-map": .viewStorage
+        case "tweaks": .viewTweaks
+        case "settings": .viewSettings
+        case "snapshots": .viewSnapshots
+        case "mise": .viewMise
+        case "go": .viewGo
+        case "about": .viewAbout
+        default: nil
+        }
     }
 
     @ViewBuilder private var detail: some View {

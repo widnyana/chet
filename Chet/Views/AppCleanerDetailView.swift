@@ -57,6 +57,11 @@ struct AppCleanerDetailView: View {
             AppUninstallConfirmSheet()
         }
         .onAppear { model.refreshRunningState() }
+        .onChange(of: model.showConfirm) { _, showing in
+            if showing {
+                VerboseLog.event(.debug, .ui, .uiSheetPresented, .code(.sheet, .sheetClean))
+            }
+        }
     }
 
     private var details: some View {

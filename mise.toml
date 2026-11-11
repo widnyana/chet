@@ -14,13 +14,46 @@ run = [
 ]
 
 [tasks.dev]
-description = "Build and launch the debug app (one LaunchServices registration only)"
+description = "Build and launch the debug app with verbose logging (one LaunchServices registration only)"
 depends = ["build"]
 run = [
   "pkill -x chet || true",
+  "for i in 1 2 3 4 5; do pgrep -x chet >/dev/null || break; sleep 1; done",
   "./scripts/dedupe-launchservices.sh .build/xc/Build/Products/Debug/chet.app",
-  "open .build/xc/Build/Products/Debug/chet.app",
+  "open -n --env CHET_VERBOSE=1 .build/xc/Build/Products/Debug/chet.app",
 ]
+
+[tasks.devlog]
+description = "Follow the verbose dev activity log (Debug builds only)"
+run = '''
+LOG="$HOME/Library/Logs/chet/application-debug.log"
+DIR="$HOME/Library/Logs/chet"
+if [ ! -d "$DIR" ]; then
+  echo "chet dev log: $DIR does not exist. If mise run dev already ran, the writer could not create it; check Console for the devlog notice."
+  exit 0
+fi
+if [ ! -e "$LOG" ]; then
+  echo "chet dev log: application-debug.log is not created yet. Run mise run dev (Debug builds only); if it already ran, the writer could not open it and logged one devlog notice to Console."
+  exit 0
+fi
+if [ ! -r "$LOG" ]; then
+  echo "chet dev log: application-debug.log is not readable by this account. Fix its ownership or permissions, then relaunch mise run dev."
+  exit 0
+fi
+if [ ! -w "$DIR" ]; then
+  echo "chet dev log: $DIR is not writable. The app can follow an existing file, but it cannot create a new one or rotate at the cap."
+fi
+if [ ! -s "$LOG" ]; then
+  echo "chet dev log: application-debug.log exists and is empty. A Debug app with CHET_VERBOSE=1 writes launch.started at launch; if the app is running, check Console for the devlog notice."
+fi
+N=$(pgrep -x chet | wc -l | tr -d ' ')
+if [ "$N" -gt 1 ]; then
+  echo "chet dev log: $N chet instances are running; lines interleave by session."
+fi
+echo "chet dev log: following application-debug.log by name (last write $(stat -f '%Sm' -t '%H:%M:%S' "$LOG")); rotation is followed, Ctrl-C stops."
+echo "chet dev log: no line after a launch means the running app has no writer (Release build or no CHET_VERBOSE=1)."
+exec tail -F "$LOG"
+'''
 
 [tasks.test]
 description = "Run ChetCore tests (pass a filter: mise run test -- --filter Cleaner)"

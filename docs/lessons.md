@@ -321,3 +321,11 @@ site, not in one patch per page.
 I removed `safeAreaBar`, added frames, and rewrote a page before measuring.
 Each attempt was reversible, but none was evidence. One measurement of the
 container frame ended the hunt.
+
+## 2026-11-10 - the open --env claim nobody ran
+
+The run instructions said `open --env` dropped a second variable, so the documented recipe passed one flag and the second was never exercised. Nobody had run the command the sentence described.
+
+Two rules come out of it. First, a sentence about tool behaviour is written only after running the command once, and the sentence names the command. Second, when a claim is corrected, the sentence is replaced, not edited to mean the opposite in place, and the wrong sentence is deleted from every file it reached in the same commit.
+
+A third consequence followed from the same run at a different altitude: a limitation that is not stated in its owning doc reads as a bug on the first use, which is why the buffered progress rows, the two-name budget, and the shared file are stated where a reader meets them.

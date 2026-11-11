@@ -8,6 +8,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let directory = FlightRecorder.defaultDirectory
         let sawCrash = LogMaintenance.launchCheck(in: directory)
+        if VerboseLog.enabled {
+            let writer = ActivityLog(
+                url: directory.appendingPathComponent(ActivityLogLimits.baseName))
+            VerboseLog.install(writer)
+            VerboseLog.event(
+                .info, .launch, .launchStarted,
+                .flag(.sawCrash, sawCrash),
+                .count(.rotationsKept, writer.rotationsKept))
+            if sawCrash {
+                VerboseLog.event(.info, .launch, .crashReportRotated)
+            }
+        }
         let recorder = FlightRecorder(directory: directory)
         if sawCrash {
             recorder.record(step: "launch", "previous crash detected")
@@ -16,6 +28,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         FlightRecorder.shared = recorder
         CrashHandler.install(directory: directory, recorder: recorder)
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        VerboseLog.event(.info, .launch, .launchTerminated)
+        VerboseLog.shutdown()
     }
 }
 

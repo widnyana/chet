@@ -51,6 +51,14 @@ struct SettingsView: View {
         }
         .frame(width: 560, height: 560)
         .sheet(isPresented: $showingScope) { ScanScopeSheet() }
+        .onAppear {
+            VerboseLog.event(.debug, .ui, .uiViewAppeared, .code(.view, .viewSettings))
+        }
+        .onChange(of: showingScope) { _, showing in
+            if showing {
+                VerboseLog.event(.debug, .ui, .uiSheetPresented, .code(.sheet, .sheetScanScope))
+            }
+        }
         .confirmationDialog(
             "Reset every tweak?", isPresented: $confirmingReset, titleVisibility: .visible
         ) {

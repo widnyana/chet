@@ -56,6 +56,9 @@ struct SnapshotsView: View {
                     action: onClean)
             }
         )
+        .onAppear {
+            VerboseLog.event(.debug, .ui, .uiViewAppeared, .code(.view, .viewSnapshots))
+        }
     }
 
     private var table: some View {

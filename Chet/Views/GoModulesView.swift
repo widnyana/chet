@@ -17,6 +17,9 @@ struct GoModulesView: View {
             bar: { commandBar }
         )
         .onAppear { model.load() }
+        .onAppear {
+            VerboseLog.event(.debug, .ui, .uiViewAppeared, .code(.view, .viewGo))
+        }
         .alert(
             "Go",
             isPresented: Binding(

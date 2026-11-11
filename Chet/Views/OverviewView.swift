@@ -20,6 +20,14 @@ struct OverviewView: View {
             bar: { commandBar }
         )
         .sheet(isPresented: $showingScope) { ScanScopeSheet() }
+        .onAppear {
+            VerboseLog.event(.debug, .ui, .uiViewAppeared, .code(.view, .viewHome))
+        }
+        .onChange(of: showingScope) { _, showing in
+            if showing {
+                VerboseLog.event(.debug, .ui, .uiSheetPresented, .code(.sheet, .sheetScanScope))
+            }
+        }
     }
 
     private var scopeNotice: some View {

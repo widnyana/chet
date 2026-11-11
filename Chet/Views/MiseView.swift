@@ -26,6 +26,9 @@ struct MiseView: View {
             }
         )
         .task { model.load() }
+        .onAppear {
+            VerboseLog.event(.debug, .ui, .uiViewAppeared, .code(.view, .viewMise))
+        }
     }
 
     private var toolbar: some View {

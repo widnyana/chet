@@ -23,6 +23,14 @@ struct HomebrewView: View {
             bar: { commandBar }
         )
         .onAppear { model.load() }
+        .onAppear {
+            VerboseLog.event(.debug, .ui, .uiViewAppeared, .code(.view, .viewHomebrew))
+        }
+        .onChange(of: model.showInstaller) { _, showing in
+            if showing {
+                VerboseLog.event(.debug, .ui, .uiSheetPresented, .code(.sheet, .sheetInstaller))
+            }
+        }
         .searchable(text: $query, placement: .toolbar, prompt: "Search packages")
         .sheet(isPresented: $model.showInstaller) {
             HomebrewInstallerSheet()

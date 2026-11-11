@@ -18,6 +18,14 @@ struct UninstallWorkspace: View {
                 }
         }
         .onAppear { model.load() }
+        .onAppear {
+            VerboseLog.event(.debug, .ui, .uiViewAppeared, .code(.view, .viewApps))
+        }
+        .onChange(of: model.showBulkConfirm) { _, showing in
+            if showing {
+                VerboseLog.event(.debug, .ui, .uiSheetPresented, .code(.sheet, .sheetUninstall))
+            }
+        }
         .sheet(
             isPresented: Binding(
                 get: { model.report != nil },

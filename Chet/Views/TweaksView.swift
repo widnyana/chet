@@ -36,6 +36,9 @@ struct TweaksView: View {
         .sheet(item: $model.pendingConfirmation) { pending in
             TweakConfirmView(pending: pending)
         }
+        .onAppear {
+            VerboseLog.event(.debug, .ui, .uiViewAppeared, .code(.view, .viewTweaks))
+        }
     }
 
     private var toolbar: some View {

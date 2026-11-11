@@ -65,6 +65,8 @@ final class ScanModel {
     var scanThreads = UserDefaults.standard.integer(forKey: ScanModel.threadsKey) {
         didSet {
             guard oldValue != scanThreads else { return }
+            VerboseLog.event(
+                .info, .settings, .settingsChanged, .code(.settingsKey, .settingsKeyScanThreads))
             UserDefaults.standard.set(scanThreads, forKey: ScanModel.threadsKey)
         }
     }
@@ -74,6 +76,8 @@ final class ScanModel {
     var includeTempInDuplicates = UserDefaults.standard.bool(forKey: "includeTempInDuplicates") {
         didSet {
             guard oldValue != includeTempInDuplicates else { return }
+            VerboseLog.event(
+                .info, .settings, .settingsChanged, .code(.settingsKey, .settingsKeyIncludeTemp))
             UserDefaults.standard.set(includeTempInDuplicates, forKey: "includeTempInDuplicates")
         }
     }
@@ -82,6 +86,8 @@ final class ScanModel {
     var scanOutsideHome = UserDefaults.standard.bool(forKey: ScanModel.outsideHomeKey) {
         didSet {
             guard oldValue != scanOutsideHome else { return }
+            VerboseLog.event(
+                .info, .settings, .settingsChanged, .code(.settingsKey, .settingsKeyScanOutsideHome))
             UserDefaults.standard.set(scanOutsideHome, forKey: ScanModel.outsideHomeKey)
         }
     }
@@ -90,6 +96,8 @@ final class ScanModel {
     var largeFileMinSizeMB = UserDefaults.standard.object(forKey: ScanModel.largeFileKey) as? Int ?? 500 {
         didSet {
             guard oldValue != largeFileMinSizeMB else { return }
+            VerboseLog.event(
+                .info, .settings, .settingsChanged, .code(.settingsKey, .settingsKeyLargeFileMinSize))
             UserDefaults.standard.set(largeFileMinSizeMB, forKey: ScanModel.largeFileKey)
         }
     }
@@ -98,6 +106,8 @@ final class ScanModel {
     var excludedPaths = UserDefaults.standard.stringArray(forKey: ScanModel.excludedKey) ?? [] {
         didSet {
             guard oldValue != excludedPaths else { return }
+            VerboseLog.event(
+                .info, .settings, .settingsChanged, .code(.settingsKey, .settingsKeyExcludedPaths))
             UserDefaults.standard.set(excludedPaths, forKey: ScanModel.excludedKey)
         }
     }
@@ -109,6 +119,8 @@ final class ScanModel {
     {
         didSet {
             guard oldValue != userRules else { return }
+            VerboseLog.event(
+                .info, .settings, .settingsChanged, .code(.settingsKey, .settingsKeyUserRules))
             if userRules.isEmpty {
                 UserDefaults.standard.removeObject(forKey: ScanModel.userRulesKey)
             } else {
@@ -130,6 +142,8 @@ final class ScanModel {
     var duplicateMinSizeMB = UserDefaults.standard.object(forKey: ScanModel.duplicateMinKey) as? Int ?? 1 {
         didSet {
             guard oldValue != duplicateMinSizeMB else { return }
+            VerboseLog.event(
+                .info, .settings, .settingsChanged, .code(.settingsKey, .settingsKeyDuplicateMinSize))
             UserDefaults.standard.set(duplicateMinSizeMB, forKey: ScanModel.duplicateMinKey)
         }
     }
@@ -138,6 +152,8 @@ final class ScanModel {
     var largeFileOldAgeDays = UserDefaults.standard.object(forKey: ScanModel.oldAgeKey) as? Int ?? 365 {
         didSet {
             guard oldValue != largeFileOldAgeDays else { return }
+            VerboseLog.event(
+                .info, .settings, .settingsChanged, .code(.settingsKey, .settingsKeyLargeFileMinAge))
             UserDefaults.standard.set(largeFileOldAgeDays, forKey: ScanModel.oldAgeKey)
         }
     }
@@ -159,6 +175,8 @@ final class ScanModel {
     /// to remember it.
     var scope = ScanModel.storedScope() {
         didSet {
+            VerboseLog.event(
+                .info, .settings, .settingsChanged, .code(.settingsKey, .settingsKeyScanScope))
             guard remembersScope else { return }
             Self.storeScope(scope)
         }
@@ -348,6 +366,17 @@ final class ScanModel {
         resultScope = runningScope
         let runningSteps = enabledScanSteps.filter(runningScope.runs)
         steps = ScanStepState.all.filter { runningSteps.contains($0.id) }
+        VerboseLog.event(
+            .info, .scan, .scanStarted,
+            .code(.step, .stepScan),
+            .flag(.allowOutsideHome, scanOutsideHome),
+            .count(.excludedPaths, excludedPaths.count),
+            .count(.extraRules, userRules.count),
+            .count(.enabledSteps, runningSteps.count),
+            .bytes(.largeFileThreshold, Int64(largeFileMinSizeMB) * 1_000_000),
+            .count(.threads, scanThreads),
+            .bytes(.duplicateSize, Int64(duplicateMinSizeMB) * 1_000_000),
+            .count(.oldAgeDays, largeFileOldAgeDays))
         let gate = ScanPauseGate()
         pauseGate = gate
         isPaused = false
@@ -366,11 +395,13 @@ final class ScanModel {
             for await event in session.events() {
                 guard gen == generation else { break }
                 FlightRecorder.shared?.record(event)
+                logScanEvent(event)
                 apply(event)
             }
             guard gen == generation else { return }
             heartbeat?.cancel()
             FlightRecorder.shared?.flushNow()
+            VerboseLog.flush()
             progress = nil
             currentStep = nil
             isScanning = false
@@ -394,6 +425,7 @@ final class ScanModel {
         heartbeat?.cancel()
         FlightRecorder.shared?.record(step: "scan", "cancelled")
         FlightRecorder.shared?.flushNow()
+        VerboseLog.flush()
         pauseGate?.setPaused(false)
         pauseGate = nil
         isPaused = false
@@ -547,6 +579,46 @@ final class ScanModel {
         if let index = steps.firstIndex(where: { $0.id == id }) { steps[index].done = true }
     }
 
+    private func logScanEvent(_ event: ScanEvent) {
+        let step: LogCode
+        let done: Int?
+        let total: Int?
+        switch event {
+        case .started(let started):
+            step = Self.stepCode(started)
+            done = nil
+            total = nil
+        case .stepActivity(let activityStep, let activityDone, let activityTotal, _):
+            step = Self.stepCode(activityStep)
+            done = activityDone
+            total = activityTotal
+        case .taggedCaches:
+            step = .stepTaggedCaches
+            done = nil
+            total = nil
+        case .rulesProgress, .rules, .finished, .done, .progress, .rootMeasured, .treeUpdate,
+            .folderTrees, .readErrors, .largeFiles, .duplicates, .leftovers, .photos, .videos,
+            .snapshots:
+            return
+        }
+        VerboseLog.event(
+            .debug, .scan, .scanEvent, .code(.step, step),
+            done.map { LogField.count(.done, $0) }, total.map { LogField.count(.total, $0) })
+    }
+
+    nonisolated static func stepCode(_ step: ScanStep) -> LogCode {
+        switch step {
+        case .rules: .stepRules
+        case .index: .stepIndex
+        case .largeFiles: .stepLargeFiles
+        case .duplicates: .stepDuplicates
+        case .leftovers: .stepLeftovers
+        case .photos: .stepPhotos
+        case .videos: .stepVideos
+        case .snapshots: .stepSnapshots
+        }
+    }
+
     private func apply(_ event: ScanEvent) {
         switch event {
         case .started(let step):
@@ -622,6 +694,10 @@ final class ScanModel {
         else { return }
         // Empty categories are noise; keep them only to show that Full Disk Access is missing.
         guard !result.items.isEmpty || result.needsFullDiskAccess else { return }
+        VerboseLog.event(
+            .debug, .scan, .scanCategory,
+            .code(.category, ruleCategoryCode(result.category)),
+            .count(.selected, result.items.count))
         if !categories.contains(where: { $0.id == result.category }) {
             categories.append(
                 CategoryState(id: result.category, title: Self.titles[result.category] ?? result.category))

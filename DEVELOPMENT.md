@@ -36,6 +36,7 @@ Every development step is a mise task:
 | `mise run layout` | Check the persistent chrome against the registry in `docs/DESIGN.md` |
 | `mise run xcode` | Open the generated project in Xcode |
 | `mise run log` | Follow the clean audit log |
+| `mise run devlog` | Follow the dev activity log; rotation is followed; see [Dev activity log](#dev-activity-log) |
 | `mise run clean` | Remove build output, the generated project, and `dist/` |
 
 The Xcode project is generated from `project.yml` by XcodeGen and is not committed.
@@ -46,6 +47,28 @@ The app ships a privileged helper, `chet-helper`, as a second target. `mise run 
 `Contents/MacOS/chet-helper` with its launchd plist in `Contents/Library/LaunchDaemons` and
 signs it, so Xcode's final app signature covers both. It is off until the user registers it in
 Settings; nothing in the build registers or launches it.
+
+## Dev activity log
+
+`mise run dev` turns on a verbose activity log. The task launches the app with `CHET_VERBOSE=1`; nothing else is needed. A normal launch does not, and a Release build never writes it. No variable at launch means no writer, no file, and no cost.
+
+The log is `~/Library/Logs/chet/application-debug.log`. Within its own family the only other name is the previous file, `application-debug.1.log`, and that sibling exists only after a rotation, so a first run leaves one file. Two names is the whole budget, so there is no per-launch file to clean up. The directory is shared with artifacts that are not part of this family: `clean.log`, `crash.txt`, the `crash-<id>.txt` rotations, and the `flight-<pid>.log` files. The file has a size cap and rotates rather than truncating, so the newest events are always present and the oldest are always the ones missing.
+
+`mise run devlog` follows the file. To answer a question rather than watch a stream, filter it (the filtered views need `jq`; `mise run devlog` does not): `jq -r .message ~/Library/Logs/chet/application-debug.log | sort | uniq -c` lists which events happened and how often; `jq -c 'select(.session == "<uuid>") | {level, message, fields}' ~/Library/Logs/chet/application-debug.log` isolates one app run. Every line carries a `session` key, which is what a filter selects on.
+
+Each line is one JSON object. The six keys are `time`, `session`, `level`, `category`, `message`, `fields`; the encoder writes them in alphabetical order, so a raw line reads `category`, `fields`, `level`, `message`, `session`, `time`. `time` is ISO 8601 and `session` is one UUID per writer instance. `level` is `debug`, `info`, `warn` or `error`; `category` is one of `launch`, `scan`, `index`, `rules`, `clean`, `storage`, `uninstall`, `tweaks`, `settings`, `process`, `ui`. `message` is a dotted event name, and the list is closed: `launch.started`, `launch.crashReportRotated`, `launch.terminated`, `scan.started`, `scan.event`, `scan.category`, `rules.progress`, `rules.result`, `index.progress`, `index.rollup`, `index.unreadable`, `index.finished`, `clean.refused`, `clean.started`, `clean.finished`, `clean.summary`, `storage.snapshotCreated`, `storage.snapshotDeleted`, `storage.trashMove`, `storage.emptyTrash`, `uninstall.finished`, `tweak.read`, `tweak.apply`, `tweak.revert`, `tweak.preview`, `settings.changed`, `process.run`, `ui.viewAppeared`, `ui.sheetPresented`, `ui.navigationChanged`. `fields` is an array of `{"key": …, "value": …}` objects whose keys and value shapes are closed.
+
+### What it never records
+
+The log never records an absolute path, a basename longer than 128 bytes, a command-line argument, an environment value, a tweak payload, a raw bundle identifier or a raw tweak identifier. It also never records per-item clean rows: a clean writes a start row, an end row and a summary row, because `clean.log` already holds the per-item ledger and a second copy would only disagree with it. This is a list of data classes, not a scrubbing step: why a value cannot be represented is a property of the record type, stated in [docs/DESIGN.md](docs/DESIGN.md), `## Dev activity log (D-Segment)`.
+
+### Why the file can look empty
+
+`info`, `warn` and `error` rows are written as they happen. `debug` rows, which is what progress ticks are, ride a small buffer and reach the file when the buffer fills, at an explicit flush point, or on the first append after a few seconds have passed; there is no timer, so an idle app writes nothing. A freshly started run can therefore show only its launch and view rows until the first batch lands. A hard kill, including the SIGTERM that the next `mise run dev` sends, loses the buffered progress rows only, because every action row was written immediately and a normal quit flushes. If the file does not exist at all after a launch that should have enabled it, the writer disabled itself rather than failing the app: check Console for the `devlog` notice. A Full Disk Access relaunch drops the flag, so relaunch with `mise run dev`.
+
+### Why this is not crash.txt
+
+When the app dies by a signal, read `crash.txt`. When the app survives and misbehaves, read the activity log. They are different files because they are written under different constraints, and the constraints are stated once, in [docs/DESIGN.md](docs/DESIGN.md), `## Dev activity log (D-Segment)`. The crash file's retention is unchanged.
 
 ## Project layout
 

@@ -122,6 +122,14 @@ struct DiskMapView: View {
                 trashReport = nil
             }
         }
+        .onAppear {
+            VerboseLog.event(.debug, .ui, .uiViewAppeared, .code(.view, .viewStorage))
+        }
+        .onChange(of: trashRequest?.id) { _, request in
+            if request != nil {
+                VerboseLog.event(.debug, .ui, .uiSheetPresented, .code(.sheet, .sheetTrash))
+            }
+        }
     }
 
     // MARK: - Header and metrics

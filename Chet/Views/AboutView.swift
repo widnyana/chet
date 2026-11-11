@@ -37,6 +37,9 @@ struct AboutView: View {
         .background(Theme.paper)
         .frame(width: 560, height: 620)
         .task { await load() }
+        .onAppear {
+            VerboseLog.event(.debug, .ui, .uiViewAppeared, .code(.view, .viewAbout))
+        }
         .onChange(of: model.isCleaning) { _, cleaning in
             if !cleaning { refreshPaths() }
         }
