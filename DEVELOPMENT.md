@@ -179,7 +179,9 @@ the zsh or bash startup files, a bounded scan of likely bases containing `instal
 
 `mise run install-chet` reads the latest GitHub release, so a release must be published before
 it can install one. That task is for a checkout: the installer is a standalone script, and end
-users need bash, curl, and the macOS tools, not mise.
+users need bash, curl, and the macOS tools, not mise. JSON comes from python3 when it is
+installed and from the system JavaScript engine otherwise, so a Mac without Command Line Tools
+can still install.
 
 While the repository is private, both the script download and the release asset need a token:
 `curl -H "Authorization: Bearer $GITHUB_TOKEN" ...` for the raw file, and

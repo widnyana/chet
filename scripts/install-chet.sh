@@ -124,6 +124,13 @@ trap 'exit 143' TERM
 trap 'status=$?; cleanup; exit "$status"' EXIT
 
 read_release() {
+  if command -v python3 >/dev/null 2>&1 && release_python "$1" "$2"; then
+    return 0
+  fi
+  release_jxa "$1" "$2"
+}
+
+release_python() {
   python3 - "$1" "$2" <<'PYCODE'
 import json
 import sys
@@ -165,6 +172,39 @@ elif mode == "asset":
                 sys.exit(0)
     sys.exit(1)
 PYCODE
+}
+
+release_jxa() {
+  osascript -l JavaScript -e 'function run(argv) {
+  var path = argv[0], mode = argv[1];
+  var text = $.NSString.stringWithContentsOfFileEncodingError(path, $.NSUTF8StringEncoding, null);
+  function out(line) {
+    var data = $.NSString.alloc.initWithUTF8String(String(line) + "\n").dataUsingEncoding($.NSUTF8StringEncoding);
+    $.NSFileHandle.fileHandleWithStandardOutput.writeData(data);
+  }
+  var data = {};
+  try { if (!text.isNil()) { var parsed = JSON.parse(text.js); if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) { data = parsed; } } } catch (error) { data = {}; }
+  var assets = (data.assets || []).filter(function (asset) { return asset && typeof asset === "object"; });
+  if (mode === "tag") { out(data.tag_name || ""); return; }
+  if (mode === "names") { assets.forEach(function (asset) { out(asset.name || ""); }); return; }
+  if (mode !== "asset") { throw new Error("unknown mode"); }
+  var rules = [
+    function (name) { return name.indexOf(".dmg") === name.length - 4 && name.indexOf("chet") >= 0; },
+    function (name) { return name.indexOf(".dmg") === name.length - 4; },
+    function (name) { return name.indexOf(".zip") === name.length - 4 && name.indexOf("chet") >= 0; },
+    function (name) { return name.indexOf(".zip") === name.length - 4; }
+  ];
+  for (var i = 0; i < rules.length; i += 1) {
+    for (var j = 0; j < assets.length; j += 1) {
+      var name = String(assets[j].name || "").toLowerCase();
+      if (rules[i](name)) {
+        out([assets[j].name, assets[j].browser_download_url || "", assets[j].url || ""].join("\t"));
+        return;
+      }
+    }
+  }
+  throw new Error("no asset");
+}' "$1" "$2"
 }
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/chet-install.XXXXXX")
