@@ -35,12 +35,20 @@ are user-level and need no Full Disk Access.
 
 ## Scan
 
-Home has three states:
+Home names the state it is in:
 
 - **Never scanned**: the disk capacity bar and a **Scan** button.
-- **Scanning**: the step list, a linear progress bar, **Pause**, and **Resume**.
-- **Finished**: the Safe to remove and Check first ledgers, the total space, and the command
-  bar.
+- **Scanning**: the step list, a linear progress bar, **Pause**, and **Resume**. No result
+  sentence appears until the scan finishes.
+- **Finished, not everything readable**: **Not everything was read**, with what to grant.
+- **Finished and empty**: **Nothing to reclaim**, `This Mac is tidy.` This appears only after a
+  scan that finished and read the folders it measures.
+- **Finished with findings**: the Safe to remove and Check first ledgers, the total space, and
+  the command bar.
+
+The incomplete-results banner names how many folders a measured category could not read. Folder
+problems outside what a category measures, such as macOS-protected paths or files in your home
+folder, do not raise it.
 
 Start a scan from the toolbar, from **Scan** on Home, or with Command-R. The toolbar control
 stays available on every destination except Apps and Tweaks.

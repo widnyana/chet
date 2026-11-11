@@ -181,7 +181,7 @@ struct DiskMapView: View {
                     selected: Set(collection.keys),
                     hovered: hovered?.url,
                     isEnabled: !model.isScanning,
-                    hasReadErrors: !model.readErrors.isEmpty,
+                    readErrors: model.readErrors,
                     onToggle: toggle,
                     onOpen: open,
                     onReveal: reveal)
@@ -190,6 +190,15 @@ struct DiskMapView: View {
             .padding(.top, Spacing.s4)
             .padding(.bottom, Spacing.s3)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        } else if !model.isScanning, !model.steps.isEmpty, model.folderTrees.isEmpty {
+            EmptyStateView(
+                title: "The scan did not produce a disk map.",
+                message: "Folder measuring failed or the scan was stopped. Scan again to build it.",
+                actionTitle: "Scan this Mac",
+                action: { model.scan() }
+            )
+            .padding(Spacing.s8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if !model.isScanning {
             EmptyStateView(
                 title: "The disk map appears after a scan.",

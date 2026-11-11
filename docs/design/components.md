@@ -153,6 +153,17 @@ Rules:
   says `Scan to measure`.
 - The bar never animates its width. It updates in place.
 
+## Home state copy
+
+Home resolves one of five reasons before it speaks: never scanned, scanning, unreadable,
+measured empty, and findings. `HomeState` owns every sentence, so the subtitle and the empty
+state cannot disagree. While scanning, no empty state renders. The unreadable reason appears
+when a folder a category measures could not be read or Full Disk Access is missing.
+
+The incomplete-results banner is scoped: `ReadScope.blockingCount` counts only errors inside a
+measured category root. Files passed as roots, vanished paths, protected system folders, and
+other users' homes are classified and ignored, and the banner states the count it used.
+
 ## LedgerTable
 
 The main comparison surface. It is `ColumnTable`: one pinned header, one hairline

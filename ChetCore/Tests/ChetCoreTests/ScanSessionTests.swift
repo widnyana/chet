@@ -167,6 +167,76 @@ struct ScanSessionTests {
         #expect(seen["user-rules"] == 1)
     }
 
+    @Test func userRootsKeepOnlyDirectories() throws {
+        let dir = try TempDir()
+        try dir.file("Documents/x", bytes: 1)
+        try dir.file("loose.txt", bytes: 1)
+        try FileManager.default.createDirectory(
+            at: dir.url.appendingPathComponent("Archive.app"), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(
+            at: dir.url.appendingPathComponent("linked"),
+            withDestinationURL: dir.url.appendingPathComponent("Documents"))
+        #expect(Set(ScanSession.userRoots(dir.url).map(\.lastPathComponent)) == ["Documents"])
+    }
+
+    @Test func skippedIndexErrnosNameVanishedPathErrors() {
+        #expect(ScanSession.skippedIndexErrnos == [ENOTDIR, ENOENT, ELOOP, EACCES])
+    }
+
+    @Test func indexErrorsOnNonDirectoriesAreSkipped() throws {
+        let dir = try TempDir()
+        let loose = try dir.text("loose.txt", "x")
+        let vanished = dir.url.appendingPathComponent("vanished", isDirectory: true)
+        let loop = dir.url.appendingPathComponent("loop")
+        try FileManager.default.createSymbolicLink(at: loop, withDestinationURL: loop)
+        for errno in [ENOTDIR, ENOENT, ELOOP, EACCES] {
+            #expect(!ScanSession.indexErrorIsReportable(WalkError(url: loose, errno: errno)))
+        }
+        #expect(!ScanSession.indexErrorIsReportable(WalkError(url: vanished, errno: ENOENT)))
+        #expect(!ScanSession.indexErrorIsReportable(WalkError(url: loop, errno: ELOOP)))
+    }
+
+    @Test func indexErrorsOnRegularFileRootsAreNotEmitted() async throws {
+        let dir = try TempDir()
+        let loose = try dir.text("loose.txt", "not a folder")
+        for await event in ScanSession(
+            home: dir.url, enabledSteps: [.index], scanScope: ScanScope(roots: [loose.path])
+        ).events() {
+            if case .readErrors(let errors) = event {
+                #expect(errors.isEmpty)
+                return
+            }
+        }
+        Issue.record("the index step emitted no readErrors event")
+    }
+
+    @Test func unreadableDirectoryRootIsEmittedAsAReadError() async throws {
+        let dir = try TempDir()
+        let locked = dir.url.appendingPathComponent("Locked", isDirectory: true)
+        try dir.text("Locked/inside.txt", "x")
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o000], ofItemAtPath: locked.path)
+        defer {
+            try? FileManager.default.setAttributes(
+                [.posixPermissions: 0o700], ofItemAtPath: locked.path)
+        }
+        #expect(ScanSession.indexErrorIsReportable(WalkError(url: locked, errno: EACCES)))
+        var reported: [WalkError] = []
+        for await event in ScanSession(
+            home: dir.url, enabledSteps: [.index], scanScope: ScanScope(roots: [locked.path])
+        ).events() {
+            if case .readErrors(let errors) = event {
+                reported = errors
+                break
+            }
+        }
+        let lockedCanonical = ScanScope.canonicalPath(locked.path)
+        #expect(
+            reported.contains {
+                ScanScope.canonicalPath($0.url.path) == lockedCanonical && $0.errno == EACCES
+            })
+    }
+
     @Test func leavingTheStreamStopsTheScanAndRestoresIOPolicy() async throws {
         let dir = try TempDir()
         for i in 0..<200 { try dir.file("Documents/f\(i)", bytes: 10) }

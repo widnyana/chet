@@ -198,7 +198,7 @@ struct StorageLedger: View {
     let selected: Set<URL>
     let hovered: URL?
     let isEnabled: Bool
-    let hasReadErrors: Bool
+    let readErrors: [WalkError]
     let onToggle: (FolderNode) -> Void
     let onOpen: (FolderNode) -> Void
     let onReveal: (FolderNode) -> Void
@@ -284,7 +284,7 @@ struct StorageLedger: View {
                     .foregroundStyle(Theme.inkSecondary)
                     .lineLimit(1)
             }
-            if hasReadErrors {
+            if ReadScope.blockingCount(readErrors, roots: [folder.url.path]) > 0 {
                 StatusLabel(
                     text: "Some folders here could not be read.",
                     systemImage: "exclamationmark.triangle",

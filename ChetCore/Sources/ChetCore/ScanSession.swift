@@ -113,10 +113,27 @@ public final class ScanSession: Sendable {
         self.largeFileOldAge = largeFileOldAge
     }
 
+    static let skippedIndexErrnos: Set<Int32> = [ENOTDIR, ENOENT, ELOOP, EACCES]
+
+    static func indexErrorIsReportable(_ error: WalkError) -> Bool {
+        guard skippedIndexErrnos.contains(error.errno) else { return true }
+        var st = stat()
+        return lstat(error.url.path, &st) == 0 && st.st_mode & S_IFMT == S_IFDIR
+    }
+
     /// Top-level folders of the home folder, without Library and hidden folders.
     public static func userRoots(_ home: URL) -> [URL] {
-        let children = (try? FileManager.default.contentsOfDirectory(at: home, includingPropertiesForKeys: nil)) ?? []
-        return children.filter { !$0.lastPathComponent.hasPrefix(".") && $0.lastPathComponent != "Library" }
+        let keys: Set<URLResourceKey> = [.isDirectoryKey, .isSymbolicLinkKey, .isPackageKey]
+        let children =
+            (try? FileManager.default.contentsOfDirectory(
+                at: home, includingPropertiesForKeys: Array(keys))) ?? []
+        return children.filter { child in
+            guard !child.lastPathComponent.hasPrefix("."), child.lastPathComponent != "Library"
+            else { return false }
+            guard let values = try? child.resourceValues(forKeys: keys) else { return false }
+            return values.isDirectory == true && values.isSymbolicLink != true
+                && values.isPackage != true
+        }
     }
 
     /// The folders this scan measures. A scope root outside the home folder is honoured only
@@ -236,18 +253,19 @@ public final class ScanSession: Sendable {
             setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_PROCESS, IOPOL_THROTTLE)
             guard !Task.isCancelled else { return }
             if let built = index {
+                let readErrors = built.readErrors.filter(Self.indexErrorIsReportable)
                 VerboseLog.event(
                     .info, .index, .indexFinished,
-                    .count(.trees, built.trees.count), .count(.readErrors, built.readErrors.count),
+                    .count(.trees, built.trees.count), .count(.readErrors, readErrors.count),
                     .code(.sizeBasis, .sizeBasisAllocated))
-                for error in built.readErrors {
+                for error in readErrors {
                     VerboseLog.event(
                         .warn, .index, .indexUnreadable,
-                        .basename(.folder, Basename(path: error.url.path)),
+                        .path(.folder, RelativePath(String(error.url.path.dropFirst()))),
                         .status(.errno, error.errno))
                 }
                 emit(.folderTrees(built.trees, built.treeSizeBasis))
-                emit(.readErrors(built.readErrors))
+                emit(.readErrors(readErrors))
                 if scanScope.categories.isEmpty || scanScope.categories.contains("tagged-caches") {
                     emit(
                         .taggedCaches(

@@ -146,12 +146,20 @@ Top to bottom:
 
 1. Page header: `Clean up your Mac`, a one-line subtitle, the amount that can be reclaimed.
 2. Capacity bar: volume name, capacity, used, reclaimable, free, text legend.
-3. Scan state:
+3. Scan state, always named rather than assumed:
    - never scanned: an empty state, `No scan yet`, with the action in the
      command bar;
-   - scanning: the phase list and a linear progress;
-   - finished: the category ledger in two groups, `Safe to remove` and
-     `Check first`.
+   - scanning: the phase list and a linear progress, and no empty state at all;
+   - finished but with a folder a displayed number needs unreadable:
+     `Not everything was read`, with the Full Disk Access instruction;
+   - finished and measured with nothing to reclaim: `Nothing to reclaim`,
+     `This Mac is tidy.`;
+   - finished with findings: the category ledger in two groups, `Safe to remove`
+     and `Check first`.
+   The subtitles follow the same five reasons. The incomplete-results banner
+   appears only when an unreadable folder lies inside a folder a category
+   measures, and states the count; protected system paths, other users' homes,
+   paths that vanished during the walk, and files passed as roots never raise it.
 4. Category ledger: monochrome symbol, name, item count, size. Largest first.
    Clicking a row opens the category.
 5. Command bar: `Scan this Mac`, `Scan again`, `Stop scan`, or `Clean selected` with

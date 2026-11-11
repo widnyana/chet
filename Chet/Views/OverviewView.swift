@@ -61,12 +61,19 @@ struct OverviewView: View {
         return model.totalBytes.formatted(.byteCount(style: .file))
     }
 
+    private var state: HomeState {
+        HomeState.resolve(
+            isScanning: model.isScanning,
+            hasScanned: model.lastScan != nil,
+            didFinishScan: model.didFinishScan,
+            totalBytes: model.totalBytes,
+            blockingReadErrorCount: ReadScope.blockingCount(
+                model.readErrors, roots: model.resultScope.roots),
+            needsFullDiskAccess: model.categories.contains(where: \.needsFullDiskAccess))
+    }
+
     private var subtitle: String {
-        if model.isScanning { return "Scanning caches and logs." }
-        guard model.lastScan != nil else {
-            return "A clear account of this disk."
-        }
-        if model.totalBytes == 0 { return "This Mac is tidy." }
+        if let subtitle = state.subtitle { return subtitle }
         let count = rows(in: .safe).count + rows(in: .review).count
         return "\(count) \(count == 1 ? "category" : "categories"). Pick one to review."
     }
@@ -85,16 +92,39 @@ struct OverviewView: View {
     }
 
     @ViewBuilder private var content: some View {
+        let blockingCount = ReadScope.blockingCount(
+            model.readErrors, roots: model.resultScope.roots)
         VStack(alignment: .leading, spacing: Spacing.s4) {
-            if !model.readErrors.isEmpty {
-                StatusLabel(
-                    text: "Some folders could not be read. Results may be incomplete.",
-                    systemImage: "exclamationmark.triangle",
-                    tone: .amber)
+            if blockingCount > 0 {
+                VStack(alignment: .leading, spacing: Spacing.s2) {
+                    StatusLabel(
+                        text: "\(blockingCount) "
+                            + (blockingCount == 1 ? "folder" : "folders")
+                            + " could not be read.",
+                        systemImage: "exclamationmark.triangle",
+                        tone: .amber)
+                    DisclosureGroup("Details") {
+                        ForEach(
+                            Array(
+                                model.readErrors.filter {
+                                    ReadScope.classify($0, roots: model.resultScope.roots)
+                                        == .categoryRoot
+                                }.prefix(3).enumerated()
+                            ),
+                            id: \.offset
+                        ) { _, error in
+                            Text(error.url.path)
+                                .font(Typography.caption)
+                                .foregroundStyle(Theme.inkSecondary)
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }
             }
-            if model.isScanning {
+            if state == .scanning {
                 scanProgress
-            } else if model.lastScan == nil {
+            } else if state == .neverScanned {
                 neverScanned
             } else {
                 ledgers
@@ -114,10 +144,12 @@ struct OverviewView: View {
         let safe = rows(in: .safe)
         let review = rows(in: .review)
         VStack(alignment: .leading, spacing: Spacing.s6) {
-            if safe.isEmpty && review.isEmpty {
-                EmptyStateView(
-                    title: "Nothing to reclaim",
-                    message: "This Mac is tidy.")
+            if safe.isEmpty && review.isEmpty, let title = state.emptyTitle,
+                let message = state.emptyMessage
+            {
+                EmptyStateView(title: title, message: message, identifier: "home.empty")
+                    .accessibilityIdentifier(
+                        state == .unreadable ? "home.unreadable" : "home.empty")
             }
             if !safe.isEmpty { ledger("Safe to remove", safe) }
             if !review.isEmpty { ledger("Check first", review) }

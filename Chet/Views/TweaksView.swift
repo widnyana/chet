@@ -147,6 +147,9 @@ struct TweaksView: View {
 
     private var emptyMessage: String {
         if model.filter == .changed && model.query.isEmpty {
+            if model.readings.contains(where: { !$0.isSupported }) {
+                return "Some settings could not be read."
+            }
             return "Every supported setting still has its macOS default."
         }
         return "Try another word, or show all tweaks."

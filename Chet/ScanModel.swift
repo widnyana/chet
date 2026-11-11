@@ -218,7 +218,8 @@ final class ScanModel {
     @ObservationIgnored private var countedURLs: Set<URL> = []
     /// Reclaimable bytes per counted URL. `selectedBytes` reads this on selection changes.
     @ObservationIgnored private var bytesByURL: [URL: Int64] = [:]
-    private(set) var totalBytes: Int64 = 0
+    private(set) var totalBytes: Int64 = Int64(
+        UserDefaults.standard.integer(forKey: ScanModel.lastScanBytesKey))
     private(set) var selectedBytes: Int64 = 0
     /// Category id -> groups, for duplicates and similar media.
     var groups: [String: [ItemGroup]] = [:]
@@ -359,6 +360,7 @@ final class ScanModel {
         selectedBytes = 0
         selectedSnapshots = []
         folderTrees = []
+        readErrors = []
         confirmItems = []
         confirmSnapshots = []
         report = nil
@@ -445,6 +447,7 @@ final class ScanModel {
         partialTrees = []
         recentFolders = []
         activity = nil
+        readErrors = []
     }
 
     /// Pause or resume the running scan; no-op when idle.

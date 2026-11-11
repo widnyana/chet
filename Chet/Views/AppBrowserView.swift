@@ -358,7 +358,7 @@ private struct AppRow: View {
                     if let bytes = model.appSizes[app.url] {
                         SizeColumn(bytes: bytes, width: ColumnRegistry.spec(.size).width)
                     } else {
-                        Text("Unknown")
+                        Text(model.isMeasuringSizes ? "Measuring" : "Unknown")
                             .font(Typography.row)
                             .monospacedDigit()
                             .foregroundStyle(Theme.ink)
@@ -431,7 +431,7 @@ private struct AppCell: View {
                             .foregroundStyle(Theme.inkSecondary)
                             .lineLimit(1)
                         Text(
-                            "\(model.appSizes[app.url].map { $0.formatted(.byteCount(style: .file)) } ?? "Unknown") · \(model.locationLabel(app))"
+                            "\(model.appSizes[app.url].map { $0.formatted(.byteCount(style: .file)) } ?? (model.isMeasuringSizes ? "Measuring" : "Unknown")) · \(model.locationLabel(app))"
                         )
                         .font(Typography.caption)
                         .monospacedDigit()

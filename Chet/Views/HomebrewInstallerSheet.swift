@@ -123,6 +123,8 @@ struct HomebrewInstallerSheet: View {
             Spacer(minLength: Spacing.s2)
             if installed {
                 StatusLabel(text: "Installed", systemImage: "checkmark.circle", tone: .neutral)
+            } else if model.loadError != nil || model.packages.isEmpty {
+                StatusLabel(text: "Unknown", systemImage: "questionmark.circle", tone: .neutral)
             }
         }
         .padding(.horizontal, Spacing.s3)

@@ -30,7 +30,7 @@ struct SnapshotsView: View {
                     if model.isScanning {
                         LoadingStateView(message: "Checking snapshots")
                             .pageHorizontalPadding()
-                    } else {
+                    } else if model.snapshotErrors.isEmpty {
                         EmptyStateView(
                             title: "No local snapshots",
                             message: "Time Machine keeps them only while it has room.")
