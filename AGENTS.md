@@ -16,12 +16,26 @@ Window minimum: `960 x 632`.
 
 ## UI tests
 
-- Every launch: `open -n --env DRY_RUN=1 <app-copy>`. `-n` is mandatory; flags repeat, so a second
-  gate is `open -n --env DRY_RUN=1 --env CHET_TWEAK_PREVIEW=confirm <app>`.
-- Never rely on the repo `.env`; never execute the bundle binary instead of `open -n`.
-- No test writes a preference, removes a file, empties the Trash, or restarts an app.
+- `mise run uitest` is the only supported entry. It exports `DRY_RUN=1`, builds
+  `.build/tools/axdrv` when stale, snapshots git status and five user paths, and runs
+  `chetUITests` against `.build/xc`. No `open -a`, no `pkill`.
+- Local mode runs in the signed-in session and takes focus: it needs `--allow-focus` to run beside
+  a chet outside `.build`, and refuses a locked screen or a machine in use (keyboard idle under
+  20 s) unless `--allow-active-input`.
+- `--mode session --session-user <name>` runs as root in that account's GUI session and never
+  touches the signed-in session. The account must exist and have logged in once; exit 5 prints
+  the setup command.
+- A run writes only under `CHET_UITEST_ROOT`: the app redirects Application Support,
+  Preferences, Logs, Caches, and Trash through `TestPaths`. The runner exits 6 if git status or
+  a user path changed; the case removes its own root.
+- `chet-helper` is never registered or started: `DRY_RUN` keeps `HelperService` off, the runner
+  refuses a running helper (exit 4), and the suite fails when a helper has started since the test
+  session began.
+- Focus is required. Each test calls `requireFocus()` before an action; a different frontmost app
+  aborts the run before input. The app must be `id.web.widnyana.chet` under `.build/xc`.
 - Gates: Home `Preview only. Nothing is changed.`; Tweaks `Preview only. No tweak is changed.`
-  Tweak controls stay disabled and the key unchanged. Confirm/revert sheets need the preview hook.
+  Tweak controls stay disabled and the key unchanged. Confirm and revert sheets need
+  `CHET_TWEAK_PREVIEW=confirm` or `revert`.
 - Cover: access (granted, denied, skipped), scan (never, running, paused, done, empty), dry run,
   sidebar, sheets (Cancel, Escape, blocked while cleaning).
 

@@ -28,6 +28,7 @@ Every development step is a mise task:
 | `mise run build` | Debug build into `.build/xc`: `chet-helper` first, then the app |
 | `mise run dev` | Build the debug app and launch it |
 | `mise run test` | Run the ChetCore tests. Filter with `mise run test -- --filter Cleaner` |
+| `mise run uitest` | Run the XCUITest suite in an isolated scratch root. `--build-only` prepares `axdrv` |
 | `mise run check` | Tests, debug build, and a check that the binary is arm64 only |
 | `mise run release` | Release build, arm64 check, and `dist/chet.zip` |
 | `mise run dmg` | The release build in `dist/chet.dmg`, with an `Applications` symlink |
@@ -153,8 +154,30 @@ same result.
 - `mise run bench` compares GPU and SHA-256 hashing speed. It writes 1 GB of temp files.
 - UI work is checked at the 960 x 632 minimum window size. `mise run layout` checks the
   persistent chrome against the registry in `docs/DESIGN.md`.
-- [AGENTS.md](AGENTS.md) covers driving the built app through accessibility selectors and the
-  `DRY_RUN=1` rule for UI tests.
+
+### UI tests
+
+`mise run uitest` runs `chetUITests` against the Debug build. It exports `DRY_RUN=1`, prepares
+`.build/tools/axdrv`, and snapshots git status plus the five user paths before and after; a
+change exits 6. The app redirects its write locations through `CHET_UITEST_ROOT`, so the case's
+scratch root is the only writable place, and `chet-helper` stays unregistered.
+
+Two drivers, one grammar. XCUITest owns interaction: launching, foreground checks, clicks, and
+typing through `XCUIElement`. `axdrv` owns what the XCTest tree does not expose: `color`,
+`frame`, and `dump`. Both resolve the same `AXSelector` terms from
+`ChetCore/Sources/ChetCore/AXSelector.swift` (`id=`, `role=`, `desc=`, `enabled=`; a bare term is
+a substring; exactly one match or exit 6). Tests reach the probe through `AXProbe`, which reads
+the app pid from `<CHET_UITEST_ROOT>/app.pid` and passes `--pid`. The probe comes from one build:
+
+```sh
+swiftc -O scripts/axdrv.swift ChetCore/Sources/ChetCore/AXSelector.swift -o .build/tools/axdrv
+```
+
+Local mode takes focus in the signed-in session: it needs `--allow-focus` beside a chet outside
+`.build`, and refuses a machine in use unless `--allow-active-input`. Session mode
+(`--mode session --session-user <name>`) runs as root inside that account's logged-in GUI session
+and never touches the signed-in session; the account must exist and have logged in once.
+[AGENTS.md](AGENTS.md) lists the gates and the selector rules.
 
 ## Release
 
