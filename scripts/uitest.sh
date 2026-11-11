@@ -265,6 +265,10 @@ XCODE_ARGS=(
     -derivedDataPath .build/xc
 )
 for test_id in "${ONLY_TESTS[@]}"; do
+    case "$test_id" in
+        */*) ;;
+        *) test_id="chetUITests/$test_id" ;;
+    esac
     XCODE_ARGS+=("-only-testing:$test_id")
 done
 
