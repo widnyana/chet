@@ -118,7 +118,7 @@ run = "tail -f ~/Library/Logs/chet/clean.log"
 
 [tasks.clean]
 description = "Remove build output, generated project and dist/"
-run = "rm -rf .build ChetCore/.build chet.xcodeproj dist || true"
+run = "rm -rf .build ChetCore/.build chet.xcodeproj dist"
 
 [tasks.scan-bench]
 description = "Read-only scan benchmark (pass a folder: mise run scan-bench -- /path)"
