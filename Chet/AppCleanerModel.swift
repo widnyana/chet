@@ -77,6 +77,7 @@ final class AppCleanerModel {
 
     var markedApps: Set<URL> = []
     var appSizes: [URL: Int64] = [:]
+    var appLastUsed: [URL: Date] = [:]
     var isMeasuringSizes = false
     var isBulkRemoving = false
     var bulkProgress: (done: Int, total: Int, current: String?)?
@@ -87,6 +88,10 @@ final class AppCleanerModel {
     private let home = FileManager.default.homeDirectoryForCurrentUser
     private var detailTask: Task<Void, Never>?
     private var sizeTask: Task<Void, Never>?
+    private var lastUsedTask: Task<Void, Never>?
+    private var lastUsedQueue: [URL] = []
+    private var lastUsedAnswered: Set<URL> = []
+    private var lastUsedGeneration = 0
     private var bulkTask: Task<Void, Never>?
     /// Bumped on every selection change; stale component scans are dropped.
     private var generation = 0
@@ -136,6 +141,9 @@ final class AppCleanerModel {
         isLoadingApps = true
         loadError = nil
         hasFullDiskAccess = FullDiskAccess.status() == .granted
+        lastUsedTask?.cancel()
+        lastUsedTask = nil
+        lastUsedGeneration += 1
         let worker = makeUninstaller()
         Task {
             let inventory = await Task.detached(priority: .userInitiated) {
@@ -148,6 +156,7 @@ final class AppCleanerModel {
                 : "The applications folder could not be read. Check Full Disk Access, then reload."
             isLoadingApps = false
             startMeasuringSizes()
+            pruneLastUsed()
             if let selectedAppID, !inventory.apps.contains(where: { $0.url == selectedAppID }) {
                 clearSelection()
             }
@@ -201,6 +210,50 @@ final class AppCleanerModel {
                 appSizes[app.url] = bytes
             }
             isMeasuringSizes = false
+        }
+    }
+
+    // MARK: - Last used
+
+    /// Spotlight's last-used date arrives one app at a time for the rows on screen. A nil
+    /// answer is remembered so the row is asked once. Reloading cancels the pass, drops the
+    /// apps that are no longer installed, and resumes the rest.
+    func readLastUsed(_ app: InstalledApp) {
+        guard !lastUsedAnswered.contains(app.url), !lastUsedQueue.contains(app.url) else { return }
+        lastUsedQueue.append(app.url)
+        startLastUsedPass()
+    }
+
+    func isLastUsedAnswered(_ app: InstalledApp) -> Bool {
+        lastUsedAnswered.contains(app.url)
+    }
+
+    private func pruneLastUsed() {
+        let installed = Set(apps.map(\.url))
+        lastUsedQueue.removeAll { !installed.contains($0) }
+        lastUsedAnswered.formIntersection(installed)
+        appLastUsed = appLastUsed.filter { installed.contains($0.key) }
+        startLastUsedPass()
+    }
+
+    private func startLastUsedPass() {
+        guard lastUsedTask == nil, !lastUsedQueue.isEmpty else { return }
+        let worker = makeUninstaller()
+        let generation = lastUsedGeneration
+        lastUsedTask = Task {
+            defer {
+                if generation == lastUsedGeneration { lastUsedTask = nil }
+            }
+            while let pending = lastUsedQueue.first {
+                if Task.isCancelled { return }
+                let date = await Task.detached(priority: .utility) {
+                    worker.lastUsed(pending)
+                }.value
+                guard !Task.isCancelled, generation == lastUsedGeneration else { return }
+                lastUsedQueue.removeFirst()
+                lastUsedAnswered.insert(pending)
+                if let date { appLastUsed[pending] = date }
+            }
         }
     }
 

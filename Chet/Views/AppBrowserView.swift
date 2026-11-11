@@ -203,6 +203,20 @@ struct AppBrowserView: View {
             ordered = apps.sorted { (model.appSizes[$0.url] ?? -1) < (model.appSizes[$1.url] ?? -1) }
         case .status:
             ordered = apps.sorted { statusRank($0) < statusRank($1) }
+        case .lastUsed:
+            let dated =
+                apps
+                .filter { model.appLastUsed[$0.url] != nil }
+                .sorted {
+                    let left = model.appLastUsed[$0.url] ?? .distantPast
+                    let right = model.appLastUsed[$1.url] ?? .distantPast
+                    return ascending ? left > right : left < right
+                }
+            let undated =
+                apps
+                .filter { model.appLastUsed[$0.url] == nil }
+                .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+            return dated + undated
         }
         return ascending ? ordered : ordered.reversed()
     }
@@ -271,7 +285,7 @@ struct AppBrowserView: View {
 
 /// The sortable columns of the Applications list. Every column is sortable (repo rule).
 private enum AppSort {
-    case name, location, version, size, status
+    case name, location, version, size, status, lastUsed
 }
 
 private struct AppListHeader: View {
@@ -337,11 +351,16 @@ private struct AppRow: View {
                             .font(Typography.row)
                             .foregroundStyle(Theme.ink)
                             .lineLimit(1)
-                        Text(app.bundleID ?? "Unknown")
-                            .font(Typography.caption)
-                            .foregroundStyle(Theme.inkSecondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
+                        ViewThatFits(in: .horizontal) {
+                            HStack(spacing: Spacing.s2) {
+                                identityLine.fixedSize()
+                                AppLastUsedLabel(app: app).fixedSize()
+                            }
+                            VStack(alignment: .leading, spacing: 1) {
+                                identityLine
+                                AppLastUsedLabel(app: app)
+                            }
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     Text(model.locationLabel(app))
@@ -372,6 +391,14 @@ private struct AppRow: View {
             })
     }
 
+    @ViewBuilder private var identityLine: some View {
+        Text(app.bundleID ?? "Unknown")
+            .font(Typography.caption)
+            .foregroundStyle(Theme.inkSecondary)
+            .lineLimit(1)
+            .truncationMode(.middle)
+    }
+
     @ViewBuilder private var status: some View {
         if model.isAppRunning(app) {
             StatusLabel(
@@ -384,6 +411,34 @@ private struct AppRow: View {
         } else {
             Color.clear.frame(height: 1)
         }
+    }
+}
+
+/// Spotlight's answer for one app, shown in the name cell of the list and the grid card.
+/// Pending rows show a dim placeholder, an answered absence shows the explicit copy.
+private struct AppLastUsedLabel: View {
+    @Environment(AppCleanerModel.self) private var model
+    let app: InstalledApp
+
+    var body: some View {
+        Group {
+            if let date = model.appLastUsed[app.url] {
+                caption(Text("Last used \(date, format: .relative(presentation: .named))"))
+            } else if model.isLastUsedAnswered(app) {
+                caption(Text("Last used: not recorded"))
+                    .help("Spotlight records a last-used date only for apps it saw launch.")
+            } else {
+                caption(Text("Last used …"), ink: Theme.inkTertiary)
+            }
+        }
+        .onAppear { model.readLastUsed(app) }
+    }
+
+    private func caption(_ text: Text, ink: Color = Theme.inkSecondary) -> some View {
+        text.font(Typography.caption)
+            .foregroundStyle(ink)
+            .lineLimit(1)
+            .truncationMode(.tail)
     }
 }
 
@@ -430,6 +485,7 @@ private struct AppCell: View {
                             .font(Typography.caption)
                             .foregroundStyle(Theme.inkSecondary)
                             .lineLimit(1)
+                        AppLastUsedLabel(app: app)
                         Text(
                             "\(model.appSizes[app.url].map { $0.formatted(.byteCount(style: .file)) } ?? (model.isMeasuringSizes ? "Measuring" : "Unknown")) · \(model.locationLabel(app))"
                         )

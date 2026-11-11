@@ -256,6 +256,9 @@ public struct AppUninstaller: Sendable {
     public let log: AuditLog?
     public let recorder: FlightRecorder?
     public var isRunning: @Sendable ([String]) -> Bool
+    /// Spotlight's last-used date for one bundle. Read on demand for the apps on screen;
+    /// discovery never calls it.
+    public var lastUsed: @Sendable (URL) -> Date? = AppUninstaller.lastUsedDate
     public var trash: @Sendable (URL) throws -> Void
     /// Root-owned remnants, and app bundles the Trash refuses for lack of permission. Set only
     /// when the helper is registered and the dry-run gate is off; without it such a row is a skip.

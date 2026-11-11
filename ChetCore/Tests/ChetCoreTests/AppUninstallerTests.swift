@@ -735,6 +735,31 @@ struct AppUninstallerTests {
         #expect(lines.first?["mode"] as? String == "permanent")
         #expect(lines.first?["result"] as? String == "removed")
     }
+
+    @Test func lastUsedDateIsNilWhenSpotlightHasNoRecord() throws {
+        let directory = try TempDir()
+        let absent = directory.url.appendingPathComponent("NotInstalled.app", isDirectory: true)
+        #expect(AppUninstaller.lastUsedDate(absent) == nil)
+    }
+
+    @Test func discoveryNeverReadsLastUsed() throws {
+        let home = try TempDir()
+        let apps = try TempDir()
+        try makeApp(in: apps.url, name: "Foobar", bundleID: "com.test.foobar")
+        let reads = Paths()
+        var worker = AppUninstaller(home: home.url, appFolders: [apps.url], searchRoots: [])
+        worker.lastUsed = { url in
+            reads.append(url)
+            return Date(timeIntervalSince1970: 1_000)
+        }
+
+        let found = worker.installedApps()
+
+        #expect(found.map(\.name) == ["Foobar"])
+        #expect(reads.value.isEmpty)
+        #expect(worker.lastUsed(found[0].url) == Date(timeIntervalSince1970: 1_000))
+        #expect(reads.value == [found[0].url])
+    }
 }
 
 private final class Counter: @unchecked Sendable {
