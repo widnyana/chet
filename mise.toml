@@ -64,7 +64,7 @@ run = "swift test --package-path ChetCore"
 description = "Release build, build number bumped, arm64 check, zipped to dist/chet.zip"
 depends = ["gen"]
 run = [
-  "sh scripts/bump-build.sh",
+  "if [ -z \"${CHET_NO_BUMP:-}\" ]; then sh scripts/bump-build.sh; fi",
   "xcodebuild -project chet.xcodeproj -scheme chet-helper -configuration Release -destination 'platform=macOS' -derivedDataPath .build/xc -quiet build",
   "xcodebuild -project chet.xcodeproj -scheme chet -configuration Release -destination 'platform=macOS' -derivedDataPath .build/xc -quiet build",
   "test \"$(lipo -archs .build/xc/Build/Products/Release/chet.app/Contents/MacOS/chet)\" = arm64",

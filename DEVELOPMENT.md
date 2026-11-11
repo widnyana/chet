@@ -163,10 +163,11 @@ same result.
 read-only image holding `chet.app` and an `Applications` symlink; the mount carries no custom
 volume icon.
 
-Releases are built on this laptop, not in CI. `mise run publish` runs `mise run dmg`, with
-`--clean` removing the build output first, stops when the build number did not change, commits
-`Chet/Info.plist`, tags `v<version>` from `CFBundleShortVersionString`, pushes the branch and
-the annotated tag, and runs `gh release create` with `dist/chet.dmg` and `dist/chet.zip`.
+Releases are built on this laptop, not in CI. `mise run publish` bumps `CFBundleVersion`,
+commits `Chet/Info.plist`, then builds with `CHET_NO_BUMP=1 mise run dmg` so the artifact carries
+the committed number; `--clean` removes the build output first. It tags `v<version>` from
+`CFBundleShortVersionString`, pushes the branch and the annotated tag, and runs
+`gh release create` with `dist/chet.dmg` and `dist/chet.zip`.
 `--dry-run` prints the version, the tag, the artifacts, and every command instead of changing
 anything. `--skip-build` reuses the files in `dist/` and skips the build and the plist commit.
 

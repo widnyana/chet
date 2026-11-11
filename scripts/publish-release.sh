@@ -116,8 +116,15 @@ if ! command -v gh >/dev/null 2>&1; then
   exit 4
 fi
 
-if ! gh auth status -h github.com >/dev/null 2>&1; then
+if ! env -u GITHUB_TOKEN gh auth status -h github.com >/dev/null 2>&1; then
   printf 'gh is not authenticated for github.com. Run gh auth login -h github.com.\n' >&2
+  exit 4
+fi
+
+repo_slug="widnyana/chet"
+if ! env -u GITHUB_TOKEN gh api "repos/$repo_slug" >/dev/null 2>&1; then
+  printf 'gh cannot read %s. A private repository needs gh auth with the repo scope.\n' "$repo_slug" >&2
+  printf 'Run gh auth refresh -h github.com -s repo, and keep GITHUB_TOKEN out of the publish run.\n' >&2
   exit 4
 fi
 
@@ -161,9 +168,10 @@ if [ "$dry_run" = 1 ]; then
     if [ "$clean" = 1 ]; then
       printf '  mise run clean\n'
     fi
-    printf '  mise run dmg\n'
+    printf '  sh scripts/bump-build.sh\n'
     printf '  git add Chet/Info.plist\n'
     printf '  git commit -m %q\n' "chore(release): $version build $planned_build"
+    printf '  CHET_NO_BUMP=1 mise run dmg\n' 
   fi
   printf '  git tag -a %q -m %q\n' "$tag" "Chet $version"
   printf '  git push origin HEAD\n'
@@ -183,10 +191,7 @@ if [ "$skip_build" = 0 ]; then
     fi
   fi
   before_build=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")
-  if ! mise run dmg; then
-    printf 'mise run dmg failed.\n' >&2
-    exit 5
-  fi
+  sh scripts/bump-build.sh
   after_build=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")
   if [ "$after_build" = "$before_build" ]; then
     printf 'The build number did not change.\n' >&2
@@ -194,6 +199,15 @@ if [ "$skip_build" = 0 ]; then
   fi
   git add Chet/Info.plist
   git commit -m "chore(release): $version build $after_build"
+  if ! CHET_NO_BUMP=1 mise run dmg; then
+    printf 'mise run dmg failed.\n' >&2
+    exit 5
+  fi
+  built_build=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")
+  if [ "$built_build" != "$after_build" ]; then
+    printf 'The build changed the build number after the commit.\n' >&2
+    exit 5
+  fi
 else
   after_build=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")
 fi
@@ -206,10 +220,10 @@ fi
 git tag -a "$tag" -m "Chet $version"
 git push origin HEAD
 git push origin "$tag"
-release_output=$(gh "${release_args[@]}")
+release_output=$(env -u GITHUB_TOKEN gh "${release_args[@]}")
 release_url=$(printf '%s' "$release_output" | tr -d '\n')
 
-release_view=$(gh release view "$tag" --json isDraft,tagName,assets)
+release_view=$(env -u GITHUB_TOKEN gh release view "$tag" --json isDraft,tagName,assets)
 asset_names=$(printf '%s\n' "$release_view" | python3 -c 'import json, sys
 data = json.load(sys.stdin)
 for asset in data.get("assets") or []:
