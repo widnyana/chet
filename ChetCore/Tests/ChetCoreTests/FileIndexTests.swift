@@ -273,7 +273,10 @@ struct FileIndexTests {
     @Test func cancellationStopsTheThreadedWalk() async throws {
         let dir = try TempDir()
         for i in 0..<200 { for j in 0..<50 { try dir.file("d\(i)/f\(j)", bytes: 10) } }
-        let builder = FileIndexBuilder(policy: dir.policy, threads: 4)
+        let gate = ScanPauseGate()
+        gate.setPaused(true)
+        var builder = FileIndexBuilder(policy: dir.policy, threads: 4)
+        builder.pauseGate = gate
         let task = Task { () throws -> FileIndex in
             try await withTaskCancellationHandler(
                 operation: {
@@ -282,6 +285,7 @@ struct FileIndexTests {
         }
         try await Task.sleep(for: .milliseconds(20))
         task.cancel()
+        gate.setPaused(false)
         await #expect(throws: CancellationError.self) { try await task.value }
     }
 
