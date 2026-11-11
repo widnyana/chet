@@ -368,8 +368,8 @@ final class AppCleanerModel {
             privileged: Self.privilegedRemover())
     }
 
-    /// Root remnants go through the daemon only when it is on and the gate is off. The app
-    /// bundle itself is never routed here: `appRevalidation` owns that decision.
+    /// Root remnants and permission-denied app bundles go through the daemon only when it is
+    /// on and the gate is off.
     @MainActor
     private static func privilegedRemover() -> (@Sendable (URL, String) -> UninstallOutcome?)? {
         guard HelperService.isAvailable else { return nil }

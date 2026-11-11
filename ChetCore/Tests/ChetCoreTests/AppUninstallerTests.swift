@@ -594,6 +594,147 @@ struct AppUninstallerTests {
         #expect(lines.allSatisfy { $0["result"] as? String == "trashed" })
         #expect(lines.allSatisfy { $0["mode"] as? String == "trash" })
     }
+
+    private func appFixture() throws -> (home: TempDir, apps: TempDir, app: InstalledApp) {
+        let home = try TempDir()
+        let apps = try TempDir()
+        try makeApp(in: apps.url, name: "Foobar", bundleID: "com.test.foobar")
+        let app = try #require(
+            AppUninstaller(home: home.url, appFolders: [apps.url], searchRoots: []).installedApps().first)
+        return (home, apps, app)
+    }
+
+    private func appPlan(_ app: InstalledApp, bytes: Int64 = 100) -> UninstallPlan {
+        UninstallPlan(
+            app: app, components: [], includeApp: true, appBytes: bytes,
+            otherBundleIDs: [], otherNames: [])
+    }
+
+    @Test func permissionDeniedAppGoesToTheHelper() async throws {
+        let (home, apps, app) = try appFixture()
+        let urls = Paths()
+        let ids = BundleIDs()
+        let report = await uninstaller(
+            home: home.url, apps: [apps.url], roots: [],
+            trash: { _ in throw NSError(domain: NSPOSIXErrorDomain, code: Int(EPERM)) },
+            privileged: { url, bundleID in
+                urls.append(url)
+                ids.append(bundleID)
+                return .removed(100)
+            }
+        )
+        .uninstall(appPlan(app), dryRun: false)
+
+        #expect(report.results.count == 1)
+        #expect(report.results.first?.outcome == .removed(100))
+        #expect(report.removedBytes == 100)
+        #expect(report.trashedBytes == 0)
+        #expect(urls.value.map(AppUninstaller.canonicalPath) == [AppUninstaller.canonicalPath(app.url)])
+        #expect(ids.value == ["com.test.foobar"])
+    }
+
+    @Test func permissionDeniedAppWithoutHelperNeedsAdministrator() async throws {
+        let (home, apps, app) = try appFixture()
+        let report = await uninstaller(
+            home: home.url, apps: [apps.url], roots: [],
+            trash: { _ in throw NSError(domain: NSPOSIXErrorDomain, code: Int(EACCES)) }
+        )
+        .uninstall(appPlan(app), dryRun: false)
+
+        #expect(report.results.count == 1)
+        #expect(report.results.first?.outcome == .skipped(.requiresAdmin))
+        #expect(report.removedBytes == 0)
+    }
+
+    @Test func trashedAppNeverCallsTheHelper() async throws {
+        let (home, apps, app) = try appFixture()
+        let calls = Counter()
+        let report = await uninstaller(
+            home: home.url, apps: [apps.url], roots: [],
+            privileged: { _, _ in
+                calls.increment()
+                return .removed(100)
+            }
+        )
+        .uninstall(appPlan(app), dryRun: false)
+
+        #expect(calls.value == 0)
+        #expect(report.results.first?.outcome == .trashed(100))
+    }
+
+    @Test func failedHelperIsReportedOnce() async throws {
+        let (home, apps, app) = try appFixture()
+        let calls = Counter()
+        let report = await uninstaller(
+            home: home.url, apps: [apps.url], roots: [],
+            trash: { _ in throw NSError(domain: NSCocoaErrorDomain, code: NSFileWriteNoPermissionError) },
+            privileged: { _, _ in
+                calls.increment()
+                return .failed("helper said no")
+            }
+        )
+        .uninstall(appPlan(app), dryRun: false)
+
+        #expect(calls.value == 1)
+        #expect(report.results.count == 1)
+        #expect(report.results.first?.outcome == .failed("helper said no"))
+    }
+
+    @Test func dryRunAppNeverCallsTheHelper() async throws {
+        let (home, apps, app) = try appFixture()
+        let calls = Counter()
+        let report = await uninstaller(
+            home: home.url, apps: [apps.url], roots: [],
+            trash: { _ in throw NSError(domain: NSPOSIXErrorDomain, code: Int(EPERM)) },
+            privileged: { _, _ in
+                calls.increment()
+                return .removed(100)
+            }
+        )
+        .uninstall(appPlan(app), dryRun: true)
+
+        #expect(calls.value == 0)
+        #expect(report.results.first?.outcome == .trashed(100))
+        #expect(report.results.first?.dryRun == true)
+    }
+
+    @Test func nonPermissionTrashErrorStaysFailed() async throws {
+        let (home, apps, app) = try appFixture()
+        let calls = Counter()
+        let message = NSError(domain: NSCocoaErrorDomain, code: NSFileNoSuchFileError).localizedDescription
+        let report = await uninstaller(
+            home: home.url, apps: [apps.url], roots: [],
+            trash: { _ in throw NSError(domain: NSCocoaErrorDomain, code: NSFileNoSuchFileError) },
+            privileged: { _, _ in
+                calls.increment()
+                return .removed(100)
+            }
+        )
+        .uninstall(appPlan(app), dryRun: false)
+
+        #expect(calls.value == 0)
+        #expect(report.results.first?.outcome == .failed(message))
+    }
+
+    @Test func removedAppRowIsLoggedAsPermanent() async throws {
+        let (home, apps, app) = try appFixture()
+        let logURL = home.url.appendingPathComponent("Library/Logs/chet/clean.log")
+        let worker = AppUninstaller(
+            home: home.url, appFolders: [apps.url], searchRoots: [], log: AuditLog(url: logURL),
+            recorder: nil, isRunning: { _ in false },
+            trash: { _ in throw NSError(domain: NSPOSIXErrorDomain, code: Int(EPERM)) },
+            privileged: { _, _ in .removed(100) })
+        let report = await worker.uninstall(appPlan(app), dryRun: false)
+
+        #expect(report.results.first?.outcome == .removed(100))
+        let lines = try String(contentsOf: logURL, encoding: .utf8)
+            .split(separator: "\n").compactMap { line -> [String: Any]? in
+                (try? JSONSerialization.jsonObject(with: Data(line.utf8))) as? [String: Any]
+            }
+        #expect(lines.count == 1)
+        #expect(lines.first?["mode"] as? String == "permanent")
+        #expect(lines.first?["result"] as? String == "removed")
+    }
 }
 
 private final class Counter: @unchecked Sendable {

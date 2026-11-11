@@ -257,8 +257,8 @@ public struct AppUninstaller: Sendable {
     public let recorder: FlightRecorder?
     public var isRunning: @Sendable ([String]) -> Bool
     public var trash: @Sendable (URL) throws -> Void
-    /// Root-owned remnants. Set only when the helper is registered and the dry-run gate is off;
-    /// without it an admin remnant is a skip, and the app bundle is never routed here.
+    /// Root-owned remnants, and app bundles the Trash refuses for lack of permission. Set only
+    /// when the helper is registered and the dry-run gate is off; without it such a row is a skip.
     public let privileged: (@Sendable (URL, String) -> UninstallOutcome?)?
 
     /// Names that must never drive a name match: they are shared folders, not app names.
@@ -836,8 +836,23 @@ public struct AppUninstaller: Sendable {
                     try trash(plan.app.url)
                     report.results.append(appResult(plan, outcome: .trashed(plan.appBytes), dryRun: false))
                 } catch {
-                    report.results.append(
-                        appResult(plan, outcome: .failed(error.localizedDescription), dryRun: false))
+                    if Self.isPermissionDenial(error) {
+                        if let privileged {
+                            let outcome =
+                                privileged(plan.app.url, plan.app.bundleID ?? "") ?? .skipped(.requiresAdmin)
+                            report.results.append(
+                                appResult(
+                                    plan,
+                                    outcome: outcome.isPermanentRemoval ? .removed(plan.appBytes) : outcome,
+                                    dryRun: false))
+                        } else {
+                            report.results.append(
+                                appResult(plan, outcome: .skipped(.requiresAdmin), dryRun: false))
+                        }
+                    } else {
+                        report.results.append(
+                            appResult(plan, outcome: .failed(error.localizedDescription), dryRun: false))
+                    }
                 }
             }
         } else {
@@ -883,7 +898,6 @@ public struct AppUninstaller: Sendable {
         }
         guard !policy.isProtectedPath(app.url) else { return .protected }
         guard appFolders.contains(where: { Self.isInside(app.url, $0) }) else { return .policy }
-        guard Self.isWritable(app.url.deletingLastPathComponent()) else { return .requiresAdmin }
         return nil
     }
 
@@ -903,7 +917,8 @@ public struct AppUninstaller: Sendable {
         guard let log else { return }
         for row in report.results {
             log.append(
-                category: "applications", path: row.url.path, bytes: row.bytes, mode: .trash,
+                category: "applications", path: row.url.path, bytes: row.bytes,
+                mode: row.outcome.isPermanentRemoval ? .permanent : .trash,
                 result: row.outcome.logValue, dryRun: report.dryRun)
         }
     }
@@ -928,6 +943,14 @@ public struct AppUninstaller: Sendable {
             guard let path else { return false }
             return access(path, W_OK) == 0
         }
+    }
+
+    private static func isPermissionDenial(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        if nsError.domain == NSPOSIXErrorDomain, nsError.code == Int(EPERM) || nsError.code == Int(EACCES) {
+            return true
+        }
+        return nsError.domain == NSCocoaErrorDomain && nsError.code == NSFileWriteNoPermissionError
     }
 
     private func isDirectory(_ url: URL) -> Bool {
