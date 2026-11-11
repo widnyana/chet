@@ -60,9 +60,10 @@ description = "Run ChetCore tests (pass a filter: mise run test -- --filter Clea
 run = "swift test --package-path ChetCore"
 
 [tasks.release]
-description = "Release build, arm64 check, zipped to dist/chet.zip"
+description = "Release build, build number bumped, arm64 check, zipped to dist/chet.zip"
 depends = ["gen"]
 run = [
+  "sh scripts/bump-build.sh",
   "xcodebuild -project chet.xcodeproj -scheme chet-helper -configuration Release -destination 'platform=macOS' -derivedDataPath .build/xc -quiet build",
   "xcodebuild -project chet.xcodeproj -scheme chet -configuration Release -destination 'platform=macOS' -derivedDataPath .build/xc -quiet build",
   "test \"$(lipo -archs .build/xc/Build/Products/Release/chet.app/Contents/MacOS/chet)\" = arm64",
