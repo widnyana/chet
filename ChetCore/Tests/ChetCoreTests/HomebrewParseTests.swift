@@ -78,6 +78,32 @@ struct HomebrewParseTests {
         #expect(sized[1].paths == [dir.url.appendingPathComponent("Caskroom/thing").path])
     }
 
+    @Test func dryRunUpgradeNamesOnlyTheFormula() {
+        let formula = BrewPackage(
+            kind: .formula, name: "libpng", title: "libpng", desc: "", homepage: "",
+            version: "1.6.40", latest: "1.6.41", outdated: true, pinned: false,
+            onRequest: true, deps: [])
+
+        let result = Homebrew.upgrade([formula], dryRun: true)
+
+        #expect(result.ok)
+        #expect(result.out == "Would run: brew upgrade --formula libpng")
+        #expect(!result.out.contains("--cask"))
+    }
+
+    @Test func dryRunUpgradeNamesOnlyTheCask() {
+        let cask = BrewPackage(
+            kind: .cask, name: "figma", title: "Figma", desc: "", homepage: "",
+            version: "118.0", latest: "120.0", outdated: true, pinned: false,
+            onRequest: true, deps: [])
+
+        let result = Homebrew.upgrade([cask], dryRun: true)
+
+        #expect(result.ok)
+        #expect(result.out == "Would run: brew upgrade --cask figma")
+        #expect(!result.out.contains("--formula"))
+    }
+
     @Test func dryRunUninstallAndCleanupNeverRunBrew() {
         // Safe without brew installed: the dry-run paths never spawn a process.
         let pkg = BrewPackage(

@@ -195,6 +195,15 @@ final class HomebrewModel {
     func upgrade() {
         let targets = markedOutdated
         guard canAct, !targets.isEmpty else { return }
+        performUpgrade(targets, clearingMarks: true)
+    }
+
+    func upgrade(_ package: BrewPackage) {
+        guard canAct, !isWorking, package.outdated else { return }
+        performUpgrade([package], clearingMarks: false)
+    }
+
+    private func performUpgrade(_ targets: [BrewPackage], clearingMarks: Bool) {
         let dryRun = DryRun.enabled
         isWorking = true
         Task {
@@ -208,7 +217,7 @@ final class HomebrewModel {
                     ? result.out
                     : "Upgraded \(targets.count) \(targets.count == 1 ? "package" : "packages").")
                 : result.message
-            self.marked.removeAll()
+            if clearingMarks { self.marked.removeAll() }
             if result.ok && !dryRun { self.load() }
         }
     }
