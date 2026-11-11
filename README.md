@@ -30,8 +30,32 @@ how much space came back.
 
 ## Install
 
-Chet runs on Apple Silicon Macs with macOS 26 or newer. It ships as a zip; unzip it and move
-Chet to Applications.
+Chet runs on Apple Silicon Macs with macOS 26 or newer. With neither the repository nor mise,
+download the installer and run it:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/widnyana/chet/main/scripts/install-chet.sh -o /tmp/install-chet.sh
+bash /tmp/install-chet.sh
+```
+
+The installer needs bash, curl, and the macOS tools; it needs no mise and no Xcode. It finds
+the latest GitHub release, downloads the app asset, copies Chet to `/Applications`, and clears
+quarantine. `--user` installs into `~/Applications` instead, and `--target <dir>` installs into
+a folder you name. With no release published it says so and installs nothing. When
+`/Applications` is not writable, the installer stops and prints the one `sudo` command to run;
+it never asks for your password itself.
+
+From a checkout, run the script directly (no mise needed):
+
+```sh
+bash scripts/install-chet.sh
+```
+
+With mise installed, command below does the same.
+
+```sh
+mise run install-chet
+```
 
 Chet is not notarized. On another Mac, macOS blocks the first launch: right-click the app and
 choose Open.

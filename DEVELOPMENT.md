@@ -31,6 +31,8 @@ Every development step is a mise task:
 | `mise run check` | Tests, debug build, and a check that the binary is arm64 only |
 | `mise run release` | Release build, arm64 check, and `dist/chet.zip` |
 | `mise run dmg` | The release build in `dist/chet.dmg`, with an `Applications` symlink |
+| `mise run publish` | Build, tag `v<version>`, push, and upload `dist/chet.dmg` and `dist/chet.zip` |
+| `mise run install-chet` | Install the latest GitHub release into `/Applications` |
 | `mise run bench` | Compare GPU and SHA-256 hashing speed (writes 1 GB of temp files) |
 | `mise run fmt` / `mise run lint` | Format Swift code, or only check the format |
 | `mise run layout` | Check the persistent chrome against the registry in `docs/DESIGN.md` |
@@ -159,10 +161,23 @@ same result.
 `mise run release` builds the app, checks that the binary is arm64 only, and writes
 `dist/chet.zip`. `mise run dmg` runs the same build and writes `dist/chet.dmg`, a compressed
 read-only image holding `chet.app` and an `Applications` symlink; the mount carries no custom
-volume icon. The app is ad-hoc signed and not notarized, and the image is unsigned for the same
-reason. The helper needs a Team ID: `SMAppService` records an ad-hoc daemon and then refuses
-to start it, so Settings reports the build as unsupported and disables the administrator
-switch. The quarantine step for another Mac is in the
+volume icon.
+
+Releases are built on this laptop, not in CI. `mise run publish` runs `mise run dmg`, with
+`--clean` removing the build output first, stops when the build number did not change, commits
+`Chet/Info.plist`, tags `v<version>` from `CFBundleShortVersionString`, pushes the branch and
+the annotated tag, and runs `gh release create` with `dist/chet.dmg` and `dist/chet.zip`.
+`--dry-run` prints the version, the tag, the artifacts, and every command instead of changing
+anything. `--skip-build` reuses the files in `dist/` and skips the build and the plist commit.
+
+`mise run install-chet` reads the latest GitHub release, so a release must be published before
+it can install one. That task is for a checkout: the installer is a standalone script, and end
+users need bash, curl, and the macOS tools, not mise.
+
+The app is ad-hoc signed and not notarized, and the image is unsigned for the same reason. The
+helper needs a Team ID: `SMAppService` records an ad-hoc daemon and then refuses to start it,
+so Settings reports the build as unsupported and disables the administrator switch. The
+quarantine step for another Mac is in the
 [user guide](docs/USER-GUIDE.md#install-on-another-mac).
 
 ## Boundaries

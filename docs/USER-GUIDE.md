@@ -246,7 +246,28 @@ itself.
 
 ## Install on another Mac
 
-The app is ad-hoc signed and not notarized. Copied to another Mac, macOS blocks it at first
+Download the installer and run it:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/widnyana/chet/main/scripts/install-chet.sh -o /tmp/install-chet.sh
+bash /tmp/install-chet.sh
+```
+
+It needs bash, curl, and the macOS tools, not mise or Xcode. It finds the latest GitHub
+release, downloads the app asset, copies `chet.app` to `/Applications`, and clears the
+quarantine flag, in that order. `--user` installs into `~/Applications` instead, and
+`--target <dir>` installs into a folder you name. With no release published the script says so
+and installs nothing.
+
+From a checkout, run the script directly (no mise needed):
+
+```sh
+bash scripts/install-chet.sh
+```
+
+With mise installed, `mise run install-chet` does the same.
+
+The app is ad-hoc signed and not notarized. If you copy it by hand, macOS blocks it at first
 launch. Right-click the app and choose **Open**, or remove the quarantine flag:
 
 ```sh
