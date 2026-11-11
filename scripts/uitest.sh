@@ -12,12 +12,13 @@ cd "$REPO_DIR"
 MODE=local
 ALLOW_FOCUS=0
 ALLOW_ACTIVE_INPUT=0
+WAIT_IDLE=0
 BUILD_ONLY=0
 SESSION_USER=""
 ONLY_TESTS=()
 
 usage() {
-    printf 'usage: %s [--only <test>]... [--build-only] [--mode local|session] [--allow-focus] [--allow-active-input] [--session-user <name>]\n' "$0" >&2
+    printf 'usage: %s [--only <test>]... [--build-only] [--mode local|session] [--allow-focus] [--allow-active-input] [--wait-idle] [--session-user <name>]\n' "$0" >&2
     exit 2
 }
 
@@ -34,7 +35,20 @@ require_idle_machine() {
         fail 7 "cannot read keyboard idle time"
     fi
     if [ "$idle_ns" -lt 20000000000 ]; then
-        fail 7 "the machine is in use (idle under 20 s); pass --allow-active-input only when you are not typing"
+        if [ "$WAIT_IDLE" = 1 ]; then
+            printf 'uitest: waiting for 20 s without input before starting\n' >&2
+            local waited=0
+            while [ "$waited" -lt 180 ]; do
+                sleep 2
+                waited=$((waited + 2))
+                idle_ns=$(ioreg -c IOHIDSystem 2>/dev/null | sed -n 's/.*HIDIdleTime" = \([0-9]*\).*/\1/p' | head -1)
+                if [ -n "$idle_ns" ] && [ "$idle_ns" -ge 20000000000 ]; then
+                    return 0
+                fi
+            done
+            fail 7 "no 20 s idle window within 180 s; stop typing and run again, or pass --allow-active-input"
+        fi
+        fail 7 "the machine is in use (idle under 20 s); pass --wait-idle to wait, or --allow-active-input when you accept the risk"
     fi
 }
 
@@ -73,6 +87,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --allow-active-input)
             ALLOW_ACTIVE_INPUT=1
+            shift
+            ;;
+        --wait-idle)
+            WAIT_IDLE=1
             shift
             ;;
         --session-user)
