@@ -14,25 +14,24 @@ struct AboutView: View {
 
     private let auditLog = AuditLog()
     private var logsDirectory: URL { FlightRecorder.defaultDirectory }
+    private let productSentence = "Shows what takes space, and removes only what you pick."
+    private let accessSentence = "Some folders stay hidden until you grant access."
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Spacing.s6) {
-                PageHeader(
-                    title: "Chet",
-                    subtitle: "Shows what takes space, and removes only what you pick.",
-                    metric: build?.version,
-                    metricLabel: build?.version == nil ? nil : "version",
-                    icon: NSApplication.shared.applicationIconImage)
+            VStack(alignment: .leading, spacing: 0) {
+                hero
+                Hairline()
+                    .padding(.vertical, Spacing.s6)
                 if let build {
-                    sections(build)
+                    facts(build)
                 } else {
                     LoadingStateView(message: "Reading this build")
                 }
             }
             .pageHorizontalPadding()
             .padding(.vertical, Spacing.s6)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity)
         }
         .background(Theme.paper)
         .frame(width: 560, height: 620)
@@ -45,60 +44,129 @@ struct AboutView: View {
         }
     }
 
-    private func sections(_ build: BuildInfo) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.s8) {
-            section("This build") {
-                AboutInfoRow(label: "Build", value: build.build ?? "Unknown")
-                Hairline()
-                AboutInfoRow(label: "Minimum macOS", value: build.minimumOS ?? "Unknown")
+    private var hero: some View {
+        VStack(spacing: Spacing.s3) {
+            Image(nsImage: NSApplication.shared.applicationIconImage)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: Metrics.aboutIconSize, height: Metrics.aboutIconSize)
+            Text("Chet")
+                .font(Typography.title)
+                .foregroundStyle(Theme.ink)
+            Text(productSentence)
+                .font(Typography.body)
+                .foregroundStyle(Theme.inkSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: Metrics.aboutIntroWidth)
+            if let versionLine {
+                Text(versionLine)
+                    .font(Typography.caption)
+                    .foregroundStyle(Theme.inkSecondary)
+                    .monospacedDigit()
+                    .textSelection(.enabled)
             }
-            section("Status") {
-                AboutInfoRow(
-                    label: "Full Disk Access",
-                    value: model.access == .granted ? "Granted" : "Not granted",
-                    detail: model.access == .granted ? nil : "Some folders stay hidden until you grant access.",
-                    tone: model.access == .granted ? .neutral : .amber,
-                    systemImage: model.access == .granted ? "checkmark.circle" : "exclamationmark.triangle",
-                    actionTitle: model.access == .granted ? nil : "Open Settings",
-                    actionHelp: "Open Full Disk Access in System Settings",
-                    action: { _ = NSWorkspace.shared.open(FullDiskAccess.settingsURL) })
-                Hairline()
-                AboutInfoRow(label: "Last scan", value: lastScan.value, detail: lastScan.detail)
+        }
+        .frame(maxWidth: .infinity)
+        .multilineTextAlignment(.center)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(heroLabel)
+    }
+
+    private var versionLine: String? {
+        guard let build else { return nil }
+        return "Version \(build.version ?? "Unknown") (build \(build.build ?? "Unknown"))"
+    }
+
+    private var heroLabel: String {
+        guard let versionLine else { return "Chet, \(productSentence)" }
+        return "Chet, \(productSentence), \(versionLine)"
+    }
+
+    private func facts(_ build: BuildInfo) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            AboutRow(label: "Minimum macOS") {
+                valueText(build.minimumOS ?? "Unknown")
             }
-            section("Logs") {
-                AboutPathRow(
-                    label: "Audit log",
-                    path: auditLog.url.path,
-                    detail: logExists ? "A record of each item Chet removed." : "No log yet.",
-                    actionTitle: logExists ? "Show" : nil,
-                    actionHelp: "Open the clean log",
-                    action: { _ = NSWorkspace.shared.open(auditLog.url) })
-                Hairline()
-                AboutPathRow(
-                    label: "Logs folder",
-                    path: logsDirectory.path,
-                    detail: logsExist ? nil : "The folder appears after the first run.",
-                    actionTitle: logsExist ? "Open" : nil,
-                    actionHelp: "Open ~/Library/Logs/chet",
-                    action: { _ = NSWorkspace.shared.open(logsDirectory) })
+            AboutRow(
+                label: "Full Disk Access",
+                actionTitle: model.access == .granted ? nil : "Open Settings",
+                actionHelp: "Open Full Disk Access in System Settings",
+                action: model.access == .granted
+                    ? nil : { _ = NSWorkspace.shared.open(FullDiskAccess.settingsURL) }
+            ) {
+                VStack(alignment: .leading, spacing: Spacing.s1) {
+                    StatusLabel(
+                        text: model.access == .granted ? "Granted" : "Not granted",
+                        systemImage: model.access == .granted
+                            ? "checkmark.circle" : "exclamationmark.triangle",
+                        tone: model.access == .granted ? .neutral : .amber,
+                        help: model.access == .granted ? "Full Disk Access is granted" : accessSentence)
+                    if model.access != .granted {
+                        Text(accessSentence)
+                            .font(Typography.caption)
+                            .foregroundStyle(Theme.inkSecondary)
+                    }
+                }
+            }
+            AboutRow(label: "Last scan") {
+                VStack(alignment: .leading, spacing: Spacing.s1) {
+                    valueText(lastScan.value)
+                    if let detail = lastScan.detail {
+                        Text(detail)
+                            .font(Typography.caption)
+                            .foregroundStyle(Theme.inkSecondary)
+                    }
+                }
+            }
+            AboutRow(
+                label: "Audit log",
+                actionTitle: logExists ? "Show" : nil,
+                actionHelp: "Open the clean log",
+                action: logExists ? { _ = NSWorkspace.shared.open(auditLog.url) } : nil
+            ) {
+                VStack(alignment: .leading, spacing: Spacing.s1) {
+                    pathText(auditLog.url.path)
+                    if !logExists {
+                        Text("No log yet")
+                            .font(Typography.caption)
+                            .foregroundStyle(Theme.inkSecondary)
+                    }
+                }
+            }
+            AboutRow(
+                label: "Logs folder",
+                actionTitle: logsExist ? "Open" : nil,
+                actionHelp: "Open ~/Library/Logs/chet",
+                action: logsExist ? { _ = NSWorkspace.shared.open(logsDirectory) } : nil
+            ) {
+                pathText(logsDirectory.path)
             }
         }
     }
 
-    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.s3) {
-            SectionHeader(title: title)
-            VStack(spacing: 0) { content() }
-        }
+    private func valueText(_ text: String) -> some View {
+        Text(text)
+            .font(Typography.row)
+            .monospacedDigit()
+            .foregroundStyle(Theme.ink)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .textSelection(.enabled)
+    }
+
+    private func pathText(_ path: String) -> some View {
+        Text(path)
+            .font(Typography.caption)
+            .foregroundStyle(Theme.ink)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .textSelection(.enabled)
+            .help(path)
     }
 
     private var lastScan: (value: String, detail: String?) {
-        if model.isScanning {
-            return ("Scanning", "Results update when it ends.")
-        }
-        guard let date = model.lastScan else {
-            return ("No scan yet", "Run a scan from the main window.")
-        }
+        if model.isScanning { return ("Scanning", nil) }
+        guard let date = model.lastScan else { return ("No scan yet", nil) }
         return (
             model.totalBytes.formatted(.byteCount(style: .file)),
             date.formatted(date: .abbreviated, time: .shortened)
@@ -117,87 +185,35 @@ struct AboutView: View {
     }
 }
 
-/// Ledger row for a labelled fact with an optional status icon and action.
-private struct AboutInfoRow: View {
+private struct AboutRow<Value: View>: View {
     let label: String
-    let value: String
-    var detail: String?
-    var tone: StatusTone = .neutral
-    var systemImage: String?
     var actionTitle: String?
     var actionHelp: String?
     var action: (() -> Void)?
+    let value: Value
 
-    var body: some View {
-        HStack(spacing: Spacing.s3) {
-            Text(label)
-                .font(Typography.body)
-                .foregroundStyle(Theme.ink)
-            Spacer(minLength: Spacing.s3)
-            VStack(alignment: .trailing, spacing: 2) {
-                HStack(spacing: Spacing.s1) {
-                    if let systemImage {
-                        Image(systemName: systemImage)
-                            .font(Typography.iconAction)
-                            .foregroundStyle(tone.color)
-                    }
-                    Text(value)
-                        .font(Typography.row)
-                        .monospacedDigit()
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .textSelection(.enabled)
-                        .foregroundStyle(tone == .neutral ? Theme.ink : tone.color)
-                }
-                if let detail {
-                    Text(detail)
-                        .font(Typography.caption)
-                        .foregroundStyle(Theme.inkSecondary)
-                        .multilineTextAlignment(.trailing)
-                        .lineLimit(2)
-                }
-            }
-            if let actionTitle, let action {
-                SecondaryActionButton(title: actionTitle, help: actionHelp, action: action)
-            }
-        }
-        .padding(.vertical, Spacing.s2)
+    init(
+        label: String, actionTitle: String? = nil, actionHelp: String? = nil,
+        action: (() -> Void)? = nil, @ViewBuilder value: () -> Value
+    ) {
+        self.label = label
+        self.actionTitle = actionTitle
+        self.actionHelp = actionHelp
+        self.action = action
+        self.value = value()
     }
-}
-
-/// Ledger row for a filesystem path, with a secondary action when the path exists.
-private struct AboutPathRow: View {
-    let label: String
-    let path: String
-    var detail: String?
-    var actionTitle: String?
-    var actionHelp: String?
-    var action: (() -> Void)?
-
     var body: some View {
-        HStack(spacing: Spacing.s3) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(label)
-                    .font(Typography.body)
-                    .foregroundStyle(Theme.ink)
-                Text(path)
-                    .font(Typography.caption)
-                    .foregroundStyle(Theme.inkSecondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .textSelection(.enabled)
-                    .help(path)
-                if let detail {
-                    Text(detail)
-                        .font(Typography.caption)
-                        .foregroundStyle(Theme.inkSecondary)
-                }
-            }
-            Spacer(minLength: Spacing.s3)
+        HStack(alignment: .top, spacing: Spacing.s3) {
+            Text(label)
+                .font(Typography.caption)
+                .foregroundStyle(Theme.inkSecondary)
+                .frame(width: Metrics.aboutLabelWidth, alignment: .leading)
+            value
+                .frame(maxWidth: .infinity, alignment: .leading)
             if let actionTitle, let action {
                 SecondaryActionButton(title: actionTitle, help: actionHelp, action: action)
             }
         }
-        .padding(.vertical, Spacing.s2)
+        .frame(minHeight: Metrics.rowHeight)
     }
 }

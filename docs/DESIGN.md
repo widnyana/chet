@@ -391,25 +391,47 @@ spinner while checking. No glass card and no pulsing dot.
 
 ### About
 
-One fixed 560 x 620 window, opened from `Chet > About Chet`. It is a
-ledger of app facts, not a landing page and not a system report. The window
-title is `About Chet`; the page header names the app.
+One fixed 560 x 620 window, opened from `Chet > About Chet`. It is a record of
+the app's own facts, not a landing page and not a system report. The window
+title is `About Chet`.
 
 Top to bottom:
 
-1. Page header: app icon, `Chet`, one sentence, the version.
-2. This build: build number, minimum macOS.
-3. Status: Full Disk Access with `Open Settings` when denied, last scan.
-4. Logs: selectable audit log and logs folder paths with `Show` and `Open`.
+1. Centered hero: the app icon at 88 pt, `Chet`, the one-sentence product
+   line, and `Version 0.10.0 (build 42)` in caption with tabular numerals.
+   No page metric; the version is not the page's subject.
+2. One `Hairline`, spaced above and below.
+3. Five rows on one label column: `Minimum macOS`, `Full Disk Access`,
+   `Last scan`, `Audit log`, `Logs folder`. No section headings, no row rules,
+   no card or inset.
 
 Rules:
 
-- Every missing read says `Unknown`. Never a zero standing in for a value.
+- Every missing read says `Unknown`, `No scan yet`, or `No log yet`. Never a zero
+  standing in for a value.
 - The window reads the app bundle and its own log paths only. It does not
   inventory the machine.
 - Paths truncate in the middle and keep the full path in the tooltip.
+- `Show` appears only when the audit log exists; `Open` only when the logs folder
+  exists. A missing action is removed, not disabled.
+- One accent: amber appears only on `Not granted`, with one sentence and
+  `Open Settings`.
 - No animation. The only motion is the native spinner while the build facts
   load.
+
+Why this shape:
+
+- Centered hero: the window has one subject, so it gets one focal point instead
+  of a page-like ledger.
+- Version in the hero line, not a 34 pt metric: it is a fact about the app, not
+  the page's subject.
+- Five rows and no headings: a heading per pair of rows is bureaucracy; the list
+  is short.
+- No row rules and no cards: the paper surface is already the container; a panel
+  inside a fixed window adds nesting.
+- Paths stay visible: "where are the logs" is part of the job; middle truncation
+  and a tooltip keep them quiet.
+- One accent: amber appears only when Full Disk Access is missing.
 
 ## Components
 
@@ -430,8 +452,8 @@ Rules:
   held for at least 0.45 s so a fast pass cannot flash past
   with items, bytes, freed, skipped, failed, current path, and action.
 - `PermissionPage`: plain page, one action.
-- `AboutInfoRow` and `AboutPathRow`: label, value or selectable path, optional
-  status icon, detail, and secondary action.
+- `AboutRow`: the About window's private label/value row. A 136 pt label column,
+  caption label, one value, and at most one secondary action. No row rules.
 - `PreferenceRow` and `DefinitionRow`: the preference list row and the detail sheet's
   label/value row. Geometry lives in the component.
 - `SettingsPanel`, `SettingsRow`, `SettingsActionRow`, `SettingsNote`,
@@ -485,19 +507,26 @@ Full copy is in [design/copy.md](design/copy.md).
 8. If a screen needs two focal points, the screen is doing two jobs. Split it.
 9. The app icon is the only asset with a gradient.
 
-## Dev activity log (D-Segment)
+## Dev activity log
 
-The dev activity log is two types and one slot. `VerboseLog` is the facade: `enabled` is computed once per process under `#if DEBUG` from `CHET_VERBOSE` using the `DryRun.parse` rule (`1` or `true`, trimmed, lowercased; everything else, including absent, means off). There is no second variable and no path override: the writer's location is the app's log directory, resolved by the app. `ActivityLog` is the writer: one construction site in `Chet/ChetApp.swift`, installed into the facade's slot, cleared at termination. When the slot is nil every `event` and `flush` is a no-op, which is the disabled path: no file, no descriptor, no rendered record. There is no `enabled` bool parameter and no writer parameter anywhere in the view layer.
+The dev activity log is a Debug-only trace of what the app did. It is separate from the clean
+audit log and from `crash.txt`.
 
-A record is a closed sum: `time`, `session`, then level, category, message and fields whose keys and values are closed enumerations. A field value is a count, a byte count, a duration, a status code carrying a fixed numeric code, a basename, a not-absolute path, or a redaction tag. No case accepts a free string, so redaction is a property of the type rather than a step in the writer. Release builds compile `enabled` to `false` and never read the environment.
-
-`maxFileBytes` is 1 MiB. A record is bounded by `maxRecordBytes` (2,048 bytes): a longer render is dropped and never truncated, so no line is ever split. The cap is enforced by the rotation predicate (on-disk bytes plus pending bytes plus the next line greater than `maxFileBytes`) and by a buffer that is only ever written whole. Rotation replaces `application-debug.1.log`; launch prune keeps the newest `kept` rotated names, counted excluding the live name, through `LogMaintenance.pruneLogs(in:prefix:suffix:kept:)` with `("application-debug", ".log", 2)`, which never matches a `crash-` or `flight-` name and never deletes the live name.
-
-Flush policy: 16 records, or the first append after the 5 s bound, for `debug` rows; immediate for `info`, `warn`, `error`. Explicit flush points sit at scan end, scan cancel, before and after destructive removals, before a storage trash move, before uninstall execution, before tweak apply or revert, and at termination. One `flock` is held for the writer's lifetime and re-taken on the new live descriptor after rotation. A non-owner opens the existing path without create, never renames, and rechecks the inode on every flush so its bytes do not keep landing in the rotated file. A failed open, write, rename, or re-lock degrades the writer to `isAvailable == false` with one `devlog` category notice and no retry loop; there is no fallback file.
-
-The activity log never reads or writes `crash.txt` or any crash rotation, registers no signal handler, and writes nothing on a fatal signal; the crash path's `write(2)`-only handler is unchanged, so the two files share no descriptor, no rotation, and no code path. Crash pruning stays `("crash-", ".txt", 5)`, so five rotated crash names survive. The helper daemon and `chet-scan` never install a writer: the only construction site is the app target, and the helper is a separate launchd process that `mise run dev` does not start.
-
-Logging is passive. It never blocks the UI: every seam call is a plain non-throwing statement, no view reads writer state, and the hooks sit outside `body`. It never changes a scan outcome: `ScanEquivalenceTests` runs the scan pipeline twice over one fixture, once with a real writer installed on a temporary directory and a recording sink, and once with the writer slot nil and the same sink, and asserts the two outcome arrays are equal. The writer arm's file is checked non-empty, so the comparison is a logging run against a non-logging run, not two no-ops; the case is serialized and clears the slot afterwards. It needs no Full Disk Access and never triggers or consumes a TCC prompt; the log directory is the user's own and is the one the crash path already writes.
+- Activation: `VerboseLog.enabled` is Debug-only and reads `CHET_VERBOSE`. `mise run dev` sets
+  it. Absent, `0`, `yes`, or a Release build installs no writer, creates no file, and leaves
+  every call a no-op.
+- Record shape: one JSON object per line with keys `time`, `session`, `level`, `category`,
+  `message`, and `fields`, sorted. `level`, `category`, `message`, and the field keys and
+  values are closed enumerations, so a message cannot carry an arbitrary string. A record
+  over 2,048 bytes is dropped, never split.
+- Limits: two names, `application-debug.log` and `application-debug.1.log`, at 1 MiB each,
+  pruned at launch.
+- Flush: 16 records, 5 s from the last flush, any record above debug level, an explicit flush
+  around destructive work, and app termination. No timer runs.
+- Degradation: an unavailable writer is a no-op with one Console notice in the `devlog`
+  category, and there is no retry loop or fallback file.
+- Crash separation: the crash writer owns `crash.txt` and its rotations, and nothing in the
+  activity log runs from a signal handler. Crash retention is unchanged at five rotated names.
 
 ## Layout registry
 

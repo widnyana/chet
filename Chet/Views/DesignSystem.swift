@@ -45,6 +45,9 @@ enum Metrics {
     static let widePageMargin: CGFloat = 32
     static let gridCellMinWidth: CGFloat = 164
     static let rowHeight: CGFloat = 40
+    static let aboutIconSize: CGFloat = 88
+    static let aboutLabelWidth: CGFloat = 136
+    static let aboutIntroWidth: CGFloat = 420
     static let commandBarMinHeight: CGFloat = 56
     static let tableHeaderHeight: CGFloat = 32
     /// Controls use one radius and one height so every primary action matches.

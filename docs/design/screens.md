@@ -324,22 +324,24 @@ the main window and can stay open during a scan.
 
 Top to bottom:
 
-1. `PageHeader`: app icon, `Chet`, the one-sentence product line, metric: the
-   version.
-2. `This build`: build, minimum macOS.
-3. `Status`: Full Disk Access with `Granted` or the amber `Not granted` plus
-   `Open Settings`; last scan with its byte total and date.
-4. `Logs`: audit log path with `Show` when it exists; logs folder with `Open`.
+1. Centered hero: 88 pt app icon, `Chet`, the one-sentence product line, and
+   `Version <v> (build <b>)` in caption with tabular numerals. The hero is one
+   accessibility element; its label composes the app name, the sentence, and the
+   version line.
+2. One `Hairline`, spaced above and below.
+3. Five rows on one 136 pt label column: `Minimum macOS`, `Full Disk Access`,
+   `Last scan`, `Audit log`, `Logs folder`. No section headings, no row rules,
+   no cards.
 
 The window does not inventory the machine. No model, chip, memory, disk, or GPU
 rows.
 
 States:
 
-- Loading: header plus `Reading this build`; no fake values.
+- Loading: hero plus `Reading this build`; no rows, no fake values.
 - Partial: a missing build key says `Unknown`; other rows render.
 - Empty: `No scan yet`, `No log yet`; the missing action is removed, not dead.
-- Denied access: amber status, one sentence, `Open Settings`.
+- Denied access: amber `Not granted`, one sentence, `Open Settings`.
 - Long paths truncate in the middle with the full path in the tooltip.
 
 ## Permission page

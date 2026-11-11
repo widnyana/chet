@@ -294,8 +294,12 @@ Uninstall complete
 
 ## About
 
+- Version line: `Version <v> (build <b>)`.
+- Rows: `Minimum macOS`, `Full Disk Access`, `Last scan`, `Audit log`, `Logs folder`.
 - Status: `Granted` or `Not granted`.
-- Audit log detail: `A record of each item Chet removed.` or `No log yet.`
+- Denied sentence: `Some folders stay hidden until you grant access.`
+- Loading: `Reading this build`.
+- Empty: `No scan yet`, `No log yet`; scanning: `Scanning`.
 - Missing value: `Unknown`.
 
 ## Tweaks

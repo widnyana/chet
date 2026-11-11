@@ -17,7 +17,7 @@ hairline
 Rules:
 
 - One page title. It names the job, not the category ID.
-- The icon is optional and only for an object page: an app or About. It is
+- The icon is optional and only for an object page: an app. It is
   44 pt and uses the page's own asset.
 - The subtitle is one sentence. It may name the risk or the count.
 - The metric is the number the page is about. It is optional; when present it
