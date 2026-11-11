@@ -70,7 +70,7 @@ struct ConfirmSheet: View {
                 }
                 VStack(alignment: .leading, spacing: Spacing.s2) {
                     if permanent > 0 {
-                        HStack(spacing: Spacing.s2) {
+                        HStack(alignment: .firstTextBaseline, spacing: Spacing.s2) {
                             Image(systemName: "trash.slash")
                                 .foregroundStyle(Theme.inkSecondary)
                             Text(
@@ -80,10 +80,11 @@ struct ConfirmSheet: View {
                             )
                             .font(Typography.body)
                             .foregroundStyle(Theme.ink)
+                            .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     if trashed > 0 {
-                        HStack(spacing: Spacing.s2) {
+                        HStack(alignment: .firstTextBaseline, spacing: Spacing.s2) {
                             Image(systemName: "trash")
                                 .foregroundStyle(Theme.inkSecondary)
                             Text(
@@ -93,6 +94,7 @@ struct ConfirmSheet: View {
                             )
                             .font(Typography.body)
                             .foregroundStyle(Theme.ink)
+                            .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                 }
