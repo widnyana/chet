@@ -47,11 +47,13 @@ Trash, or restarts an app.
 Root cleanup is one gated path owned by `ChetCore` (`ChetHelperProtocol`, `HelperGuard.refusal`,
 `HelperSession`, `PrivilegedClient`). Daemon target: `chet-helper`.
 
-- Removal is permanent (`removeItem`), never the Trash. No helper means a policy skip and `enabled: false`.
+- Removal is permanent (`removeItem`), never the Trash; `chet.app` is never removed. No helper
+  means a policy skip and `enabled: false`.
 - Empty Trash is one gated path: `SystemStatusModel` resolves the gate once and passes it to
   the engine; the footer only chooses the sentence.
-- `HelperGuard`: absolute paths only, no `..`, no symlink in a parent, no protected tree, only
-  children of `/Library/{Caches,Logs,Application Support,Preferences,LaunchAgents,LaunchDaemons}`.
+- `HelperGuard`: absolute paths only, no `..`, no symlink in a parent, no protected tree. It
+  accepts children of `/Library/{Caches,Logs,Application Support,Preferences,LaunchAgents,LaunchDaemons}`
+  and one direct `.app` bundle in `/Applications`.
 - `DRY_RUN=1` never registers or calls the daemon.
 - Never install, approve, or exercise the daemon in an automated check. Registration and real
   removal are manual, from a copy in `/Applications`, with the user's consent.

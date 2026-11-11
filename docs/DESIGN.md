@@ -244,6 +244,17 @@ checkbox, name, publisher or bundle ID, location, version, size, and a text
 status for running or admin. The command bar is present on the screen and
 disabled until an app is marked. Opening an app is separate from marking it.
 
+The confirmation lists the consequences: the app and the chosen files move to
+the Trash, you can restore them, and Chet checks each item again. When the app
+is marked it also says `If macOS needs an administrator for the app, it is
+removed permanently, not moved to the Trash.` That row appears once. When no
+app is marked, an administrator component adds `Items that need an
+administrator are removed permanently, not moved to the Trash.` instead.
+
+The bundle follows the two paths the sentence names: the Trash when macOS
+allows the move, and permanent removal by the helper when macOS refuses. The
+report keeps `Moved to the Trash` and `Removed permanently` as its wording.
+
 ### Homebrew
 
 A searchable inventory of installed Homebrew packages. No scan control; the

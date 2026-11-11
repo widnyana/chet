@@ -61,7 +61,9 @@ struct AppUninstallConfirmSheet: View {
                     consequenceRow("The app and the files you chose move to the Trash.", icon: "trash")
                     consequenceRow("You can restore them from the Trash.", icon: "arrow.uturn.backward")
                     consequenceRow("Chet checks each item again before it moves.", icon: "checkmark.shield")
-                    if !DryRun.enabled,
+                    if !DryRun.enabled, model.appSelected {
+                        consequenceRow(AppCopy.permanentAppRemoval, icon: "lock.open")
+                    } else if !DryRun.enabled,
                         model.selectedComponentList.contains(where: { $0.requiresAdmin })
                     {
                         consequenceRow(

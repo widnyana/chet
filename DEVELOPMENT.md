@@ -124,7 +124,8 @@ A root-owned item takes one more step. `Cleaner` and `AppUninstaller` hand it to
 `privileged` closure instead of removing it themselves. The app builds that closure from
 `PrivilegedClient`, and the daemon applies `HelperGuard.refusal` before `removeItem`. With the
 closure absent, a root-owned item is a policy skip, so no engine can remove one on its own.
-The removal is permanent; root-owned data has no per-user Trash.
+The removal is permanent, never the Trash. The daemon removes children of the six `/Library`
+trees and one direct `.app` bundle in `/Applications`; it never removes `chet.app`.
 
 Rules for new code:
 
@@ -168,6 +169,6 @@ switch. The quarantine step for another Mac is in the
 
 App thinning, Docker images, and tweaks outside the catalog are out of scope. Root-owned data
 is in scope only through the registered helper and only under `/Library/Caches`,
-`/Library/Logs`, and the app remnant roots in `HelperGuard`; an app bundle always needs a
-writable parent. The reasons for the rest are in the
+`/Library/Logs`, and the app remnant roots in `HelperGuard`, plus one direct `.app` bundle in
+`/Applications`; removal is permanent, never the Trash. The reasons for the rest are in the
 [user guide](docs/USER-GUIDE.md#not-covered).

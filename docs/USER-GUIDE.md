@@ -187,8 +187,10 @@ Each row says why it matched:
 The app is unchecked when it is open or cannot be written. The **Move to Trash** button is
 disabled while the app or one of its helpers runs, and the core checks again before the first
 move. Related files go first and the app bundle goes last, so a failed move never hides the app
-itself. Files go to the Trash; a file that needed an administrator is removed permanently
-instead, and the app bundle always goes to the Trash.
+itself. Files go to the Trash. An item that needed an administrator is removed permanently
+instead. The app bundle goes to the Trash when macOS allows it; when macOS refuses, Chet asks
+the administrator helper and the bundle is removed permanently. The confirmation says which
+path applies before you act.
 
 ## How Chet protects your data
 
@@ -219,10 +221,12 @@ itself.
 - The helper lives inside the app. It starts on your first removal and exits when the approval
   runs out, so nothing privileged stays running. An approval lasts 1 to 60 minutes, 10 by
   default; change it with the **Approval lifetime** slider.
-- These files are removed permanently: root-owned data has no Trash of your own. The app
-  bundle itself is never touched, and each row is checked again right before it goes.
-- Covered: `/Library/Caches`, `/Library/Logs`, and app remnants under `/Library` such as launch
-  agents and launch daemons. Nothing else outside those trees.
+- These files are removed permanently: root-owned data has no Trash of your own. Each row is
+  checked again right before it goes. The one exception is the app bundle you chose in Apps:
+  the helper removes it permanently only when the Trash move was refused.
+- Covered: children of `/Library/Caches`, `/Library/Logs`, `/Library/Application Support`,
+  `/Library/Preferences`, `/Library/LaunchAgents` and `/Library/LaunchDaemons`, plus one direct
+  app bundle in `/Applications`. Nothing else. Chet itself is never removed.
 - With the helper off, those rows stay unchecked and a cleanup skips them.
 - Only a signed build can turn this on. A locally built copy is ad-hoc signed, has no Team ID,
   and macOS refuses its helper; the panel says so and keeps the switch off.

@@ -3,6 +3,9 @@ import ChetCore
 /// Plain names for app parts, how strongly a file belongs to an app, and why an item
 /// was left alone. The core's `title` strings are used by logs and tests.
 enum AppCopy {
+    static let permanentAppRemoval =
+        "If macOS needs an administrator for the app, it is removed permanently, not moved to the Trash."
+
     static func component(_ kind: AppComponentKind) -> String {
         switch kind {
         case .application: "The app"

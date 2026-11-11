@@ -78,7 +78,8 @@ identifier or one of its helpers.
 Each row says why it matched. Exact bundle identifier and helper matches are selected. Name
 matches stay unchecked. Group containers shared with another app cannot be selected. Related
 files move first and the app bundle moves last, so a failed move never hides the app itself.
-Everything goes to the Trash.
+The bundle goes to the Trash when macOS allows it; when macOS refuses, the administrator helper
+removes it permanently.
 
 ![Chet Apps, with the installed apps and what each one leaves behind](docs/images/chet-apps.png)
 
@@ -126,15 +127,18 @@ helper. It is off until you turn it on and never asks for an administrator by it
 - Turn it on in Settings, pane Folders, panel Administrator. macOS asks you to approve Chet,
   and you can turn it off in the same panel.
 - An approval lasts from 1 to 60 minutes, 10 by default.
-- Removal is permanent: root-owned data has no Trash of its own. App bundles are never touched.
-- Covered: `/Library/Caches`, `/Library/Logs`, and app remnants under `/Library` such as
-  launch agents and daemons. Nothing else outside these trees.
+- Removal is permanent: root-owned data has no Trash of its own. The one app bundle you
+  uninstall is removed this way only when macOS refuses the Trash.
+- Covered: children of `/Library/Caches`, `/Library/Logs`, `/Library/Application Support`,
+  `/Library/Preferences`, `/Library/LaunchAgents` and `/Library/LaunchDaemons`, plus one direct
+  app bundle in `/Applications`. Nothing else.
 
 ## Limits
 
 Chet does not thin app binaries or remove app languages, because that breaks code signatures.
-It does not prune Docker or OrbStack images. It never removes an app bundle that needs
-administrator rights. Tweaks changes only the preferences it can read back and verify.
+It does not prune Docker or OrbStack images. It removes one app bundle permanently only when
+macOS refuses the Trash for that bundle, and never `chet.app`. Tweaks changes only the
+preferences it can read back and verify.
 
 ## Keyboard and accessibility
 
