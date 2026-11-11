@@ -250,9 +250,11 @@ snapshot() {
     for path in "${USER_PATHS[@]}"; do
         case "$path" in
             */Library/Preferences)
-                find "$path" -maxdepth 1 -type f -print0 2>/dev/null |
-                    xargs -0 stat -f '%m %z %N' 2>/dev/null | sort ||
+                if [ -d "$path" ]; then
+                    find "$path" -maxdepth 1 -type f -exec stat -f '%m %z %N' {} + 2>/dev/null | sort
+                else
                     printf 'missing %s\n' "$path"
+                fi
                 ;;
             *)
                 stat -f '%m %z %N' "$path" 2>/dev/null || printf 'missing %s\n' "$path"
