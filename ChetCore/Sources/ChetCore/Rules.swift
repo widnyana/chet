@@ -28,7 +28,9 @@ public struct Rule: Sendable, Identifiable {
     /// whose name is in this set becomes one item: regenerable project build dirs such as
     /// Rust's `target/` or Node's `node_modules/`. A matched dir is never descended into.
     public let recursiveNames: Set<String>?
-    /// Directory names never descended into while walking `recursiveNames` roots
+    /// Build artifacts matched by name, sibling, or marker while walking a rule's roots.
+    public let recursiveArtifacts: [BuildArtifact]?
+    /// Directory names never matched or descended into while walking recursive roots
     /// (`.git` is always skipped). Prevents double-counting under another rule's match.
     public let prunedNames: Set<String>
     /// When true, a walked directory holding a `pyvenv.cfg` child is one item: a Python
@@ -46,13 +48,16 @@ public struct Rule: Sendable, Identifiable {
         /// One root per VirtualBox machine folder listed in
         /// `~/Library/VirtualBox/VirtualBox.xml`.
         case virtualBoxMachines
+        /// The pnpm content-addressable store, when one exists.
+        case pnpmStore
     }
 
     public init(
         id: String, category: String? = nil, title: String, roots: [String], risk: Risk, mode: DeleteMode,
         owningBundleID: String? = nil, minAge: TimeInterval? = nil, extensions: Set<String>? = nil,
         excluded: Set<String> = [], keepNewest: Bool = false, wholeRoots: Bool = false,
-        recursiveNames: Set<String>? = nil, prunedNames: Set<String> = [], discovery: Discovery? = nil,
+        recursiveNames: Set<String>? = nil, recursiveArtifacts: [BuildArtifact]? = nil,
+        prunedNames: Set<String> = [], discovery: Discovery? = nil,
         listOnly: Bool = false, requiresAdmin: Bool = false, matchesVirtualEnvironments: Bool = false
     ) {
         self.id = id
@@ -68,6 +73,7 @@ public struct Rule: Sendable, Identifiable {
         self.keepNewest = keepNewest
         self.wholeRoots = wholeRoots
         self.recursiveNames = recursiveNames
+        self.recursiveArtifacts = recursiveArtifacts
         self.prunedNames = prunedNames
         self.matchesVirtualEnvironments = matchesVirtualEnvironments
         self.discovery = discovery
@@ -104,7 +110,7 @@ extension Rule {
                 "Library/Caches/Homebrew", "Library/Caches/pip", "Library/Caches/org.swift.swiftpm",
                 "Library/Caches/CocoaPods", "Library/Caches/go-build", "Library/Caches/Yarn", "Library/Caches/pnpm",
                 ".npm/_cacache", ".cargo/registry/cache", ".gradle/caches", ".cache/uv", ".cache/nix",
-            ], risk: .safe, mode: .permanent, wholeRoots: true),
+            ], risk: .safe, mode: .permanent, wholeRoots: true, discovery: .pnpmStore),
         Rule(
             id: "browser-safari", category: "browser", title: "Safari cache",
             roots: ["Library/Caches/com.apple.Safari"], risk: .safe, mode: .permanent,
@@ -140,7 +146,7 @@ extension Rule {
         Rule(
             id: "dev-garbage", title: "Project build dirs",
             roots: ["Development", "Projects", "Documents", "Desktop"], risk: .review, mode: .trash,
-            recursiveNames: DuplicateScope.regenerableNames,
+            recursiveArtifacts: BuildArtifact.catalog,
             prunedNames: [".terraform", ".terragrunt-cache"], matchesVirtualEnvironments: true),
         Rule(
             id: "terraform-build-dirs", category: "dev-garbage", title: "Terraform build dirs",

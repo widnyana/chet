@@ -13,6 +13,32 @@ struct ScanSessionTests {
         return events
     }
 
+    private static let buildCategoryIDs: Set<String> = ["dev-garbage", "terraform-build-dirs"]
+
+    private func mergedCategories(_ events: [ScanEvent]) -> [String: [ScanItem]] {
+        var categories: [String: [ScanItem]] = [:]
+        var builds: [ScanItem] = []
+        for event in events {
+            switch event {
+            case .rules(let result):
+                if Self.buildCategoryIDs.contains(result.category) {
+                    builds += result.items
+                    if let tagged = categories["tagged-caches"] {
+                        categories["tagged-caches"] = TaggedCachePrecedence.keep(
+                            tagged, builds: builds)
+                    }
+                }
+                categories[result.category, default: []] += result.items
+            case .taggedCaches(let items):
+                categories["tagged-caches", default: []] += TaggedCachePrecedence.keep(
+                    items, builds: builds)
+            default:
+                break
+            }
+        }
+        return categories.filter { !$0.value.isEmpty }
+    }
+
     @Test func userRootsSkipLibraryAndHiddenFolders() throws {
         let dir = try TempDir()
         for name in ["Documents/x", "Library/x", ".cache/x", "Movies/x"] { try dir.file(name, bytes: 1) }
@@ -87,6 +113,64 @@ struct ScanSessionTests {
         #expect(tagged.count == 1)
         #expect(tagged.first?.url.lastPathComponent == "target")
         #expect(tagged.first?.categoryID == "tagged-caches")
+    }
+
+    @Test func taggedVirtualEnvironmentStaysInBuildCategory() async throws {
+        let dir = try TempDir()
+        let venv = "Development/proj/.venv"
+        try dir.file("\(venv)/pyvenv.cfg", bytes: 100)
+        try dir.file("\(venv)/lib/python3.14/site-packages/x.py", bytes: 2_000_000, fill: 5)
+        try Data("Signature: 8a477f597d28d172789f06886806bc55\n".utf8).write(
+            to: dir.url.appendingPathComponent("\(venv)/CACHEDIR.TAG"))
+        let events = await collect(ScanSession(home: dir.url, enabledSteps: [.rules, .index]))
+        let merged = mergedCategories(events)
+        #expect(merged["dev-garbage"]?.map(\.url.lastPathComponent) == [".venv"])
+        #expect(merged["dev-garbage"]?.map(\.kind) == ["Python venv"])
+        #expect(merged["tagged-caches"] == nil)
+    }
+
+    @Test func taggedSwiftBuildStaysInBuildCategory() async throws {
+        let dir = try TempDir()
+        let build = "Development/proj/.build"
+        try dir.file("\(build)/debug/blob", bytes: 2_000_000, fill: 6)
+        try Data("Signature: 8a477f597d28d172789f06886806bc55\n".utf8).write(
+            to: dir.url.appendingPathComponent("\(build)/CACHEDIR.TAG"))
+        let events = await collect(ScanSession(home: dir.url, enabledSteps: [.rules, .index]))
+        let merged = mergedCategories(events)
+        #expect(merged["dev-garbage"]?.map(\.url.lastPathComponent) == [".build"])
+        #expect(merged["dev-garbage"]?.map(\.kind) == ["Swift build"])
+        #expect(merged["tagged-caches"] == nil)
+    }
+
+    @Test func unrelatedTaggedDirectoryStaysInTaggedCaches() async throws {
+        let dir = try TempDir()
+        let cache = "Development/proj/cachetree"
+        try dir.file("\(cache)/blob", bytes: 2_000_000, fill: 7)
+        try Data("Signature: 8a477f597d28d172789f06886806bc55\n".utf8).write(
+            to: dir.url.appendingPathComponent("\(cache)/CACHEDIR.TAG"))
+        let events = await collect(ScanSession(home: dir.url, enabledSteps: [.rules, .index]))
+        let merged = mergedCategories(events)
+        #expect(merged["dev-garbage"] == nil)
+        #expect(merged["tagged-caches"]?.map(\.url.lastPathComponent) == ["cachetree"])
+    }
+
+    @Test func taggedCacheAheadOfBuildCategoryIsRemoved() throws {
+        let dir = try TempDir()
+        let buildURL = dir.url.appendingPathComponent("Development/proj/target")
+        try dir.file("Development/proj/target/debug/blob", bytes: 1_000)
+        let stamp = try #require(FileStamp.read(buildURL))
+        let tagged = ScanItem(
+            url: buildURL, categoryID: "tagged-caches", risk: .safe, mode: .permanent,
+            reclaimableBytes: 1_000, stamp: stamp)
+        let build = ScanItem(
+            url: buildURL, categoryID: "dev-garbage", risk: .review, mode: .trash,
+            reclaimableBytes: 1_000, stamp: stamp)
+        let result = CategoryResult(
+            ruleID: "dev-garbage", category: "dev-garbage", items: [build],
+            needsFullDiskAccess: false)
+        let merged = mergedCategories([.taggedCaches([tagged]), .rules(result)])
+        #expect(merged["tagged-caches"] == nil)
+        #expect(merged["dev-garbage"]?.map(\.url) == [buildURL])
     }
 
     @Test func stepsRunInOrderAndFindEachKind() async throws {

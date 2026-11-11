@@ -8,21 +8,20 @@ public enum DuplicateScope: Sendable, Equatable {
     case standard
     case everything
 
+    /// Hidden per-project tool state dirs; regenerable, never worth hashing.
+    public static let toolStateNames: Set<String> = [".terraform", ".terragrunt-cache"]
+
     /// Project build dir names, shared with the "Project build dirs" rule
-    /// (`Rules.rules` uses the same set as its `recursiveNames`).
+    /// (`Rules.rules` covers them through `BuildArtifact.catalog`).
     /// `.vite` and `.next` usually sit under `node_modules` or a project root, and `.turbo`
     /// caches Turborepo task output; all three rebuild from source. `build` and `.dart_tool`
     /// are Flutter output: `flutter build` and `flutter pub get` recreate them.
-    public static let regenerableNames: Set<String> = [
-        "target", "node_modules", "vendor", ".build", ".gradle", "DerivedData", "Pods", ".vite", ".next",
-        ".turbo", "build", ".dart_tool",
-    ]
+    public static let regenerableNames: Set<String> = Set(
+        BuildArtifact.catalog.filter { !$0.isVirtualEnvironment }.map(\.name)
+    ).subtracting(toolStateNames)
 
     /// Well-known cache and temporary folder names found inside user folders.
     static let tempNames: Set<String> = ["Caches", ".cache", "tmp", "temp", ".tmp"]
-
-    /// Hidden per-project tool state dirs; regenerable, never worth hashing.
-    public static let toolStateNames: Set<String> = [".terraform", ".terragrunt-cache"]
 
     /// Path components the standard scope never hashes duplicates in. Stored, not computed:
     /// the duplicate filter reads it once per walked entry.

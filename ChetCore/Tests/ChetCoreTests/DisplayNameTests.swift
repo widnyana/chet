@@ -48,4 +48,38 @@ struct DisplayNameTests {
                 == (title: "managedappdistributionagent", vendor: "apple"))
         #expect(DisplayName.bundleIDParts("HomeKit") == nil)
     }
+
+    // MARK: - build artifact labels
+
+    @Test func everyCatalogEntryResolvesItsLabel() throws {
+        let dir = try TempDir()
+        for artifact in BuildArtifact.catalog {
+            try dir.file("\(artifact.name)/payload", bytes: 10)
+            if let sibling = artifact.requiresSibling {
+                try dir.file(sibling, bytes: 10)
+            }
+            if artifact.isVirtualEnvironment {
+                try dir.file("\(artifact.name)/pyvenv.cfg", bytes: 10)
+            }
+            #expect(BuildArtifact.label(for: dir.url.appendingPathComponent(artifact.name)) == artifact.label)
+        }
+    }
+
+    @Test func unknownDirectoryHasNoLabel() throws {
+        let dir = try TempDir()
+        try dir.file("notes/payload", bytes: 10)
+        #expect(BuildArtifact.label(for: dir.url.appendingPathComponent("notes")) == nil)
+    }
+
+    @Test func vendorWithoutComposerJsonHasNoLabel() throws {
+        let dir = try TempDir()
+        try dir.file("vendor/autoload.php", bytes: 10)
+        #expect(BuildArtifact.label(for: dir.url.appendingPathComponent("vendor")) == nil)
+    }
+
+    @Test func virtualEnvironmentKeepsItsLabelWhateverTheFolderName() throws {
+        let dir = try TempDir()
+        try dir.file(".venv-codegen/pyvenv.cfg", bytes: 10)
+        #expect(BuildArtifact.label(for: dir.url.appendingPathComponent(".venv-codegen")) == "Python venv")
+    }
 }

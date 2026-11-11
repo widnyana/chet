@@ -659,7 +659,8 @@ final class ScanModel {
             rootsProgress = snapshot
             growInFlightRoot(snapshot)
             pushActivity(.index, done: snapshot.rootsDone, total: snapshot.rootsTotal, label: snapshot.currentFolder)
-        case .taggedCaches(let items): add("tagged-caches", items: items)
+        case .taggedCaches(let items):
+            add("tagged-caches", items: TaggedCachePrecedence.keep(items, builds: buildItems))
         case .largeFiles(let items): add("large-files", items: items)
         case .duplicates(let found):
             add(
@@ -701,6 +702,35 @@ final class ScanModel {
         }
     }
 
+    private static let buildCategories: Set<String> = ["dev-garbage", "terraform-build-dirs"]
+
+    private var buildItems: [ScanItem] {
+        categories.filter { Self.buildCategories.contains($0.id) }.flatMap(\.items)
+    }
+
+    private func dropTaggedCachesShadowed(by builds: [ScanItem]) {
+        guard let index = categories.firstIndex(where: { $0.id == "tagged-caches" }) else { return }
+        let kept = TaggedCachePrecedence.keep(categories[index].items, builds: builds)
+        guard kept.count != categories[index].items.count else { return }
+        let keptURLs = Set(kept.map(\.url))
+        for item in categories[index].items where !keptURLs.contains(item.url) { unrecord(item) }
+        if kept.isEmpty {
+            categories.remove(at: index)
+        } else {
+            categories[index].items = kept
+            categories[index].bytes = kept.reduce(Int64(0)) { $0 + $1.reclaimableBytes }
+        }
+        for item in builds { record(item) }
+    }
+
+    private func unrecord(_ item: ScanItem) {
+        guard countedURLs.remove(item.url) != nil else { return }
+        let bytes = bytesByURL.removeValue(forKey: item.url) ?? 0
+        totalBytes -= bytes
+        if selected.remove(item.url) != nil { selectedBytes -= bytes }
+        if itemsByURL[item.url] == item { itemsByURL.removeValue(forKey: item.url) }
+    }
+
     private func merge(_ result: CategoryResult) {
         // A category outside the scope is never shown, even if a rule slipped through.
         guard resultScope.categories.isEmpty || resultScope.categories.contains(result.category)
@@ -721,6 +751,9 @@ final class ScanModel {
         categories[index].items += result.items
         categories[index].bytes += itemBytes
         categories[index].needsFullDiskAccess = categories[index].needsFullDiskAccess || result.needsFullDiskAccess
+        if Self.buildCategories.contains(result.category) {
+            dropTaggedCachesShadowed(by: buildItems)
+        }
         for item in result.items where item.risk == .safe { select(item.url) }
         categories = categories.map { ($0.bytes, $0) }.sorted { $0.0 > $1.0 }.map(\.1)
     }

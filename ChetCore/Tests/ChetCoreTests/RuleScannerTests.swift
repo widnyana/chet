@@ -4,6 +4,8 @@ import Testing
 @testable import ChetCore
 
 struct RuleScannerTests {
+    private let noPnpmStore = PnpmStoreResolver(storePath: { nil }, exists: { _ in false })
+
     private func rule(_ id: String) throws -> Rule {
         try #require(Rule.catalog.first { $0.id == id })
     }
@@ -41,6 +43,7 @@ struct RuleScannerTests {
         // A match is a leaf: nested node_modules are never double-counted.
         try dir.file("Development/repos/app/node_modules/left-pad/index.js", bytes: 100)
         try dir.file("Development/repos/api/target/release/binary", bytes: 2_000_000)
+        try dir.file("Documents/site/composer.json", bytes: 100)
         try dir.file("Documents/site/vendor/autoload.php", bytes: 500_000)
         // .git is never entered, so nothing inside it matches.
         try dir.file("Development/repos/api/.git/node_modules/x", bytes: 100)
@@ -94,7 +97,8 @@ struct RuleScannerTests {
 
     @Test func missingRootIsEmptyNotError() async throws {
         let dir = try TempDir()
-        let result = try await RuleScanner(home: dir.url).scan(try rule("package-caches"))
+        let result = try await RuleScanner(home: dir.url, pnpmStore: noPnpmStore)
+            .scan(try rule("package-caches"))
         #expect(result.items.isEmpty)
         #expect(!result.needsFullDiskAccess)
     }
@@ -147,7 +151,8 @@ struct RuleScannerTests {
         try dir.file("Library/Caches/go-build/8f/x", bytes: 100)
         try dir.file("Library/Caches/go-build/8a/y", bytes: 100)
         try dir.file("Library/Caches/Homebrew/downloads/z", bytes: 100)
-        let items = try await RuleScanner(home: dir.url).scan(try rule("package-caches")).items
+        let items = try await RuleScanner(home: dir.url, pnpmStore: noPnpmStore)
+            .scan(try rule("package-caches")).items
         #expect(Set(items.map(\.url.lastPathComponent)) == ["go-build", "Homebrew"])
         #expect(items.allSatisfy { dir.policy.isDeletable($0.url) == .allowed })
     }
@@ -173,7 +178,7 @@ struct RuleScannerTests {
         let dir = try TempDir()
         try dir.file("Library/Caches/a/x", bytes: 100)
         var ids: [String] = []
-        for await result in RuleScanner(home: dir.url).scanAll() { ids.append(result.ruleID) }
+        for await result in RuleScanner(home: dir.url, pnpmStore: noPnpmStore).scanAll() { ids.append(result.ruleID) }
         #expect(Set(ids) == Set(Rule.catalog.map(\.id)))
     }
 
@@ -391,5 +396,146 @@ struct RuleScannerTests {
         let buildDirs = try await scanner.scan(try rule("dev-garbage")).items.map(\.url.path)
         #expect(buildDirs.count == 1)
         #expect(buildDirs.first?.hasSuffix("Development/app/target") == true)
+    }
+
+    // MARK: - build artifacts
+
+    @Test func vendorBesideComposerJsonMatches() async throws {
+        let dir = try TempDir()
+        try dir.file("Development/site/composer.json", bytes: 100)
+        try dir.file("Development/site/vendor/autoload.php", bytes: 500_000)
+        let items = try await RuleScanner(home: dir.url).scan(try rule("dev-garbage")).items
+        #expect(items.map(\.url.lastPathComponent) == ["vendor"])
+    }
+
+    @Test func vendorWithoutComposerJsonDoesNotMatch() async throws {
+        let dir = try TempDir()
+        try dir.file("Development/site/vendor/autoload.php", bytes: 500_000)
+        let items = try await RuleScanner(home: dir.url).scan(try rule("dev-garbage")).items
+        #expect(items.isEmpty)
+    }
+
+    @Test func nestedVendorUnderExportFolderDoesNotMatch() async throws {
+        let dir = try TempDir()
+        try dir.file("Development/site/composer.json", bytes: 100)
+        try dir.file("Development/site/src/export/html/vendor/autoload.php", bytes: 500_000)
+        let items = try await RuleScanner(home: dir.url).scan(try rule("dev-garbage")).items
+        #expect(items.isEmpty)
+    }
+
+    @Test func nodeModulesDirectlyInProjectStillMatches() async throws {
+        let dir = try TempDir()
+        try dir.file("Development/repos/app/node_modules/express/index.js", bytes: 1_000_000)
+        let items = try await RuleScanner(home: dir.url).scan(try rule("dev-garbage")).items
+        #expect(items.map(\.url.path) == [dir.url.appendingPathComponent("Development/repos/app/node_modules").path])
+    }
+
+    @Test func virtualEnvironmentWithArbitraryNameMatches() async throws {
+        let dir = try TempDir()
+        try dir.file("Development/repos/app/list/pyvenv.cfg", bytes: 100)
+        try dir.file("Development/repos/app/list/lib/python3.14/site-packages/x.py", bytes: 400_000)
+        let items = try await RuleScanner(home: dir.url).scan(try rule("dev-garbage")).items
+        #expect(items.map(\.url.lastPathComponent) == ["list"])
+    }
+
+    @Test func pnpmStoreSamplePathMatchesNothing() async throws {
+        let dir = try TempDir()
+        try dir.file(
+            "Development/tools/pnpm/store/v10/files/aa/node_modules/left-pad/index.js",
+            bytes: 1_000_000)
+        let items = try await RuleScanner(home: dir.url).scan(try rule("dev-garbage")).items
+        #expect(items.isEmpty)
+    }
+
+    @Test func artifactInsideSkippedStoreDoesNotMatch() async throws {
+        let dir = try TempDir()
+        try dir.file("Development/app/_cacache/node_modules/x/index.js", bytes: 1_000_000)
+        try dir.file("Development/app/.pnpm-store/node_modules/y/index.js", bytes: 1_000_000)
+        let items = try await RuleScanner(home: dir.url).scan(try rule("dev-garbage")).items
+        #expect(items.isEmpty)
+    }
+
+    @Test func packageStoreLayoutDetection() throws {
+        let dir = try TempDir()
+        try dir.file("plain/store/x", bytes: 10)
+        try dir.file("plain/.pnpm-store/x", bytes: 10)
+        try dir.file("plain/_cacache/x", bytes: 10)
+        try dir.file("indexed/index.db", bytes: 10)
+        try dir.file("indexed/v10/x", bytes: 10)
+        try dir.file("unversioned/index.db", bytes: 10)
+        try dir.file("unversioned/data/x", bytes: 10)
+        let at: (String) -> URL = { dir.url.appendingPathComponent($0) }
+        #expect(BuildArtifact.isPackageStore(at("plain/store")))
+        #expect(BuildArtifact.isPackageStore(at("plain/.pnpm-store")))
+        #expect(BuildArtifact.isPackageStore(at("plain/_cacache")))
+        #expect(BuildArtifact.isPackageStore(at("indexed")))
+        #expect(!BuildArtifact.isPackageStore(at("unversioned")))
+        #expect(!BuildArtifact.isPackageStore(at("plain/store/x")))
+    }
+
+    @Test func regenerableNamesMatchCatalog() {
+        let names: Set<String> = [
+            "target", "node_modules", "vendor", ".build", ".gradle", "DerivedData", "Pods", ".vite",
+            ".next", ".turbo", "build", ".dart_tool",
+        ]
+        #expect(DuplicateScope.regenerableNames == names)
+        #expect(Set(BuildArtifact.catalog.map(\.name)).isSuperset(of: names))
+    }
+
+    @Test func pnpmStoreDiscoveryHonoursOrder() async throws {
+        let dir = try TempDir()
+        let resolved = dir.url.appendingPathComponent("resolved-store").path
+        let pnpmHome = dir.url.appendingPathComponent("pnpm-home/store").path
+        try dir.file("resolved-store/v10/files/x", bytes: 1_000_000)
+        try dir.file("pnpm-home/store/v10/files/y", bytes: 1_000_000)
+        let resolver = PnpmStoreResolver(
+            storePath: { resolved },
+            exists: { $0 == resolved || $0 == pnpmHome })
+        let items = try await RuleScanner(home: dir.url, pnpmStore: resolver)
+            .scan(try rule("package-caches")).items
+        #expect(items.map(\.url.path) == [resolved])
+    }
+
+    @Test func pnpmStoreDiscoveryPrefersLocalShareOverLibrary() async throws {
+        let dir = try TempDir()
+        let local = dir.url.appendingPathComponent(".local/share/pnpm/store").path
+        let library = dir.url.appendingPathComponent("Library/pnpm/store").path
+        try dir.file(".local/share/pnpm/store/v10/files/x", bytes: 400_000)
+        try dir.file("Library/pnpm/store/v10/files/y", bytes: 400_000)
+        let resolver = PnpmStoreResolver(
+            storePath: { nil }, exists: { $0 == local || $0 == library })
+        let items = try await RuleScanner(home: dir.url, pnpmStore: resolver)
+            .scan(try rule("package-caches")).items
+        #expect(items.map(\.url.path) == [local])
+    }
+
+    @Test func pnpmStoreLookupRunsOncePerScan() async throws {
+        let dir = try TempDir()
+        let calls = ScanCallCounter()
+        let resolver = PnpmStoreResolver(
+            storePath: {
+                calls.bump()
+                return nil
+            }, exists: { _ in false })
+        _ = try await RuleScanner(home: dir.url, pnpmStore: resolver)
+            .scan(try rule("package-caches"))
+        #expect(calls.value == 1)
+    }
+}
+
+private final class ScanCallCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    func bump() {
+        lock.lock()
+        defer { lock.unlock() }
+        count += 1
+    }
+
+    var value: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return count
     }
 }

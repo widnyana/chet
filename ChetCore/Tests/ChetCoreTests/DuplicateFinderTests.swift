@@ -184,6 +184,7 @@ struct DuplicateFinderTests {
 
     @Test func buildDirRuleSharesTheRegenerableNames() {
         let rule = Rule.catalog.first { $0.id == "dev-garbage" }
-        #expect(rule?.recursiveNames == DuplicateScope.regenerableNames)
+        let artifacts = Set(rule?.recursiveArtifacts?.map(\.name) ?? [])
+        #expect(DuplicateScope.regenerableNames.isSubset(of: artifacts))
     }
 }

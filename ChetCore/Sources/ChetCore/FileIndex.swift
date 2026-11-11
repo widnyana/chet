@@ -56,6 +56,18 @@ public struct TaggedFolder: Sendable, Equatable {
     public let bytes: Int64
 }
 
+public enum TaggedCachePrecedence {
+    public static func keep(_ tagged: [ScanItem], builds: [ScanItem]) -> [ScanItem] {
+        tagged.filter { item in
+            let path = item.url.path
+            return !builds.contains { build in
+                let root = build.url.path
+                return path == root || path.hasPrefix(root + "/")
+            }
+        }
+    }
+}
+
 /// A folder the walk could not read; totals remain best-known (ncdu's error-as-node semantics).
 public struct WalkError: Sendable, Equatable {
     public let url: URL

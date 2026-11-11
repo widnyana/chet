@@ -263,6 +263,13 @@ The bundle follows the two paths the sentence names: the Trash when macOS
 allows the move, and permanent removal by the helper when macOS refuses. The
 report keeps `Moved to the Trash` and `Removed permanently` as its wording.
 
+### Project build files
+
+A directory appears in one category. When a build rule and a cache marker both claim it, the
+build rule wins: a virtual environment or a `.build` directory is listed under Project build
+files and removed from Tagged cache folders in the same merge, so the count and the table agree.
+Package stores are skipped by the build walk and measured by the package cache rule.
+
 ### Homebrew
 
 A searchable inventory of installed Homebrew packages. No scan control; the

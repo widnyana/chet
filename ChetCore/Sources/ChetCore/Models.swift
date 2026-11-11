@@ -58,10 +58,12 @@ public struct ScanItem: Identifiable, Hashable, Sendable {
     public let ownerBundleID: String?
     /// Root-owned data. The cleaner routes it to the privileged helper instead of removing it.
     public let requiresAdmin: Bool
+    /// Tool behind a build directory, for example `Rust target`. Nil outside build artifacts.
+    public let kind: String?
 
     public init(
         url: URL, categoryID: String, risk: Risk, mode: DeleteMode, reclaimableBytes: Int64, stamp: FileStamp,
-        ownerBundleID: String? = nil, requiresAdmin: Bool = false
+        ownerBundleID: String? = nil, requiresAdmin: Bool = false, kind: String? = nil
     ) {
         self.url = url
         self.categoryID = categoryID
@@ -71,5 +73,6 @@ public struct ScanItem: Identifiable, Hashable, Sendable {
         self.stamp = stamp
         self.ownerBundleID = ownerBundleID
         self.requiresAdmin = requiresAdmin
+        self.kind = kind
     }
 }

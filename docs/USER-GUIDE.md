@@ -105,6 +105,7 @@ Delete means the item is removed permanently; Move to Trash means it can be rest
 | Xcode archives | `~/Library/Developer/Xcode/Archives` | Check first | Move to Trash |
 | Old installers | `.dmg`, `.pkg`, `.xip`, `.iso` in Downloads, older than 30 days | Check first | Move to Trash |
 | iPhone and iPad backups | Finder backups of iPhone and iPad | Check first | Move to Trash |
+| Project build files | `target`, `node_modules`, `vendor`, `.build`, `.gradle`, DerivedData, Pods, `.vite`, `.next`, `.turbo`, `build`, `.dart_tool`, `.terraform`, `.terragrunt-cache`, and Python virtual environments | Check first | Move to Trash |
 | Duplicate files | Files with the same bytes (1 MB and larger) | Check first | Move to Trash |
 | Large files | Over 500 MB, or over 50 MB and untouched for a year | Check first | Move to Trash |
 | Leftover app files | Library data of apps that are no longer installed | Check first | Move to Trash |
@@ -114,6 +115,18 @@ Delete means the item is removed permanently; Move to Trash means it can be rest
 | Time Machine snapshots | Snapshots on the startup disk | Check first | Delete with `tmutil` |
 | System caches | `/Library/Caches`, one item per folder | Check first | Delete with administrator |
 | System logs | `/Library/Logs`, one item per folder | Check first | Delete with administrator |
+
+Project build files follow strict rules so a folder name alone is never enough:
+
+- `vendor` counts only when its parent holds `composer.json`; a vendor folder of hand-written
+  exports stays out.
+- A Python virtual environment counts when the folder holds `pyvenv.cfg`, whatever the folder is
+  called. It appears once, under Project build files, not under Tagged cache folders.
+- Nothing inside a package manager store counts as a project build file. A pnpm store is skipped,
+  and its space is measured under Developer caches instead.
+- Every row names the tool behind it: `Rust target`, `Node modules`, `PHP vendor`, `Swift build`,
+  `Gradle`, `Xcode DerivedData`, `CocoaPods`, `Vite`, `Next.js`, `Turborepo`, `Build output`,
+  `Dart tool`, `Terraform`, `Terragrunt cache`, or `Python venv`.
 
 ## Settings
 

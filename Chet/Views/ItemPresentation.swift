@@ -48,6 +48,7 @@ struct ItemNameCell: View {
             : nil
         let split = bundleName.flatMap { DisplayName.bundleIDParts($0) }
         let location = DisplayName.location(of: item.url)
+        let subtitle = item.kind.map { "\($0) · \(location)" } ?? location
         HStack(spacing: Spacing.s2) {
             Image(nsImage: app?.icon ?? IconCache.icon(for: item.url))
                 .resizable()
@@ -61,7 +62,7 @@ struct ItemNameCell: View {
                 .font(Typography.row)
                 .foregroundStyle(Theme.ink)
                 .lineLimit(1)
-                Text(location)
+                Text(subtitle)
                     .font(Typography.caption)
                     .foregroundStyle(Theme.inkSecondary)
                     .lineLimit(1)
