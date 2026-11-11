@@ -26,7 +26,7 @@ enum AppBrowserStyle: String, CaseIterable, Identifiable {
 
     static let `default` =
         AppBrowserStyle(
-            rawValue: UserDefaults.standard.string(forKey: "appBrowserStyle") ?? "") ?? .list
+            rawValue: TestEnvironment.defaults.string(forKey: "appBrowserStyle") ?? "") ?? .list
 }
 
 /// One app's result inside a bulk pass. The report is the same per-app report the
@@ -82,10 +82,10 @@ final class AppCleanerModel {
     var isBulkRemoving = false
     var bulkProgress: (done: Int, total: Int, current: String?)?
     var style = AppBrowserStyle.default {
-        didSet { UserDefaults.standard.set(style.rawValue, forKey: "appBrowserStyle") }
+        didSet { TestEnvironment.defaults.set(style.rawValue, forKey: "appBrowserStyle") }
     }
 
-    private let home = FileManager.default.homeDirectoryForCurrentUser
+    private let home = TestEnvironment.paths.root
     private var detailTask: Task<Void, Never>?
     private var sizeTask: Task<Void, Never>?
     private var lastUsedTask: Task<Void, Never>?
@@ -417,7 +417,7 @@ final class AppCleanerModel {
 
     private func makeUninstaller() -> AppUninstaller {
         AppUninstaller(
-            home: home, log: AuditLog(), recorder: FlightRecorder.shared,
+            home: home, log: TestEnvironment.auditLog, recorder: FlightRecorder.shared,
             privileged: Self.privilegedRemover())
     }
 

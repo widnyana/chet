@@ -1,12 +1,22 @@
 import ChetCore
+import Foundation
 import SwiftUI
 import os
 
 /// Installs the crash handler and flight recorder at launch, after rotating any stale crash
 /// report aside. Order matters: rotation must precede install (see LogMaintenance).
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        guard TestEnvironment.isActive else { return }
+        let root = TestEnvironment.paths.root
+        try? FileManager.default.createDirectory(
+            at: root, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        try? Data("\(ProcessInfo.processInfo.processIdentifier)".utf8).write(
+            to: root.appendingPathComponent("app.pid"), options: .atomic)
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let directory = FlightRecorder.defaultDirectory
+        let directory = TestEnvironment.paths.logs
         let sawCrash = LogMaintenance.launchCheck(in: directory)
         if VerboseLog.enabled {
             let writer = ActivityLog(
@@ -24,7 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if sawCrash {
             recorder.record(step: "launch", "previous crash detected")
             Logger(subsystem: "id.web.widnyana.chet", category: "launch").notice(
-                "previous crash detected; see ~/Library/Logs/chet/")
+                "previous crash detected; see \(directory.path)")
         }
         FlightRecorder.shared = recorder
         CrashHandler.install(directory: directory, recorder: recorder)

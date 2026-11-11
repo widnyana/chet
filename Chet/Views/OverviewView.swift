@@ -67,7 +67,7 @@ struct OverviewView: View {
 
     private var measuredRoots: [String] {
         let scopeRoots = model.resultScope.roots
-        return scopeRoots.isEmpty ? [NSHomeDirectory()] : scopeRoots
+        return scopeRoots.isEmpty ? [TestEnvironment.paths.root.path] : scopeRoots
     }
 
     private var blockingReadErrors: [WalkError] {

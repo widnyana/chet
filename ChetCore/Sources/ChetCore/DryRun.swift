@@ -7,7 +7,9 @@ import Foundation
 public enum DryRun {
     /// Resolved once per process: the environment does not change mid-run.
     public static let enabled: Bool = {
-        if let raw = ProcessInfo.processInfo.environment["DRY_RUN"] { return parse(raw) }
+        let environment = ProcessInfo.processInfo.environment
+        if environment[TestPaths.rootVariable] != nil { return true }
+        if let raw = environment["DRY_RUN"] { return parse(raw) }
         var roots = [URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)]
         roots.append(Bundle.main.bundleURL)
         return roots.contains { envFileValue(from: $0) }

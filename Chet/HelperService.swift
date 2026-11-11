@@ -33,6 +33,7 @@ enum HelperService {
     static let isSupported = CodeSignature.teamID(of: Bundle.main.bundleURL) != nil
 
     static var state: State {
+        guard !TestEnvironment.isActive else { return .off }
         guard isSupported else { return .unsupported }
         switch status {
         case .enabled: return .enabled
@@ -75,7 +76,7 @@ enum HelperService {
 
     /// The approval lifetime the daemon gets, in seconds, from the stored setting.
     static var lifetimeSeconds: TimeInterval {
-        let stored = UserDefaults.standard.object(forKey: ScanModel.helperLifetimeKey) as? Int ?? 10
+        let stored = TestEnvironment.defaults.object(forKey: ScanModel.helperLifetimeKey) as? Int ?? 10
         return TimeInterval(min(60, max(1, stored)) * 60)
     }
 

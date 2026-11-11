@@ -12,8 +12,8 @@ struct AboutView: View {
     @State private var logExists = false
     @State private var logsExist = false
 
-    private let auditLog = AuditLog()
-    private var logsDirectory: URL { FlightRecorder.defaultDirectory }
+    private let auditLog = TestEnvironment.auditLog
+    private var logsDirectory: URL { TestEnvironment.paths.logs }
     private let productSentence = "Clean up, fine-tune, and take control of your Mac."
     private let accessSentence = "Some folders stay hidden until you grant access."
 
@@ -145,7 +145,7 @@ struct AboutView: View {
             AboutRow(
                 label: "Logs folder",
                 actionTitle: logsExist ? "Open" : nil,
-                actionHelp: "Open ~/Library/Logs/chet",
+                actionHelp: "Open \(logsDirectory.path)",
                 action: logsExist ? { _ = NSWorkspace.shared.open(logsDirectory) } : nil
             ) {
                 pathText(logsDirectory.path)

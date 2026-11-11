@@ -60,106 +60,106 @@ final class ScanModel {
     var accessSkipped = false
     /// How many times the user has been sent to Settings; the second attempt unlocks the
     /// "Chet may be listed twice" hint.
-    var grantAttempts = UserDefaults.standard.integer(forKey: "grantAttempts")
+    var grantAttempts = TestEnvironment.defaults.integer(forKey: "grantAttempts")
     /// Worker count for the disk-usage walk (ncdu's `-t`): 0 = CPU count, 1 = serial shape.
-    var scanThreads = UserDefaults.standard.integer(forKey: ScanModel.threadsKey) {
+    var scanThreads = TestEnvironment.defaults.integer(forKey: ScanModel.threadsKey) {
         didSet {
             guard oldValue != scanThreads else { return }
             VerboseLog.event(
                 .info, .settings, .settingsChanged, .code(.settingsKey, .settingsKeyScanThreads))
-            UserDefaults.standard.set(scanThreads, forKey: ScanModel.threadsKey)
+            TestEnvironment.defaults.set(scanThreads, forKey: ScanModel.threadsKey)
         }
     }
     nonisolated static let threadsKey = "scanThreads"
     /// Duplicates opt-in: when true the duplicates step also hashes caches, project build
     /// dirs, and temporary places. Off by default; the Settings page is the only writer.
-    var includeTempInDuplicates = UserDefaults.standard.bool(forKey: "includeTempInDuplicates") {
+    var includeTempInDuplicates = TestEnvironment.defaults.bool(forKey: "includeTempInDuplicates") {
         didSet {
             guard oldValue != includeTempInDuplicates else { return }
             VerboseLog.event(
                 .info, .settings, .settingsChanged, .code(.settingsKey, .settingsKeyIncludeTemp))
-            UserDefaults.standard.set(includeTempInDuplicates, forKey: "includeTempInDuplicates")
+            TestEnvironment.defaults.set(includeTempInDuplicates, forKey: "includeTempInDuplicates")
         }
     }
     /// Outside-home opt-in: scan and clean paths outside the home folder, for machines and
     /// projects kept on another disk. Off by default; the Settings page is the only writer.
-    var scanOutsideHome = UserDefaults.standard.bool(forKey: ScanModel.outsideHomeKey) {
+    var scanOutsideHome = TestEnvironment.defaults.bool(forKey: ScanModel.outsideHomeKey) {
         didSet {
             guard oldValue != scanOutsideHome else { return }
             VerboseLog.event(
                 .info, .settings, .settingsChanged, .code(.settingsKey, .settingsKeyScanOutsideHome))
-            UserDefaults.standard.set(scanOutsideHome, forKey: ScanModel.outsideHomeKey)
+            TestEnvironment.defaults.set(scanOutsideHome, forKey: ScanModel.outsideHomeKey)
         }
     }
     nonisolated static let outsideHomeKey = "scanOutsideHome"
     /// Large-file threshold in MB.
-    var largeFileMinSizeMB = UserDefaults.standard.object(forKey: ScanModel.largeFileKey) as? Int ?? 500 {
+    var largeFileMinSizeMB = TestEnvironment.defaults.object(forKey: ScanModel.largeFileKey) as? Int ?? 500 {
         didSet {
             guard oldValue != largeFileMinSizeMB else { return }
             VerboseLog.event(
                 .info, .settings, .settingsChanged, .code(.settingsKey, .settingsKeyLargeFileMinSize))
-            UserDefaults.standard.set(largeFileMinSizeMB, forKey: ScanModel.largeFileKey)
+            TestEnvironment.defaults.set(largeFileMinSizeMB, forKey: ScanModel.largeFileKey)
         }
     }
     nonisolated static let largeFileKey = "largeFileMinSizeMB"
     /// Settings list: folders the scan and the cleaner never touch. Stored normalized.
-    var excludedPaths = UserDefaults.standard.stringArray(forKey: ScanModel.excludedKey) ?? [] {
+    var excludedPaths = TestEnvironment.defaults.stringArray(forKey: ScanModel.excludedKey) ?? [] {
         didSet {
             guard oldValue != excludedPaths else { return }
             VerboseLog.event(
                 .info, .settings, .settingsChanged, .code(.settingsKey, .settingsKeyExcludedPaths))
-            UserDefaults.standard.set(excludedPaths, forKey: ScanModel.excludedKey)
+            TestEnvironment.defaults.set(excludedPaths, forKey: ScanModel.excludedKey)
         }
     }
     nonisolated static let excludedKey = "excludedPaths"
     /// Settings list: folders the user added as rules. Stored as JSON in `userRulesKey`.
     var userRules =
         (try? JSONDecoder().decode(
-            [UserRule].self, from: UserDefaults.standard.data(forKey: ScanModel.userRulesKey) ?? Data())) ?? []
+            [UserRule].self, from: TestEnvironment.defaults.data(forKey: ScanModel.userRulesKey) ?? Data())) ?? []
     {
         didSet {
             guard oldValue != userRules else { return }
             VerboseLog.event(
                 .info, .settings, .settingsChanged, .code(.settingsKey, .settingsKeyUserRules))
             if userRules.isEmpty {
-                UserDefaults.standard.removeObject(forKey: ScanModel.userRulesKey)
+                TestEnvironment.defaults.removeObject(forKey: ScanModel.userRulesKey)
             } else {
-                UserDefaults.standard.set(
+                TestEnvironment.defaults.set(
                     try? JSONEncoder().encode(userRules), forKey: ScanModel.userRulesKey)
             }
         }
     }
     nonisolated static let userRulesKey = "userRules"
     /// Steps the user turned off in Settings. Raw values, so a step added later defaults on.
-    var disabledSteps = Set(UserDefaults.standard.stringArray(forKey: ScanModel.disabledStepsKey) ?? []) {
+    var disabledSteps = Set(TestEnvironment.defaults.stringArray(forKey: ScanModel.disabledStepsKey) ?? []) {
         didSet {
             guard oldValue != disabledSteps else { return }
-            UserDefaults.standard.set(disabledSteps.sorted(), forKey: ScanModel.disabledStepsKey)
+            TestEnvironment.defaults.set(disabledSteps.sorted(), forKey: ScanModel.disabledStepsKey)
         }
     }
     nonisolated static let disabledStepsKey = "disabledSteps"
     /// Duplicates: smallest file worth hashing, in MB.
-    var duplicateMinSizeMB = UserDefaults.standard.object(forKey: ScanModel.duplicateMinKey) as? Int ?? 1 {
+    var duplicateMinSizeMB = TestEnvironment.defaults.object(forKey: ScanModel.duplicateMinKey) as? Int ?? 1 {
         didSet {
             guard oldValue != duplicateMinSizeMB else { return }
             VerboseLog.event(
                 .info, .settings, .settingsChanged, .code(.settingsKey, .settingsKeyDuplicateMinSize))
-            UserDefaults.standard.set(duplicateMinSizeMB, forKey: ScanModel.duplicateMinKey)
+            TestEnvironment.defaults.set(duplicateMinSizeMB, forKey: ScanModel.duplicateMinKey)
         }
     }
     nonisolated static let duplicateMinKey = "duplicateMinSizeMB"
     /// Large files: age in days at which a smaller file still counts as old.
-    var largeFileOldAgeDays = UserDefaults.standard.object(forKey: ScanModel.oldAgeKey) as? Int ?? 365 {
+    var largeFileOldAgeDays = TestEnvironment.defaults.object(forKey: ScanModel.oldAgeKey) as? Int ?? 365 {
         didSet {
             guard oldValue != largeFileOldAgeDays else { return }
             VerboseLog.event(
                 .info, .settings, .settingsChanged, .code(.settingsKey, .settingsKeyLargeFileMinAge))
-            UserDefaults.standard.set(largeFileOldAgeDays, forKey: ScanModel.oldAgeKey)
+            TestEnvironment.defaults.set(largeFileOldAgeDays, forKey: ScanModel.oldAgeKey)
         }
     }
     nonisolated static let oldAgeKey = "largeFileOldAgeDays"
     /// Minutes one administrator approval lasts. Clamped to the helper's own 1...60 range.
-    var helperLifetimeMinutes = UserDefaults.standard.object(forKey: ScanModel.helperLifetimeKey) as? Int ?? 10 {
+    var helperLifetimeMinutes = TestEnvironment.defaults.object(forKey: ScanModel.helperLifetimeKey) as? Int ?? 10 {
         didSet {
             let clamped = min(60, max(1, helperLifetimeMinutes))
             guard clamped == helperLifetimeMinutes else {
@@ -167,7 +167,7 @@ final class ScanModel {
                 return
             }
             guard oldValue != helperLifetimeMinutes else { return }
-            UserDefaults.standard.set(helperLifetimeMinutes, forKey: ScanModel.helperLifetimeKey)
+            TestEnvironment.defaults.set(helperLifetimeMinutes, forKey: ScanModel.helperLifetimeKey)
         }
     }
     nonisolated static let helperLifetimeKey = "helperLifetimeMinutes"
@@ -182,14 +182,14 @@ final class ScanModel {
         }
     }
     /// The user asked the scope to outlive this launch.
-    var remembersScope = UserDefaults.standard.bool(forKey: ScanModel.rememberScopeKey) {
+    var remembersScope = TestEnvironment.defaults.bool(forKey: ScanModel.rememberScopeKey) {
         didSet {
             guard oldValue != remembersScope else { return }
-            UserDefaults.standard.set(remembersScope, forKey: ScanModel.rememberScopeKey)
+            TestEnvironment.defaults.set(remembersScope, forKey: ScanModel.rememberScopeKey)
             if remembersScope {
                 Self.storeScope(scope)
             } else {
-                UserDefaults.standard.removeObject(forKey: ScanModel.scopeKey)
+                TestEnvironment.defaults.removeObject(forKey: ScanModel.scopeKey)
             }
         }
     }
@@ -199,8 +199,8 @@ final class ScanModel {
     private(set) var resultScope = ScanScope.everywhere
 
     static func storedScope() -> ScanScope {
-        guard UserDefaults.standard.bool(forKey: rememberScopeKey),
-            let data = UserDefaults.standard.data(forKey: scopeKey),
+        guard TestEnvironment.defaults.bool(forKey: rememberScopeKey),
+            let data = TestEnvironment.defaults.data(forKey: scopeKey),
             let stored = try? JSONDecoder().decode(ScanScope.self, from: data)
         else { return .everywhere }
         return stored.normalized()
@@ -208,11 +208,11 @@ final class ScanModel {
 
     static func storeScope(_ scope: ScanScope) {
         guard let data = try? JSONEncoder().encode(scope.normalized()) else { return }
-        UserDefaults.standard.set(data, forKey: scopeKey)
+        TestEnvironment.defaults.set(data, forKey: scopeKey)
     }
     var categories: [CategoryState] = []
     private var ledger = ScanLedger(
-        totalBytes: Int64(UserDefaults.standard.integer(forKey: ScanModel.lastScanBytesKey)))
+        totalBytes: Int64(TestEnvironment.defaults.integer(forKey: ScanModel.lastScanBytesKey)))
     /// First item per URL (a file can sit in several categories), filled by `record` so no read
     /// rebuilds it.
     var itemsByURL: [URL: ScanItem] { ledger.itemsByURL }
@@ -266,11 +266,11 @@ final class ScanModel {
     /// Items staged for the confirm sheet: a category's selection, or all selected items.
     var confirmItems: [ScanItem] = []
     var confirmSnapshots: [LocalSnapshot] = []
-    var lastScan: Date? = UserDefaults.standard.object(forKey: ScanModel.lastScanKey) as? Date
+    var lastScan: Date? = TestEnvironment.defaults.object(forKey: ScanModel.lastScanKey) as? Date
     /// Bytes the last finished scan measured; kept beside `lastScan` so a relaunch still shows
     /// the last result instead of a zero.
     private(set) var lastScanBytes: Int64 = Int64(
-        UserDefaults.standard.integer(forKey: ScanModel.lastScanBytesKey))
+        TestEnvironment.defaults.integer(forKey: ScanModel.lastScanBytesKey))
     nonisolated static let lastScanKey = "lastScanDate"
     nonisolated static let lastScanBytesKey = "lastScanBytes"
     /// True after a scan ended by finishing, not by Stop.
@@ -320,10 +320,12 @@ final class ScanModel {
 
     /// Records that the user is being sent to grant access, before leaving the app.
     func recordGrantAttempt() {
-        AccessAttempt.record()
+        AccessAttempt.record(
+            url: TestEnvironment.paths.applicationSupport.appendingPathComponent(
+                "chet/grant-attempted", isDirectory: false))
         grantAttempts += 1
-        UserDefaults.standard.set(grantAttempts, forKey: "grantAttempts")
-        UserDefaults.standard.synchronize()
+        TestEnvironment.defaults.set(grantAttempts, forKey: "grantAttempts")
+        TestEnvironment.defaults.synchronize()
     }
 
     /// True when the app should show the non-blocking access banner: Full Disk Access is
@@ -526,7 +528,7 @@ final class ScanModel {
         }
     }
 
-    private static let home = FileManager.default.homeDirectoryForCurrentUser
+    private static let home = TestEnvironment.paths.root
 
     /// Fold a directory rollup into the live home tree (V1: subtree replace by URL). A rollup
     /// whose parent chain isn't measured yet is dropped. Its own parent rollup carries it later.
@@ -675,8 +677,8 @@ final class ScanModel {
             let finishedAt = Date()
             lastScan = finishedAt
             lastScanBytes = totalBytes
-            UserDefaults.standard.set(finishedAt, forKey: Self.lastScanKey)
-            UserDefaults.standard.set(Int(totalBytes), forKey: Self.lastScanBytesKey)
+            TestEnvironment.defaults.set(finishedAt, forKey: Self.lastScanKey)
+            TestEnvironment.defaults.set(Int(totalBytes), forKey: Self.lastScanBytesKey)
             if !snapshots.isEmpty {
                 categories.append(CategoryState(id: "snapshots", title: Self.titles["snapshots"] ?? "Snapshots"))
             }
@@ -760,9 +762,9 @@ final class ScanModel {
     ) async -> CleanReport {
         var cleaner = Cleaner(
             policy: SafetyPolicy(
-                allowsOutsideHome: UserDefaults.standard.bool(forKey: outsideHomeKey),
-                excludedPaths: UserDefaults.standard.stringArray(forKey: excludedKey) ?? []),
-            recorder: FlightRecorder.shared, dryRun: DryRun.enabled)
+                allowsOutsideHome: TestEnvironment.defaults.bool(forKey: outsideHomeKey),
+                excludedPaths: TestEnvironment.defaults.stringArray(forKey: excludedKey) ?? []),
+            log: TestEnvironment.auditLog, recorder: FlightRecorder.shared, dryRun: DryRun.enabled)
         cleaner.owner = { $0.ownerBundleID }
         if let minutes = helperLifetimeMinutes {
             let lifetime = TimeInterval(min(60, max(1, minutes)) * 60)
@@ -856,7 +858,7 @@ final class ScanModel {
     static func normalizedPath(_ raw: String) -> String? {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        let home = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL.path
+        let home = TestEnvironment.paths.root.standardizedFileURL.path
         if trimmed == "~" { return home }
         if trimmed.hasPrefix("~/") { return home + "/" + trimmed.dropFirst(2) }
         guard trimmed.hasPrefix("/") else { return nil }

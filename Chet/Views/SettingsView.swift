@@ -417,7 +417,7 @@ struct SettingsView: View {
 
     private var recordPath: String {
         let path = tweaks.historyURL.path
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let home = TestEnvironment.paths.root.path
         return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
     }
 
@@ -440,7 +440,7 @@ struct SettingsView: View {
         panel.allowsMultipleSelection = true
         panel.prompt = "Skip"
         panel.message = "Choose folders Chet should never look inside."
-        panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
+        panel.directoryURL = TestEnvironment.paths.root
         guard panel.runModal() == .OK else { return }
         for url in panel.urls {
             model.addExcludedPath(url.path)
@@ -454,7 +454,7 @@ struct SettingsView: View {
         panel.allowsMultipleSelection = true
         panel.prompt = "Add"
         panel.message = "Choose folders. Chet lists what each one contains."
-        panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
+        panel.directoryURL = TestEnvironment.paths.root
         guard panel.runModal() == .OK else { return }
         for url in panel.urls {
             model.addUserRule(path: url.path)

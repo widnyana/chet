@@ -14,7 +14,8 @@ final class SystemStatusModel {
     func refresh() {
         Task {
             let capacity = await Task.detached(priority: .utility) { VolumeCapacity.current() }.value
-            let trash = await Task.detached(priority: .utility) { TrashBin.size() }.value
+            let trash = await Task.detached(priority: .utility) { TrashBin.size(at: TestEnvironment.paths.trash) }
+                .value
             self.capacity = capacity
             self.trashBytes = trash
         }
@@ -24,7 +25,9 @@ final class SystemStatusModel {
         guard !isEmptyingTrash else { return }
         isEmptyingTrash = true
         Task {
-            _ = await Task.detached(priority: .userInitiated) { TrashBin.empty(dryRun: DryRun.enabled) }.value
+            _ = await Task.detached(priority: .userInitiated) {
+                TrashBin.empty(at: TestEnvironment.paths.trash, dryRun: DryRun.enabled)
+            }.value
             self.isEmptyingTrash = false
             self.refresh()
         }

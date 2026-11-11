@@ -854,7 +854,7 @@ struct LoadingStateView: View {
 
 enum RowIdentifier {
     static func path(_ url: URL) -> String {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let home = TestEnvironment.paths.root.path
         let path = url.path
         let relative: String
         if path.hasPrefix(home) {

@@ -87,7 +87,7 @@ struct SummaryView: View {
                 HStack {
                     SecondaryActionButton(
                         title: "Show audit log",
-                        action: { NSWorkspace.shared.open(AuditLog().url) })
+                        action: { NSWorkspace.shared.open(TestEnvironment.auditLog.url) })
                     Spacer()
                     PrimaryActionButton(
                         title: "Done",

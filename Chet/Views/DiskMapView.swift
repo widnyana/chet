@@ -94,7 +94,7 @@ struct DiskMapView: View {
             guard !model.folderTrees.isEmpty else { return }
             let kids = model.folderTrees.sorted { $0.size > $1.size }
             let home = FolderNode(
-                url: FileManager.default.homeDirectoryForCurrentUser, size: kids.reduce(0) { $0 + $1.size },
+                url: TestEnvironment.paths.root, size: kids.reduce(0) { $0 + $1.size },
                 children: kids)
             finalHome = home
             tree = home
@@ -318,7 +318,7 @@ struct DiskMapView: View {
 
     private func performTrash() {
         let policy = SafetyPolicy(
-            home: FileManager.default.homeDirectoryForCurrentUser,
+            home: TestEnvironment.paths.root,
             allowsOutsideHome: model.scanOutsideHome,
             excludedPaths: model.excludedPaths)
         let result = StorageTrasher(policy: policy, dryRun: DryRun.enabled)

@@ -49,7 +49,9 @@ final class TweaksModel {
     /// reason here, until the next successful change or a dismiss.
     private(set) var failures: [String: String] = [:]
 
-    private let historyStore = TweakHistory()
+    private let historyStore = TweakHistory(
+        url: TestEnvironment.paths.applicationSupport.appendingPathComponent(
+            "Chet/tweaks.log", isDirectory: false))
     private let catalog = TweakCatalog.all
     /// DRY_RUN: the catalog is still read, so states stay truthful, but every control is
     /// disabled and the model refuses a write before it reaches the engine.
