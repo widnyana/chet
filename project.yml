@@ -75,6 +75,14 @@ targets:
         DEVELOPMENT_TEAM: ""
         SWIFT_VERSION: "6.0"
         GENERATE_INFOPLIST_FILE: YES
+        ENABLE_TESTING_SEARCH_PATHS: YES
+        ENABLE_HARDENED_RUNTIME: NO
+        LD_RUNPATH_SEARCH_PATHS:
+          - $(inherited)
+          - "@executable_path/../Frameworks"
+          - "@loader_path/../Frameworks"
+          - "$(PLATFORM_DIR)/Developer/Library/Frameworks"
+          - "$(SDKROOT)/Developer/Library/Frameworks"
   chet-helper:
     type: tool
     platform: macOS
@@ -100,3 +108,5 @@ schemes:
       config: Debug
       targets:
         - chetUITests
+      environmentVariables:
+        DRY_RUN: "1"

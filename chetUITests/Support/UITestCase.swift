@@ -20,32 +20,32 @@ enum UITestError: Error, LocalizedError, CustomStringConvertible {
     }
 }
 
-@MainActor
 class UITestCase: XCTestCase {
-    private(set) var app: XCUIApplication!
-    private(set) var scratchRoot: URL!
+    nonisolated(unsafe) private(set) var app: XCUIApplication!
+    nonisolated(unsafe) private(set) var scratchRoot: URL!
 
     override func setUpWithError() throws {
         try super.setUpWithError()
-        try MainActor.assumeIsolated {
-            try SessionGuard.assertDryRun()
-            try SessionGuard.assertNoUserInstance()
-            try SessionGuard.assertNoHelper()
-            scratchRoot = try Self.makeScratchRoot()
-            let application = XCUIApplication()
-            application.launchEnvironment["DRY_RUN"] = "1"
-            application.launchEnvironment["CHET_UITEST_ROOT"] = scratchRoot.path
-            application.launchEnvironment["CHET_UITEST_SESSION"] = "1"
-            application.launchArguments = ["-ApplePersistenceIgnoreState", "YES"]
-            app = application
-        }
+        try SessionGuard.assertDryRun()
+        try SessionGuard.assertNoUserInstance()
+        try SessionGuard.assertNoHelper()
+        let root = try Self.makeScratchRoot()
+        scratchRoot = root
+        let application = XCUIApplication()
+        application.launchEnvironment["DRY_RUN"] = "1"
+        application.launchEnvironment["CHET_UITEST_ROOT"] = root.path
+        application.launchEnvironment["CHET_UITEST_SESSION"] = "1"
+        application.launchArguments = ["-ApplePersistenceIgnoreState", "YES"]
+        app = application
+        application.launch()
+        try FocusGuard.requireForeground(application)
     }
 
     override func tearDownWithError() throws {
-        let root = MainActor.assumeIsolated { () -> URL? in
+        let root: URL? = {
             app?.terminate()
             return scratchRoot
-        }
+        }()
         if let root {
             print("chetUITests scratch root: \(root.path)")
             if FileManager.default.fileExists(atPath: root.path) {

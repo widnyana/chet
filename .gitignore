@@ -51,6 +51,7 @@
 !scripts/layout_check.py
 !scripts/ui_id_audit.py
 !scripts/ui_selectors.py
+!scripts/uitest.sh
 
 # --- 4. Explicit re-ignores inside committable trees ---
 ChetCore/.build/

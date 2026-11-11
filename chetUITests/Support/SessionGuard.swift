@@ -22,7 +22,6 @@ enum SessionGuardError: Error, LocalizedError, CustomStringConvertible, Equatabl
     }
 }
 
-@MainActor
 enum SessionGuard {
     private static let applicationBundleIdentifier = "id.web.widnyana.chet"
     private static let sessionStart = Date()
