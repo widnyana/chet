@@ -6,9 +6,10 @@ description = "Generate chet.xcodeproj from project.yml"
 run = "xcodegen generate --quiet"
 
 [tasks.build]
-description = "Debug build of the app into .build/xc"
+description = "Debug build of the app into .build/xc (bumps the build number)"
 depends = ["gen"]
 run = [
+  "sh scripts/bump-build.sh",
   "xcodebuild -project chet.xcodeproj -scheme chet-helper -configuration Debug -destination 'platform=macOS' -derivedDataPath .build/xc -quiet build",
   "xcodebuild -project chet.xcodeproj -scheme chet -configuration Debug -destination 'platform=macOS' -derivedDataPath .build/xc -quiet build",
 ]

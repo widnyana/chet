@@ -42,7 +42,7 @@ Every development step is a mise task:
 The Xcode project is generated from `project.yml` by XcodeGen and is not committed.
 `mise run gen` regenerates it; the build tasks do this for you.
 
-`mise run release` increments `CFBundleVersion` in `Chet/Info.plist` before the Release build, so every shipped build carries a new number. `mise run dmg` inherits the bump through its `release` dependency. No other task writes that key, and the bumped plist is committed with the release.
+`mise run build` and `mise run release` each increment `CFBundleVersion` in `Chet/Info.plist` before their build, so every built bundle carries a new number. `mise run dev` inherits the bump through its `build` dependency, and `mise run dmg` inherits it through `release`. No other task writes that key, and the bumped plist is committed with the change that produced it.
 
 The app ships a privileged helper, `chet-helper`, as a second target. `mise run build` and
 `mise run release` build it before the app, and the app's post-build script copies it to
