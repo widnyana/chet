@@ -92,6 +92,8 @@ while [ $# -gt 0 ]; do
 done
 
 releases_url="https://github.com/widnyana/chet/releases"
+repo_slug="widnyana/chet"
+use_gh=0
 api_base="https://api.github.com/repos/widnyana/chet/releases"
 bundle_id="id.web.widnyana.chet"
 
@@ -193,16 +195,25 @@ else
     case "$status" in
       200|201) ;;
       404)
-        if [ -n "${GITHUB_TOKEN:-}" ]; then
-          printf 'The release API answered 404 for the token in GITHUB_TOKEN.\n' >&2
-          printf 'A private repository needs a token with repo access, or gh auth without that variable.\n' >&2
-          printf 'Try: GITHUB_TOKEN=$(env -u GITHUB_TOKEN gh auth token) bash %s\n' "$0" >&2
-          printf 'Or install a local build: bash %s --archive dist/chet.zip\n' "$0" >&2
-        else
-          printf 'No published release yet.\n' >&2
+        if command -v gh >/dev/null 2>&1 && env -u GITHUB_TOKEN gh auth status -h github.com >/dev/null 2>&1; then
+          gh_path="/repos/$repo_slug/releases/latest"
+          if [ -n "$tag_arg" ]; then
+            gh_path="/repos/$repo_slug/releases/tags/$tag_arg"
+          fi
+          if env -u GITHUB_TOKEN gh api "$gh_path" > "$json_file" 2>/dev/null; then
+            use_gh=1
+          fi
         fi
-        printf 'Releases: %s\n' "$releases_url" >&2
-        exit 2
+        if [ "$use_gh" = 0 ]; then
+          if [ -n "${GITHUB_TOKEN:-}" ]; then
+            printf 'The release API answered 404 for the token in GITHUB_TOKEN.\n' >&2
+            printf 'A private repository needs a token with repo access, gh auth, or --archive.\n' >&2
+          else
+            printf 'No published release yet.\n' >&2
+          fi
+          printf 'Releases: %s\n' "$releases_url" >&2
+          exit 2
+        fi
         ;;
       *)
         printf 'The release API returned HTTP %s.\n' "$status" >&2
@@ -287,13 +298,20 @@ if [ -n "$archive" ]; then
   file=$archive
 else
   file="$tmp/$asset_name"
-  asset_curl_args=(-fsSL --retry 2 -H 'Accept: application/octet-stream')
-  if [ -n "${GITHUB_TOKEN:-}" ]; then
-    asset_curl_args+=(-H "Authorization: Bearer $GITHUB_TOKEN")
-  fi
-  if ! curl "${asset_curl_args[@]}" -o "$file" "${asset_api:-$asset_url}"; then
-    printf 'Download failed: %s\n' "$asset_name" >&2
-    exit 4
+  if [ "$use_gh" = 1 ]; then
+    if ! env -u GITHUB_TOKEN gh release download "$release_tag" --repo "$repo_slug" --pattern "$asset_name" --dir "$tmp" --clobber; then
+      printf 'Download failed: %s\n' "$asset_name" >&2
+      exit 4
+    fi
+  else
+    asset_curl_args=(-fsSL --retry 2 -H 'Accept: application/octet-stream')
+    if [ -n "${GITHUB_TOKEN:-}" ]; then
+      asset_curl_args+=(-H "Authorization: Bearer $GITHUB_TOKEN")
+    fi
+    if ! curl "${asset_curl_args[@]}" -o "$file" "${asset_api:-$asset_url}"; then
+      printf 'Download failed: %s\n' "$asset_name" >&2
+      exit 4
+    fi
   fi
 fi
 
