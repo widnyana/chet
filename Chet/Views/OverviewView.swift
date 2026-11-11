@@ -61,15 +61,30 @@ struct OverviewView: View {
         return model.totalBytes.formatted(.byteCount(style: .file))
     }
 
+    private var accessMissing: Bool {
+        model.categories.contains(where: \.needsFullDiskAccess)
+    }
+
+    private var measuredRoots: [String] {
+        let scopeRoots = model.resultScope.roots
+        return scopeRoots.isEmpty ? [NSHomeDirectory()] : scopeRoots
+    }
+
+    private var blockingReadErrors: [WalkError] {
+        guard !accessMissing else { return [] }
+        return model.readErrors.filter {
+            ReadScope.classify($0, roots: measuredRoots) == .categoryRoot
+        }
+    }
+
     private var state: HomeState {
         HomeState.resolve(
             isScanning: model.isScanning,
             hasScanned: model.lastScan != nil,
             didFinishScan: model.didFinishScan,
             totalBytes: model.totalBytes,
-            blockingReadErrorCount: ReadScope.blockingCount(
-                model.readErrors, roots: model.resultScope.roots),
-            needsFullDiskAccess: model.categories.contains(where: \.needsFullDiskAccess))
+            blockingReadErrorCount: blockingReadErrors.count,
+            needsFullDiskAccess: accessMissing)
     }
 
     private var subtitle: String {
@@ -92,8 +107,7 @@ struct OverviewView: View {
     }
 
     @ViewBuilder private var content: some View {
-        let blockingCount = ReadScope.blockingCount(
-            model.readErrors, roots: model.resultScope.roots)
+        let blockingCount = blockingReadErrors.count
         VStack(alignment: .leading, spacing: Spacing.s4) {
             if blockingCount > 0 {
                 VStack(alignment: .leading, spacing: Spacing.s2) {
@@ -105,12 +119,7 @@ struct OverviewView: View {
                         tone: .amber)
                     DisclosureGroup("Details") {
                         ForEach(
-                            Array(
-                                model.readErrors.filter {
-                                    ReadScope.classify($0, roots: model.resultScope.roots)
-                                        == .categoryRoot
-                                }.prefix(3).enumerated()
-                            ),
+                            Array(blockingReadErrors.prefix(3).enumerated()),
                             id: \.offset
                         ) { _, error in
                             Text(error.url.path)
