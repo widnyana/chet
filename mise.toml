@@ -91,6 +91,14 @@ run = [
   "echo dist/chet.dmg",
 ]
 
+[tasks.publish]
+description = "Build, tag, push, and publish dist/chet.dmg and dist/chet.zip to GitHub"
+run = 'bash scripts/publish-release.sh "$@"'
+
+[tasks.install-chet]
+description = "Install the latest published Chet release into /Applications"
+run = 'bash scripts/install-chet.sh "$@"'
+
 [tasks.bench]
 description = "Benchmark GPU vs SHA-256 duplicate hashing (writes 1 GB of temp files)"
 run = "CHET_BENCH=1 swift test --package-path ChetCore --filter hashingBenchmark"

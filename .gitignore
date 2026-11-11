@@ -43,7 +43,9 @@
 !docs/design/**
 !scripts/axdrv.swift
 !scripts/bump-build.sh
+!scripts/install-chet.sh
 !scripts/dedupe-launchservices.sh
+!scripts/publish-release.sh
 !scripts/layout_check.py
 !scripts/ui_id_audit.py
 !scripts/ui_selectors.py
