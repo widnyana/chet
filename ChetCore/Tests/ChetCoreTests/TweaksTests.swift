@@ -205,9 +205,8 @@ struct TweaksTests {
     @Test func setVerifyResetAgainstAProbeDomain() throws {
         let dir = try TempDir()
         let history = TweakHistory(url: dir.url.appendingPathComponent("tweaks.log"))
-        let probe = domain()
+        let probe = try prefsDomain(dir)
         let tweak = toggleTweak(domain: probe)
-        defer { _ = Subprocess.run("/usr/bin/defaults", ["delete", probe]) }
 
         // Start from absent.
         #expect(TweakEngine.read(tweak).current == nil)
@@ -235,13 +234,12 @@ struct TweaksTests {
     @Test func mediumRiskNeedsConfirmationAndWritesNothing() throws {
         let dir = try TempDir()
         let history = TweakHistory(url: dir.url.appendingPathComponent("tweaks.log"))
-        let probe = domain()
+        let probe = try prefsDomain(dir)
         let tweak = Tweak(
             id: "test.confirm", category: .windows, name: "Risky", summary: "Summary",
             detail: "Detail", impact: "Impact", risk: .medium,
             target: .defaults(domain: probe, key: "risky", type: .boolean),
             control: .toggle(on: .boolean(true), off: .boolean(false)))
-        defer { _ = Subprocess.run("/usr/bin/defaults", ["delete", probe]) }
 
         let blocked = TweakEngine.set(tweak, to: .boolean(true), history: history, dryRun: false)
         #expect(blocked.needsConfirmation)
@@ -258,9 +256,8 @@ struct TweaksTests {
     @Test func dryRunRefusesTheWriteAndRecordsNothing() throws {
         let dir = try TempDir()
         let history = TweakHistory(url: dir.url.appendingPathComponent("tweaks.log"))
-        let probe = domain()
+        let probe = try prefsDomain(dir)
         let tweak = toggleTweak(domain: probe)
-        defer { _ = Subprocess.run("/usr/bin/defaults", ["delete", probe]) }
 
         let gated = TweakEngine.set(tweak, to: .boolean(true), history: history, dryRun: true)
         #expect(gated.record.error == TweakError.gated.message)
@@ -359,9 +356,8 @@ struct TweaksTests {
     @Test func unchangedWriteIsNotRecorded() throws {
         let dir = try TempDir()
         let history = TweakHistory(url: dir.url.appendingPathComponent("tweaks.log"))
-        let probe = domain()
+        let probe = try prefsDomain(dir)
         let tweak = toggleTweak(domain: probe)
-        defer { _ = Subprocess.run("/usr/bin/defaults", ["delete", probe]) }
 
         let first = TweakEngine.set(tweak, to: .boolean(true), history: history, dryRun: false)
         #expect(!first.unchanged)
@@ -374,12 +370,8 @@ struct TweaksTests {
     @Test func companionsWriteVerifyAndRestore() throws {
         let dir = try TempDir()
         let history = TweakHistory(url: dir.url.appendingPathComponent("tweaks.log"))
-        let primary = domain()
-        let companion = domain()
-        defer {
-            _ = Subprocess.run("/usr/bin/defaults", ["delete", primary])
-            _ = Subprocess.run("/usr/bin/defaults", ["delete", companion])
-        }
+        let primary = try prefsDomain(dir)
+        let companion = try prefsDomain(dir)
         let tweak = Tweak(
             id: "test.companions", category: .keyboard, name: "Companion", summary: "Summary",
             detail: "Detail", impact: "Impact",
@@ -407,8 +399,7 @@ struct TweaksTests {
     @Test func rollbackRefusesAMismatchedRecord() throws {
         let dir = try TempDir()
         let history = TweakHistory(url: dir.url.appendingPathComponent("tweaks.log"))
-        let probe = domain()
-        defer { _ = Subprocess.run("/usr/bin/defaults", ["delete", probe]) }
+        let probe = try prefsDomain(dir)
         let tweak = Tweak(
             id: "test.integer", category: .keyboard, name: "Number", summary: "Summary",
             detail: "Detail", impact: "Impact",
@@ -425,12 +416,8 @@ struct TweaksTests {
     @Test func rangeAndTextControlsWriteTypedValues() throws {
         let dir = try TempDir()
         let history = TweakHistory(url: dir.url.appendingPathComponent("tweaks.log"))
-        let numberDomain = domain()
-        let textDomain = domain()
-        defer {
-            _ = Subprocess.run("/usr/bin/defaults", ["delete", numberDomain])
-            _ = Subprocess.run("/usr/bin/defaults", ["delete", textDomain])
-        }
+        let numberDomain = try prefsDomain(dir)
+        let textDomain = try prefsDomain(dir)
 
         let ranged = Tweak(
             id: "test.range", category: .keyboard, name: "Rate", summary: "Summary",
@@ -458,6 +445,12 @@ struct TweaksTests {
 
     private func domain() -> String {
         "com.chet.tweaks.tests.\(UUID().uuidString)"
+    }
+
+    private func prefsDomain(_ dir: TempDir) throws -> String {
+        let folder = dir.url.appendingPathComponent("prefs")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder.appendingPathComponent(UUID().uuidString).path
     }
 
     private func toggleTweak(domain: String) -> Tweak {

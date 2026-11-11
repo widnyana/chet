@@ -58,7 +58,15 @@ exec tail -F "$LOG"
 
 [tasks.test]
 description = "Run ChetCore tests (pass a filter: mise run test -- --filter Cleaner)"
-run = "swift test --package-path ChetCore"
+run = "DRY_RUN=1 swift test --package-path ChetCore"
+
+[tasks.test-ui]
+description = "Run the UI tests in an isolated scratch root"
+run = 'DRY_RUN=1 bash scripts/uitest.sh "$@"'
+
+[tasks.uitest]
+description = "Run the UI tests in an isolated scratch root"
+run = 'DRY_RUN=1 bash scripts/uitest.sh "$@"'
 
 [tasks.release]
 description = "Release build, build number bumped, arm64 check, zipped to dist/chet.zip"
@@ -74,8 +82,8 @@ run = [
 ]
 
 [tasks.check]
-description = "Tests, debug build, and arm64-only binary check"
-depends = ["test", "build"]
+description = "Tests, UI tests, debug build, and arm64-only binary check"
+depends = ["test", "test-ui", "build"]
 run = "test \"$(lipo -archs .build/xc/Build/Products/Debug/chet.app/Contents/MacOS/chet)\" = arm64 && echo arm64 ok"
 
 [tasks.dmg]
