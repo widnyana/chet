@@ -56,7 +56,9 @@ enum TestGuard {
         defer { free(resolved) }
         let canonical = String(cString: resolved)
         let bases = ["/var/folders", "/private/var/folders", "/tmp", "/private/tmp"]
-        guard bases.contains(where: { canonical.hasPrefix($0 + "/") }) else {
+        let containerTemporary =
+            canonical.contains("/Library/Containers/") && canonical.contains("/Data/tmp/")
+        guard containerTemporary || bases.contains(where: { canonical.hasPrefix($0 + "/") }) else {
             throw TestGuardError.pathOutsideScratchRoot(path)
         }
         return URL(fileURLWithPath: canonical, isDirectory: true)

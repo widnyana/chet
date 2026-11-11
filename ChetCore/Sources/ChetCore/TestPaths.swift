@@ -52,7 +52,9 @@ public struct TestPaths: Sendable, Equatable {
         {
             return nil
         }
-        guard temporaryBases.contains(where: { isDescendant(canonical, of: $0) }) else { return nil }
+        let temporary = isContainerTemporary(canonical)
+            || temporaryBases.contains(where: { isDescendant(canonical, of: $0) })
+        guard temporary else { return nil }
         return TestPaths(root: URL(fileURLWithPath: canonical, isDirectory: true))
     }
 
@@ -92,6 +94,10 @@ public struct TestPaths: Sendable, Equatable {
 
     private static let temporaryBases: [String] = ["/tmp", FileManager.default.temporaryDirectory.path]
         .compactMap(canonicalPath)
+
+    private static func isContainerTemporary(_ path: String) -> Bool {
+        path.contains("/Library/Containers/") && path.contains("/Data/tmp/")
+    }
 
     private static func canonicalPath(_ path: String) -> String? {
         var existing = URL(fileURLWithPath: path, isDirectory: true)
