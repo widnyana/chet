@@ -30,6 +30,53 @@ struct PrivilegedHelperTests {
         #expect(HelperGuard.refusal(path: dir.url.path, roots: [dir.url.path]) == "outside allowed roots")
     }
 
+    @Test func directAppBundleInAnInjectedAppRootIsAllowed() throws {
+        let root = try TempDir()
+        let bundle = root.url.appendingPathComponent("Slides.app")
+        try FileManager.default.createDirectory(at: bundle, withIntermediateDirectories: true)
+        #expect(HelperGuard.refusal(path: bundle.path, appRoots: [root.url.path]) == nil)
+    }
+
+    @Test func appBundleContentsAreRefused() throws {
+        let root = try TempDir()
+        let bundle = root.url.appendingPathComponent("Slides.app")
+        let contents = bundle.appendingPathComponent("Contents")
+        try FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
+        #expect(
+            HelperGuard.refusal(path: contents.path, appRoots: [root.url.path]) == "not an app bundle")
+    }
+
+    @Test func nonBundleChildOfAnAppRootIsRefused() throws {
+        let root = try TempDir()
+        let notes = try root.file("notes", bytes: 10)
+        #expect(
+            HelperGuard.refusal(path: notes.path, appRoots: [root.url.path]) == "not an app bundle")
+    }
+
+    @Test func appRootItselfIsRefused() throws {
+        let root = try TempDir()
+        #expect(
+            HelperGuard.refusal(path: root.url.path, appRoots: [root.url.path])
+                == "outside allowed roots")
+    }
+
+    @Test func symlinkedAppBundleIsRefused() throws {
+        let root = try TempDir()
+        let target = root.url.appendingPathComponent("Slides.app")
+        try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+        let link = root.url.appendingPathComponent("Link.app")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+        #expect(HelperGuard.refusal(path: link.path, appRoots: [root.url.path]) == "symlink")
+    }
+
+    @Test func chetItselfIsRefusedEvenAsADirectBundle() throws {
+        let root = try TempDir()
+        let bundle = root.url.appendingPathComponent("Chet.app")
+        try FileManager.default.createDirectory(at: bundle, withIntermediateDirectories: true)
+        #expect(
+            HelperGuard.refusal(path: bundle.path, appRoots: [root.url.path]) == "not an app bundle")
+    }
+
     @Test func systemPathsAreProtected() {
         #expect(HelperGuard.refusal(path: "/System/x") == "protected")
         #expect(HelperGuard.refusal(path: "/Library/Keychains/login.keychain-db") == "protected")

@@ -17,10 +17,16 @@ public enum HelperGuard {
     public static let plistName = "id.web.widnyana.chet.helper.plist"
 
     /// The only trees a root process removes from. A whole system tree is never a root.
+    /// The daemon removes children of six system trees and exactly one direct app bundle from
+    /// each app root; permanent removal, never the Trash.
     public static let roots = [
         "/Library/Caches", "/Library/Logs", "/Library/Application Support",
         "/Library/Preferences", "/Library/LaunchAgents", "/Library/LaunchDaemons",
     ]
+
+    /// The only folders whose direct `.app` children a root process removes. Each call may
+    /// touch exactly one bundle that sits directly in one of these folders.
+    public static let appRoots = ["/Applications"]
 
     /// Paths no helper call may reach, whatever the roots say.
     public static let protected = [
@@ -29,14 +35,17 @@ public enum HelperGuard {
         "/Library/Frameworks", "/Library/Keychains", "/Library/Mail", "/Library/Messages",
     ]
 
-    /// Nil means the helper may remove the path. `roots` is injectable so a test can use a
-    /// temp folder. Reasons are literal and reach the audit log unchanged.
+    /// Nil means the helper may remove the path. `roots` and `appRoots` are injectable so a
+    /// test can use a temp folder. Reasons are literal and reach the audit log unchanged.
     ///
     /// The helper never re-derives app ownership: Chet revalidates the item against its own
     /// catalog, and only this app can reach the daemon's mach service (the listener pins the
     /// code-signing requirement to its identifier). These rules bound damage; the catalog
     /// decides relevance.
-    public static func refusal(path raw: String, roots: [String] = HelperGuard.roots) -> String? {
+    public static func refusal(
+        path raw: String, roots: [String] = HelperGuard.roots,
+        appRoots: [String] = HelperGuard.appRoots
+    ) -> String? {
         guard !raw.isEmpty, raw.hasPrefix("/") else { return "not absolute" }
         guard !raw.split(separator: "/").contains("..") else { return "path traversal" }
         // No Foundation standardization: it rewrites the `/private` prefix, which would make
@@ -53,6 +62,14 @@ public enum HelperGuard {
         var status = stat()
         guard lstat(path, &status) == 0 else { return "missing" }
         guard (status.st_mode & S_IFMT) != S_IFLNK else { return "symlink" }
+        if let appRoot = appRoots.first(where: { path.hasPrefix($0 + "/") }) {
+            let name = (path as NSString).lastPathComponent
+            let lower = name.lowercased()
+            guard parent == appRoot, lower.hasSuffix(".app"), lower != "chet.app" else {
+                return "not an app bundle"
+            }
+            return nil
+        }
         // The root folder itself is not removable: only its children are.
         guard roots.contains(where: { path.hasPrefix($0 + "/") }) else {
             return "outside allowed roots"
