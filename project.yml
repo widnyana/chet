@@ -58,6 +58,23 @@ targets:
           ID="${EXPANDED_CODE_SIGN_IDENTITY:-}"
           [ -n "$ID" ] || ID=-
           codesign --force --options runtime --sign "$ID" "$APP/Contents/MacOS/chet-helper"
+  chetUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: chetUITests
+    dependencies:
+      - target: chet
+      - package: ChetCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: id.web.widnyana.chet.uitest
+        TEST_TARGET_NAME: chet
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        DEVELOPMENT_TEAM: ""
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: YES
   chet-helper:
     type: tool
     platform: macOS
@@ -72,3 +89,14 @@ targets:
         ENABLE_HARDENED_RUNTIME: YES
     scheme:
       testTargets: []
+schemes:
+  chet:
+    build:
+      targets:
+        chet: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - chetUITests
