@@ -34,7 +34,7 @@ struct AboutView: View {
             .frame(maxWidth: .infinity)
         }
         .background(Theme.paper)
-        .frame(width: 560, height: 620)
+        .frame(width: 560, height: 560)
         .task { await load() }
         .onAppear {
             VerboseLog.event(.debug, .ui, .uiViewAppeared, .code(.view, .viewAbout))
