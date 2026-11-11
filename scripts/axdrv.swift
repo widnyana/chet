@@ -5,12 +5,12 @@
 // Context: swift
 // Purpose: Drive a running macOS app through its accessibility tree
 //
-// Build:  swiftc -O axdrv.swift -o /tmp/axdrv
+// Build:  swiftc -O scripts/axdrv.swift ChetCore/Sources/ChetCore/AXSelector.swift -o /tmp/axdrv
 // Help:   /tmp/axdrv help
 //
 // Target: --pid <pid>, --app <name or bundle id>, AXDRV_PID, or the frontmost app.
 // Select: key=value terms, ANDed. A bare term is a case-insensitive substring match over
-//         id, description, title, and value.
+//         id, role, description, title, and value.
 import AppKit
 import ApplicationServices
 
@@ -335,51 +335,11 @@ func snapshot(_ target: Target, depthLimit: Int) -> [Node] {
 
 // MARK: - Selector
 
-struct Selector {
-    struct Term {
-        let key: String
-        let value: String
-    }
-
-    var terms: [Term] = []
-
-    init(_ operands: [String]) {
-        for operand in operands {
-            if let separator = operand.firstIndex(of: "=") {
-                let key = String(operand[..<separator]).lowercased()
-                let value = String(operand[operand.index(after: separator)...])
-                terms.append(Term(key: key, value: value))
-            } else {
-                terms.append(Term(key: "contains", value: operand))
-            }
-        }
-    }
-
-    var isEmpty: Bool { terms.isEmpty }
-
+extension AXSelector {
     func matches(_ node: Node) -> Bool {
-        for term in terms {
-            switch term.key {
-            case "id":
-                if node.id != term.value { return false }
-            case "role":
-                if node.role != term.value { return false }
-            case "desc", "description":
-                if node.desc != term.value { return false }
-            case "title":
-                if node.title != term.value { return false }
-            case "value":
-                if node.value != term.value { return false }
-            case "enabled":
-                if node.enabled != (term.value == "true") { return false }
-            case "contains":
-                let haystack = "\(node.id) \(node.desc) \(node.title) \(node.value)".lowercased()
-                if !haystack.contains(term.value.lowercased()) { return false }
-            default:
-                return false
-            }
-        }
-        return true
+        matches(
+            id: node.id, role: node.role, desc: node.desc, title: node.title, value: node.value,
+            enabled: node.enabled)
     }
 }
 
@@ -397,7 +357,7 @@ func describe(_ node: Node) -> String {
     return parts.joined(separator: " ")
 }
 
-func resolve(_ selector: Selector, in nodes: [Node]) -> Node {
+func resolve(_ selector: AXSelector, in nodes: [Node]) -> Node {
     let matches = nodes.filter { selector.matches($0) }
     if matches.count == 1 { return matches[0] }
     if matches.isEmpty {
@@ -461,7 +421,7 @@ func subtree(_ root: AXUIElement, window: String) -> [Node] {
     return nodes
 }
 
-func selectRow(containing selector: Selector, in nodes: [Node]) -> Bool {
+func selectRow(containing selector: AXSelector, in nodes: [Node]) -> Bool {
     for outline in nodes where outline.role == "AXOutline" {
         for row in subtree(outline.element, window: outline.window) where row.role == "AXRow" {
             if subtree(row.element, window: row.window).contains(where: selector.matches) {
@@ -581,340 +541,349 @@ func printNodes(_ nodes: [Node], json: Bool, target: Target) {
 
 // MARK: - Main
 
-let options = parseArguments()
-
-// Listing apps needs no target and no accessibility trust.
-if options.command == "apps" {
-    for app in runningApps().sorted(by: { ($0.localizedName ?? "") < ($1.localizedName ?? "") }) {
-        print(
-            "\(app.processIdentifier)\t\(app.bundleIdentifier ?? "?")\t"
-                + "\(app.localizedName ?? "?")\t\(app.isActive ? "active" : "")")
+@main
+struct AXDRV {
+    static func main() {
+        run()
     }
-    exit(0)
 }
 
-let target = resolveTarget(options)
+func run() {
+    let options = parseArguments()
 
-// MARK: - Pixels
-
-struct SampledColor {
-    let red: Double
-    let green: Double
-    let blue: Double
-    let count: Int
-
-    var hex: String {
-        String(
-            format: "#%02X%02X%02X",
-            Int((red * 255).rounded()), Int((green * 255).rounded()), Int((blue * 255).rounded()))
-    }
-
-    /// WCAG 2.1 relative luminance.
-    var luminance: Double {
-        func channel(_ value: Double) -> Double {
-            value <= 0.03928 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+    // Listing apps needs no target and no accessibility trust.
+    if options.command == "apps" {
+        for app in runningApps().sorted(by: { ($0.localizedName ?? "") < ($1.localizedName ?? "") }) {
+            print(
+                "\(app.processIdentifier)\t\(app.bundleIdentifier ?? "?")\t"
+                    + "\(app.localizedName ?? "?")\t\(app.isActive ? "active" : "")")
         }
-        return 0.2126 * channel(red) + 0.7152 * channel(green) + 0.0722 * channel(blue)
+        exit(0)
     }
-}
 
-func contrastRatio(_ left: SampledColor, _ right: SampledColor) -> Double {
-    let high = max(left.luminance, right.luminance)
-    let low = min(left.luminance, right.luminance)
-    return (high + 0.05) / (low + 0.05)
-}
+    let target = resolveTarget(options)
 
-/// The on-screen window of this process whose bounds contain the point, with its bounds in
-/// screen points. AX frames use the same coordinate space, so no conversion is needed.
-func windowID(containing point: CGPoint, pid: pid_t) -> (id: Int, bounds: CGRect)? {
-    let list =
-        CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
-        as? [[String: Any]] ?? []
-    for window in list {
-        guard (window[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == pid else { continue }
-        guard let raw = window[kCGWindowBounds as String] as? [String: Any],
-            let bounds = CGRect(dictionaryRepresentation: raw as CFDictionary)
-        else { continue }
-        if bounds.contains(point) {
-            return (window[kCGWindowNumber as String] as? Int ?? 0, bounds)
+    // MARK: - Pixels
+
+    struct SampledColor {
+        let red: Double
+        let green: Double
+        let blue: Double
+        let count: Int
+
+        var hex: String {
+            String(
+                format: "#%02X%02X%02X",
+                Int((red * 255).rounded()), Int((green * 255).rounded()), Int((blue * 255).rounded()))
+        }
+
+        /// WCAG 2.1 relative luminance.
+        var luminance: Double {
+            func channel(_ value: Double) -> Double {
+                value <= 0.03928 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+            }
+            return 0.2126 * channel(red) + 0.7152 * channel(green) + 0.0722 * channel(blue)
         }
     }
-    return nil
-}
 
-func captureWindow(_ id: Int) -> NSBitmapImageRep? {
-    let path = NSTemporaryDirectory() + "axdrv-\(getpid())-\(id).png"
-    let task = Process()
-    task.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-    task.arguments = ["-o", "-x", "-l", String(id), path]
-    do {
-        try task.run()
-    } catch {
+    func contrastRatio(_ left: SampledColor, _ right: SampledColor) -> Double {
+        let high = max(left.luminance, right.luminance)
+        let low = min(left.luminance, right.luminance)
+        return (high + 0.05) / (low + 0.05)
+    }
+
+    /// The on-screen window of this process whose bounds contain the point, with its bounds in
+    /// screen points. AX frames use the same coordinate space, so no conversion is needed.
+    func windowID(containing point: CGPoint, pid: pid_t) -> (id: Int, bounds: CGRect)? {
+        let list =
+            CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+            as? [[String: Any]] ?? []
+        for window in list {
+            guard (window[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == pid else { continue }
+            guard let raw = window[kCGWindowBounds as String] as? [String: Any],
+                let bounds = CGRect(dictionaryRepresentation: raw as CFDictionary)
+            else { continue }
+            if bounds.contains(point) {
+                return (window[kCGWindowNumber as String] as? Int ?? 0, bounds)
+            }
+        }
         return nil
     }
-    task.waitUntilExit()
-    defer { try? FileManager.default.removeItem(atPath: path) }
-    guard task.terminationStatus == 0,
-        let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
-        let image = NSBitmapImageRep(data: data), image.pixelsWide > 0
-    else { return nil }
-    return image
-}
 
-/// Pixel colors inside a rect of the capture, grouped by a 4-bit bucket per channel. The
-/// bucket average keeps antialiased edge pixels from dragging the reported color.
-func sampledColors(in image: NSBitmapImageRep, rect: CGRect) -> [SampledColor] {
-    let minX = max(0, Int(rect.minX.rounded(.down)))
-    let maxX = min(image.pixelsWide - 1, Int(rect.maxX.rounded(.up)))
-    let minY = max(0, Int(rect.minY.rounded(.down)))
-    let maxY = min(image.pixelsHigh - 1, Int(rect.maxY.rounded(.up)))
-    guard minX <= maxX, minY <= maxY else { return [] }
-    var buckets: [Int: (red: Double, green: Double, blue: Double, count: Int)] = [:]
-    for y in minY...maxY {
-        for x in minX...maxX {
-            // Read the stored components as they are. `screencapture` writes the
-            // composited values into a Display P3 file, and converting to sRGB shifts
-            // them: the paper token came back 2 levels light and the ink 9.
-            guard let color = image.colorAt(x: x, y: y) else { continue }
-            let red = color.redComponent
-            let green = color.greenComponent
-            let blue = color.blueComponent
-            let key =
-                (Int(red * 15) << 8) | (Int(green * 15) << 4) | Int(blue * 15)
-            let bucket = buckets[key] ?? (0, 0, 0, 0)
-            buckets[key] = (
-                bucket.red + red, bucket.green + green, bucket.blue + blue, bucket.count + 1
-            )
+    func captureWindow(_ id: Int) -> NSBitmapImageRep? {
+        let path = NSTemporaryDirectory() + "axdrv-\(getpid())-\(id).png"
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+        task.arguments = ["-o", "-x", "-l", String(id), path]
+        do {
+            try task.run()
+        } catch {
+            return nil
         }
+        task.waitUntilExit()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        guard task.terminationStatus == 0,
+            let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+            let image = NSBitmapImageRep(data: data), image.pixelsWide > 0
+        else { return nil }
+        return image
     }
-    return buckets.values
-        .map {
-            SampledColor(
-                red: $0.red / Double($0.count), green: $0.green / Double($0.count),
-                blue: $0.blue / Double($0.count), count: $0.count)
-        }
-        .sorted { $0.count > $1.count }
-}
 
-func printColorReport(
-    label: String, frame: CGRect, colors: [SampledColor], windowBounds: CGRect, json: Bool
-) {
-    let total = max(colors.reduce(0) { $0 + $1.count }, 1)
-    func share(_ color: SampledColor?) -> Double {
-        guard let color else { return 0 }
-        return Double(color.count) / Double(total)
-    }
-    let background = colors.first
-    // The ink is the cluster that contrasts most with the background and still covers
-    // enough pixels to be text rather than an edge artifact.
-    let ink = colors.dropFirst().filter { share($0) >= 0.02 }
-        .max { left, right in
-            guard let background else { return false }
-            return contrastRatio(left, background) < contrastRatio(right, background)
+    /// Pixel colors inside a rect of the capture, grouped by a 4-bit bucket per channel. The
+    /// bucket average keeps antialiased edge pixels from dragging the reported color.
+    func sampledColors(in image: NSBitmapImageRep, rect: CGRect) -> [SampledColor] {
+        let minX = max(0, Int(rect.minX.rounded(.down)))
+        let maxX = min(image.pixelsWide - 1, Int(rect.maxX.rounded(.up)))
+        let minY = max(0, Int(rect.minY.rounded(.down)))
+        let maxY = min(image.pixelsHigh - 1, Int(rect.maxY.rounded(.up)))
+        guard minX <= maxX, minY <= maxY else { return [] }
+        var buckets: [Int: (red: Double, green: Double, blue: Double, count: Int)] = [:]
+        for y in minY...maxY {
+            for x in minX...maxX {
+                // Read the stored components as they are. `screencapture` writes the
+                // composited values into a Display P3 file, and converting to sRGB shifts
+                // them: the paper token came back 2 levels light and the ink 9.
+                guard let color = image.colorAt(x: x, y: y) else { continue }
+                let red = color.redComponent
+                let green = color.greenComponent
+                let blue = color.blueComponent
+                let key =
+                    (Int(red * 15) << 8) | (Int(green * 15) << 4) | Int(blue * 15)
+                let bucket = buckets[key] ?? (0, 0, 0, 0)
+                buckets[key] = (
+                    bucket.red + red, bucket.green + green, bucket.blue + blue, bucket.count + 1
+                )
+            }
         }
-    // Antialiased glyph edges win on average for thin type, so report the glyph core
-    // separately: the smallest-luminance-distance-of-zero cluster that still exists.
-    let peak = colors.dropFirst().filter { share($0) >= 0.001 }
-        .max { left, right in
-            guard let background else { return false }
-            return contrastRatio(left, background) < contrastRatio(right, background)
-        }
-    func ratio(_ color: SampledColor?) -> Double {
-        guard let background, let color else { return 1 }
-        return contrastRatio(color, background)
+        return buckets.values
+            .map {
+                SampledColor(
+                    red: $0.red / Double($0.count), green: $0.green / Double($0.count),
+                    blue: $0.blue / Double($0.count), count: $0.count)
+            }
+            .sorted { $0.count > $1.count }
     }
-    // A point sample has one cluster. Reporting an ink share and a contrast there would be
-    // noise, so only the pixel is printed.
-    if colors.count <= 1 {
+
+    func printColorReport(
+        label: String, frame: CGRect, colors: [SampledColor], windowBounds: CGRect, json: Bool
+    ) {
+        let total = max(colors.reduce(0) { $0 + $1.count }, 1)
+        func share(_ color: SampledColor?) -> Double {
+            guard let color else { return 0 }
+            return Double(color.count) / Double(total)
+        }
+        let background = colors.first
+        // The ink is the cluster that contrasts most with the background and still covers
+        // enough pixels to be text rather than an edge artifact.
+        let ink = colors.dropFirst().filter { share($0) >= 0.02 }
+            .max { left, right in
+                guard let background else { return false }
+                return contrastRatio(left, background) < contrastRatio(right, background)
+            }
+        // Antialiased glyph edges win on average for thin type, so report the glyph core
+        // separately: the smallest-luminance-distance-of-zero cluster that still exists.
+        let peak = colors.dropFirst().filter { share($0) >= 0.001 }
+            .max { left, right in
+                guard let background else { return false }
+                return contrastRatio(left, background) < contrastRatio(right, background)
+            }
+        func ratio(_ color: SampledColor?) -> Double {
+            guard let background, let color else { return 1 }
+            return contrastRatio(color, background)
+        }
+        // A point sample has one cluster. Reporting an ink share and a contrast there would be
+        // noise, so only the pixel is printed.
+        if colors.count <= 1 {
+            if json {
+                print(
+                    #"{"label":"\#(escaped(label))","point":[\#(Int(frame.minX)),\#(Int(frame.minY))],"#
+                        + #""hex":"\#(background?.hex ?? "")"}"#)
+            } else {
+                print("\(Int(frame.minX)),\(Int(frame.minY))  \(background?.hex ?? "none")")
+            }
+            return
+        }
         if json {
+            let rows = colors.prefix(6).map {
+                String(
+                    format: #"{"hex":"%@","share":%.3f,"luminance":%.3f}"#, $0.hex, share($0),
+                    $0.luminance)
+            }
             print(
-                #"{"label":"\#(escaped(label))","point":[\#(Int(frame.minX)),\#(Int(frame.minY))],"#
-                    + #""hex":"\#(background?.hex ?? "")"}"#)
+                #"{"label":"\#(escaped(label))","frame":[\#(Int(frame.minX)),\#(Int(frame.minY)),"#
+                    + #"\#(Int(frame.width)),\#(Int(frame.height))],"window":[\#(Int(windowBounds.minX)),"#
+                    + #"\#(Int(windowBounds.minY)),\#(Int(windowBounds.width)),\#(Int(windowBounds.height))],"#
+                    + #""background":"\#(background?.hex ?? "")","ink":"\#(ink?.hex ?? "")","#
+                    + #""inkShare":\#(String(format: "%.3f", share(ink))),"contrast":\#(String(format: "%.2f", ratio(ink))),"#
+                    + #""peak":"\#(peak?.hex ?? "")","peakShare":\#(String(format: "%.3f", share(peak))),"#
+                    + #""peakContrast":\#(String(format: "%.2f", ratio(peak))),"#
+                    + #""colors":[\#(rows.joined(separator: ","))]}"#)
+            return
+        }
+        print("label      \(label)")
+        print(
+            "frame      \(Int(frame.minX)),\(Int(frame.minY)) \(Int(frame.width))x\(Int(frame.height))"
+        )
+        print(
+            "background \(background?.hex ?? "none") \(String(format: "%.0f%%", share(background) * 100))"
+        )
+        print(
+            "ink        \(ink?.hex ?? "none") \(String(format: "%.0f%%", share(ink) * 100))"
+                + "  contrast \(String(format: "%.2f", ratio(ink))):1")
+        print(
+            "peak       \(peak?.hex ?? "none") \(String(format: "%.1f%%", share(peak) * 100))"
+                + "  contrast \(String(format: "%.2f", ratio(peak))):1")
+        let palette = colors.prefix(6).map {
+            String(format: "%@ %.0f%%", $0.hex, share($0) * 100)
+        }
+        print("colors     \(palette.joined(separator: "  "))")
+    }
+
+    guard AXIsProcessTrusted() else {
+        FileHandle.standardError.write(Data("AX NOT TRUSTED\n".utf8))
+        exit(3)
+    }
+
+    messagingTimeout = options.timeout
+    nodeLimit = options.maxNodes
+    let selector = AXSelector(options.operands)
+    let nodes = snapshot(target, depthLimit: options.depth)
+
+    switch options.command {
+    case "windows":
+        let list =
+            CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+            as? [[String: Any]] ?? []
+        for window in list {
+            let owner = (window[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value
+            guard owner == target.pid else { continue }
+            let id = window[kCGWindowNumber as String] as? Int ?? 0
+            let name = window[kCGWindowName as String] as? String ?? ""
+            let bounds = window[kCGWindowBounds as String] as? [String: Any] ?? [:]
+            print(
+                "\(id)\t\(name)\t\(bounds["X"] ?? 0),\(bounds["Y"] ?? 0) "
+                    + "\(bounds["Width"] ?? 0)x\(bounds["Height"] ?? 0)")
+        }
+
+    case "activate":
+        activate(target.pid)
+        print("activated \(target.name)")
+
+    case "dump":
+        let selected = selector.isEmpty ? nodes.filter(interesting) : nodes.filter(selector.matches)
+        printNodes(options.all && selector.isEmpty ? nodes : selected, json: options.json, target: target)
+
+    case "texts":
+        for node in nodes where node.role == "AXStaticText" {
+            if selector.isEmpty || selector.matches(node), !node.value.isEmpty {
+                print(escaped(node.value))
+            }
+        }
+
+    case "press":
+        guard !selector.isEmpty else { usage() }
+        let node = resolve(selector, in: nodes)
+        print(press(node) ? "pressed \(describe(node))" : "press failed \(describe(node))")
+
+    case "select":
+        guard !selector.isEmpty else { usage() }
+        if selectRow(containing: selector, in: nodes) {
+            print("selected row containing \(options.operands.joined(separator: " "))")
         } else {
-            print("\(Int(frame.minX)),\(Int(frame.minY))  \(background?.hex ?? "none")")
+            FileHandle.standardError.write(Data("no selectable row matched\n".utf8))
+            exit(5)
         }
-        return
-    }
-    if json {
-        let rows = colors.prefix(6).map {
-            String(
-                format: #"{"hex":"%@","share":%.3f,"luminance":%.3f}"#, $0.hex, share($0),
-                $0.luminance)
+
+    case "click":
+        guard !selector.isEmpty else { usage() }
+        let node = resolve(selector, in: nodes)
+        print(click(node, pid: target.pid) ? "clicked \(describe(node))" : "click failed \(describe(node))")
+
+    case "frame":
+        guard !selector.isEmpty else { usage() }
+        let node = resolve(selector, in: nodes)
+        guard let frame = node.frame else {
+            FileHandle.standardError.write(Data("element has no frame\n".utf8))
+            exit(5)
         }
         print(
-            #"{"label":"\#(escaped(label))","frame":[\#(Int(frame.minX)),\#(Int(frame.minY)),"#
-                + #"\#(Int(frame.width)),\#(Int(frame.height))],"window":[\#(Int(windowBounds.minX)),"#
-                + #"\#(Int(windowBounds.minY)),\#(Int(windowBounds.width)),\#(Int(windowBounds.height))],"#
-                + #""background":"\#(background?.hex ?? "")","ink":"\#(ink?.hex ?? "")","#
-                + #""inkShare":\#(String(format: "%.3f", share(ink))),"contrast":\#(String(format: "%.2f", ratio(ink))),"#
-                + #""peak":"\#(peak?.hex ?? "")","peakShare":\#(String(format: "%.3f", share(peak))),"#
-                + #""peakContrast":\#(String(format: "%.2f", ratio(peak))),"#
-                + #""colors":[\#(rows.joined(separator: ","))]}"#)
-        return
-    }
-    print("label      \(label)")
-    print(
-        "frame      \(Int(frame.minX)),\(Int(frame.minY)) \(Int(frame.width))x\(Int(frame.height))"
-    )
-    print(
-        "background \(background?.hex ?? "none") \(String(format: "%.0f%%", share(background) * 100))"
-    )
-    print(
-        "ink        \(ink?.hex ?? "none") \(String(format: "%.0f%%", share(ink) * 100))"
-            + "  contrast \(String(format: "%.2f", ratio(ink))):1")
-    print(
-        "peak       \(peak?.hex ?? "none") \(String(format: "%.1f%%", share(peak) * 100))"
-            + "  contrast \(String(format: "%.2f", ratio(peak))):1")
-    let palette = colors.prefix(6).map {
-        String(format: "%@ %.0f%%", $0.hex, share($0) * 100)
-    }
-    print("colors     \(palette.joined(separator: "  "))")
-}
+            "\(Int(frame.origin.x)),\(Int(frame.origin.y)),"
+                + "\(Int(frame.width)),\(Int(frame.height))")
 
-guard AXIsProcessTrusted() else {
-    FileHandle.standardError.write(Data("AX NOT TRUSTED\n".utf8))
-    exit(3)
-}
+    case "type":
+        guard let text = options.operands.first else { usage() }
+        typeText(text, pid: target.pid)
+        print("typed \(text.count) characters into \(target.name)")
 
-messagingTimeout = options.timeout
-nodeLimit = options.maxNodes
-let selector = Selector(options.operands)
-let nodes = snapshot(target, depthLimit: options.depth)
-
-switch options.command {
-case "windows":
-    let list =
-        CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
-        as? [[String: Any]] ?? []
-    for window in list {
-        let owner = (window[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value
-        guard owner == target.pid else { continue }
-        let id = window[kCGWindowNumber as String] as? Int ?? 0
-        let name = window[kCGWindowName as String] as? String ?? ""
-        let bounds = window[kCGWindowBounds as String] as? [String: Any] ?? [:]
-        print(
-            "\(id)\t\(name)\t\(bounds["X"] ?? 0),\(bounds["Y"] ?? 0) "
-                + "\(bounds["Width"] ?? 0)x\(bounds["Height"] ?? 0)")
-    }
-
-case "activate":
-    activate(target.pid)
-    print("activated \(target.name)")
-
-case "dump":
-    let selected = selector.isEmpty ? nodes.filter(interesting) : nodes.filter(selector.matches)
-    printNodes(options.all && selector.isEmpty ? nodes : selected, json: options.json, target: target)
-
-case "texts":
-    for node in nodes where node.role == "AXStaticText" {
-        if selector.isEmpty || selector.matches(node), !node.value.isEmpty {
-            print(escaped(node.value))
+    case "key":
+        guard let raw = options.operands.first, let code = UInt16(raw) else { usage() }
+        var flags: CGEventFlags = []
+        for modifier in options.operands.dropFirst() {
+            switch modifier {
+            case "cmd", "command": flags.insert(.maskCommand)
+            case "shift": flags.insert(.maskShift)
+            case "option", "alt": flags.insert(.maskAlternate)
+            case "control", "ctrl": flags.insert(.maskControl)
+            default: usage()
+            }
         }
-    }
+        keyPress(code: CGKeyCode(code), flags: flags, pid: target.pid)
+        print("sent key \(code) to \(target.name)")
 
-case "press":
-    guard !selector.isEmpty else { usage() }
-    let node = resolve(selector, in: nodes)
-    print(press(node) ? "pressed \(describe(node))" : "press failed \(describe(node))")
-
-case "select":
-    guard !selector.isEmpty else { usage() }
-    if selectRow(containing: selector, in: nodes) {
-        print("selected row containing \(options.operands.joined(separator: " "))")
-    } else {
-        FileHandle.standardError.write(Data("no selectable row matched\n".utf8))
-        exit(5)
-    }
-
-case "click":
-    guard !selector.isEmpty else { usage() }
-    let node = resolve(selector, in: nodes)
-    print(click(node, pid: target.pid) ? "clicked \(describe(node))" : "click failed \(describe(node))")
-
-case "frame":
-    guard !selector.isEmpty else { usage() }
-    let node = resolve(selector, in: nodes)
-    guard let frame = node.frame else {
-        FileHandle.standardError.write(Data("element has no frame\n".utf8))
-        exit(5)
-    }
-    print(
-        "\(Int(frame.origin.x)),\(Int(frame.origin.y)),"
-            + "\(Int(frame.width)),\(Int(frame.height))")
-
-case "type":
-    guard let text = options.operands.first else { usage() }
-    typeText(text, pid: target.pid)
-    print("typed \(text.count) characters into \(target.name)")
-
-case "key":
-    guard let raw = options.operands.first, let code = UInt16(raw) else { usage() }
-    var flags: CGEventFlags = []
-    for modifier in options.operands.dropFirst() {
-        switch modifier {
-        case "cmd", "command": flags.insert(.maskCommand)
-        case "shift": flags.insert(.maskShift)
-        case "option", "alt": flags.insert(.maskAlternate)
-        case "control", "ctrl": flags.insert(.maskControl)
-        default: usage()
+    case "color":
+        if let point = options.at {
+            guard let window = windowID(containing: point, pid: target.pid) else {
+                FileHandle.standardError.write(Data("no window of this app contains the point\n".utf8))
+                exit(5)
+            }
+            guard let image = captureWindow(window.id) else {
+                FileHandle.standardError.write(Data("window capture failed. Grant Screen Recording.\n".utf8))
+                exit(4)
+            }
+            let scale = CGSize(
+                width: Double(image.pixelsWide) / Double(window.bounds.width),
+                height: Double(image.pixelsHigh) / Double(window.bounds.height))
+            let local = CGPoint(
+                x: (point.x - window.bounds.minX) * scale.width,
+                y: (point.y - window.bounds.minY) * scale.height)
+            let colors = sampledColors(
+                in: image, rect: CGRect(x: local.x - 1, y: local.y - 1, width: 3, height: 3))
+            printColorReport(
+                label: "point \(Int(point.x)),\(Int(point.y))", frame: CGRect(origin: point, size: .zero),
+                colors: colors, windowBounds: window.bounds, json: options.json)
+            exit(0)
         }
-    }
-    keyPress(code: CGKeyCode(code), flags: flags, pid: target.pid)
-    print("sent key \(code) to \(target.name)")
-
-case "color":
-    if let point = options.at {
-        guard let window = windowID(containing: point, pid: target.pid) else {
-            FileHandle.standardError.write(Data("no window of this app contains the point\n".utf8))
+        guard !selector.isEmpty else { usage() }
+        let node = resolve(selector, in: nodes)
+        guard let frame = node.frame else {
+            FileHandle.standardError.write(Data("element has no frame\n".utf8))
+            exit(5)
+        }
+        let center = CGPoint(x: frame.midX, y: frame.midY)
+        guard let window = windowID(containing: center, pid: target.pid) else {
+            FileHandle.standardError.write(Data("no window of this app contains the element\n".utf8))
             exit(5)
         }
         guard let image = captureWindow(window.id) else {
             FileHandle.standardError.write(Data("window capture failed. Grant Screen Recording.\n".utf8))
             exit(4)
         }
+        // The capture is in pixels; AX reports points. The ratio is the Retina scale.
         let scale = CGSize(
             width: Double(image.pixelsWide) / Double(window.bounds.width),
             height: Double(image.pixelsHigh) / Double(window.bounds.height))
-        let local = CGPoint(
-            x: (point.x - window.bounds.minX) * scale.width,
-            y: (point.y - window.bounds.minY) * scale.height)
-        let colors = sampledColors(
-            in: image, rect: CGRect(x: local.x - 1, y: local.y - 1, width: 3, height: 3))
+        let rect = CGRect(
+            x: (frame.minX - window.bounds.minX) * scale.width,
+            y: (frame.minY - window.bounds.minY) * scale.height,
+            width: frame.width * scale.width,
+            height: frame.height * scale.height
+        ).integral
         printColorReport(
-            label: "point \(Int(point.x)),\(Int(point.y))", frame: CGRect(origin: point, size: .zero),
-            colors: colors, windowBounds: window.bounds, json: options.json)
-        exit(0)
-    }
-    guard !selector.isEmpty else { usage() }
-    let node = resolve(selector, in: nodes)
-    guard let frame = node.frame else {
-        FileHandle.standardError.write(Data("element has no frame\n".utf8))
-        exit(5)
-    }
-    let center = CGPoint(x: frame.midX, y: frame.midY)
-    guard let window = windowID(containing: center, pid: target.pid) else {
-        FileHandle.standardError.write(Data("no window of this app contains the element\n".utf8))
-        exit(5)
-    }
-    guard let image = captureWindow(window.id) else {
-        FileHandle.standardError.write(Data("window capture failed. Grant Screen Recording.\n".utf8))
-        exit(4)
-    }
-    // The capture is in pixels; AX reports points. The ratio is the Retina scale.
-    let scale = CGSize(
-        width: Double(image.pixelsWide) / Double(window.bounds.width),
-        height: Double(image.pixelsHigh) / Double(window.bounds.height))
-    let rect = CGRect(
-        x: (frame.minX - window.bounds.minX) * scale.width,
-        y: (frame.minY - window.bounds.minY) * scale.height,
-        width: frame.width * scale.width,
-        height: frame.height * scale.height
-    ).integral
-    printColorReport(
-        label: describe(node), frame: frame,
-        colors: sampledColors(in: image, rect: rect), windowBounds: window.bounds,
-        json: options.json)
+            label: describe(node), frame: frame,
+            colors: sampledColors(in: image, rect: rect), windowBounds: window.bounds,
+            json: options.json)
 
-default:
-    usage()
+    default:
+        usage()
+    }
 }

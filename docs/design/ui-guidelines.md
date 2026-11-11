@@ -447,7 +447,7 @@ Run these. Do not report a state you did not see.
 2. **Launch a test copy.** `open -n --env DRY_RUN=1 <app>` for anything that can
    remove files. Never launch without the gate for a destructive path.
 3. **Drive by identifier.** Build the AX driver once:
-   `swiftc -O scripts/axdrv.swift -o /tmp/axdrv`. Then
+   `swiftc -O scripts/axdrv.swift ChetCore/Sources/ChetCore/AXSelector.swift -o /tmp/axdrv`. Then
    `/tmp/axdrv --pid <pid> dump --json`, `press id=home.scan`,
    `select id=sidebar.tweaks`, `texts`. The map of identifiers is in
    [../../AGENTS.md](../../AGENTS.md).

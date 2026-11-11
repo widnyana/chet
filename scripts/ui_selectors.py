@@ -28,17 +28,28 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 AXDRV_SOURCE = ROOT / "scripts" / "axdrv.swift"
+AXSELECTOR_SOURCE = ROOT / "ChetCore" / "Sources" / "ChetCore" / "AXSelector.swift"
 AXDRV_BIN = ROOT / ".build" / "ui-selectors" / "axdrv"
 DEFAULT_OUT = ROOT / "docs" / "ui-selectors.json"
 
 
 def built_binary() -> Path:
-    """Compile axdrv when its source is newer than the binary."""
-    if AXDRV_BIN.exists() and AXDRV_BIN.stat().st_mtime >= AXDRV_SOURCE.stat().st_mtime:
+    """Compile axdrv when any of its sources is newer than the binary."""
+    sources = (AXDRV_SOURCE, AXSELECTOR_SOURCE)
+    if AXDRV_BIN.exists() and AXDRV_BIN.stat().st_mtime >= max(
+        source.stat().st_mtime for source in sources
+    ):
         return AXDRV_BIN
     AXDRV_BIN.parent.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
-        ["swiftc", "-O", "-o", str(AXDRV_BIN), str(AXDRV_SOURCE)],
+        [
+            "swiftc",
+            "-O",
+            "-o",
+            str(AXDRV_BIN),
+            str(AXDRV_SOURCE),
+            str(AXSELECTOR_SOURCE),
+        ],
         capture_output=True,
         text=True,
     )

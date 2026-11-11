@@ -53,7 +53,7 @@ Window minimum: `960 x 632`.
 Identifiers are `screen.element`.
 
 ```sh
-swiftc -O scripts/axdrv.swift -o /tmp/axdrv
+swiftc -O scripts/axdrv.swift ChetCore/Sources/ChetCore/AXSelector.swift -o /tmp/axdrv
 ```
 
 Commands: `apps`, `--pid <pid> windows|dump|texts|press|select|click|frame|activate|type|key|color`.
