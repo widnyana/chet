@@ -3,12 +3,13 @@ import ChetCore
 import SwiftUI
 
 private func consequenceRow(_ text: String, icon: String) -> some View {
-    HStack(spacing: Spacing.s2) {
+    HStack(alignment: .firstTextBaseline, spacing: Spacing.s2) {
         Image(systemName: icon)
             .foregroundStyle(Theme.inkSecondary)
         Text(text)
             .font(Typography.body)
             .foregroundStyle(Theme.ink)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 
@@ -58,14 +59,16 @@ struct AppUninstallConfirmSheet: View {
                     .padding(.vertical, Spacing.s2)
                 }
                 VStack(alignment: .leading, spacing: Spacing.s2) {
-                    consequenceRow("The app and the files you chose move to the Trash.", icon: "trash")
+                    consequenceRow(
+                        model.appSelected
+                            ? AppCopy.appTrashConsequence
+                            : "The app and the files you chose move to the Trash.",
+                        icon: "trash")
                     consequenceRow("You can restore them from the Trash.", icon: "arrow.uturn.backward")
                     consequenceRow("Chet checks each item again before it moves.", icon: "checkmark.shield")
-                    if !DryRun.enabled, model.appSelected {
+                    if model.appSelected {
                         consequenceRow(AppCopy.permanentAppRemoval, icon: "lock.open")
-                    } else if !DryRun.enabled,
-                        model.selectedComponentList.contains(where: { $0.requiresAdmin })
-                    {
+                    } else if model.selectedComponentList.contains(where: { $0.requiresAdmin }) {
                         consequenceRow(
                             "Items that need an administrator are removed permanently, not moved to the Trash.",
                             icon: "lock.open")
@@ -88,7 +91,7 @@ struct AppUninstallConfirmSheet: View {
                     SecondaryActionButton(title: "Cancel", shortcut: .return, action: { dismiss() })
                     DestructiveActionButton(
                         title: "Move to Trash",
-                        isEnabled: model.canRemove,
+                        isEnabled: model.canRemove && !DryRun.enabled,
                         help: moveLabel,
                         accessibilityLabel: moveLabel,
                         action: {
@@ -265,9 +268,10 @@ struct BulkUninstallConfirmSheet: View {
                     .padding(.vertical, Spacing.s2)
                 }
                 VStack(alignment: .leading, spacing: Spacing.s2) {
-                    consequenceRow("The apps and the files you chose move to the Trash.", icon: "trash")
+                    consequenceRow(AppCopy.appsTrashConsequence, icon: "trash")
                     consequenceRow("You can restore them from the Trash.", icon: "arrow.uturn.backward")
                     consequenceRow("Chet checks each item again before it moves.", icon: "checkmark.shield")
+                    consequenceRow(AppCopy.permanentAppRemoval, icon: "lock.open")
                     if model.markedRunningCount > 0 {
                         StatusLabel(
                             text: "Running apps are skipped.",
@@ -283,7 +287,7 @@ struct BulkUninstallConfirmSheet: View {
                     SecondaryActionButton(title: "Cancel", shortcut: .return, action: { dismiss() })
                     DestructiveActionButton(
                         title: "Move to Trash",
-                        isEnabled: model.canBulkRemove,
+                        isEnabled: model.canBulkRemove && !DryRun.enabled,
                         help: "Move \(model.markedApps.count) apps to the Trash",
                         accessibilityLabel: "Move \(model.markedApps.count) apps to the Trash",
                         action: {

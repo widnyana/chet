@@ -3,6 +3,12 @@ import ChetCore
 /// Plain names for app parts, how strongly a file belongs to an app, and why an item
 /// was left alone. The core's `title` strings are used by logs and tests.
 enum AppCopy {
+    static let appTrashConsequence =
+        "The files go to the Trash. If macOS refuses the app, it is removed permanently."
+
+    static let appsTrashConsequence =
+        "The files go to the Trash. If macOS refuses an app, it is removed permanently."
+
     static let permanentAppRemoval =
         "If macOS needs an administrator for the app, it is removed permanently, not moved to the Trash."
 
