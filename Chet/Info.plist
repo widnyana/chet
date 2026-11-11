@@ -19,7 +19,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>0.12.1</string>
 	<key>CFBundleVersion</key>
-	<string>25</string>
+	<string>30</string>
 	<key>ChetBuildDate</key>
 	<string>$(CHET_BUILD_DATE)</string>
 	<key>ChetGitCommit</key>
