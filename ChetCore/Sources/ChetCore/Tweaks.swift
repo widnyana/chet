@@ -37,6 +37,12 @@ public enum TweakValue: Codable, Sendable, Hashable {
     }
 }
 
+extension Optional where Wrapped == TweakValue {
+    public var defaultDisplay: String {
+        self?.display ?? "Not set"
+    }
+}
+
 // MARK: - Catalog model
 
 public enum TweakCategory: String, CaseIterable, Sendable, Hashable {

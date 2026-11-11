@@ -175,6 +175,9 @@ private struct TweakRow: View {
         ) {
             control
         }
+        .background {
+            if reading.isCustomized { Theme.changedRow }
+        }
     }
 
     private var notes: [PreferenceNote] {
@@ -199,12 +202,13 @@ private struct TweakRow: View {
     }
 
     private var stateLine: String {
-        switch reading.state {
-        case .unsupported, .unknown:
-            return TweakCopy.state(reading.state)
-        default:
-            return "\(TweakCopy.state(reading.state)) · \(reading.tweak.impact)"
-        }
+        let current =
+            switch reading.state {
+            case .unsupported, .unknown: TweakCopy.state(reading.state)
+            default: "\(TweakCopy.state(reading.state)) · \(reading.tweak.impact)"
+            }
+        let fallback = TweakCopy.defaultValue(reading.tweak.defaultValue)
+        return "\(current)\nDefault \(fallback)"
     }
 
     private var restartLine: String {

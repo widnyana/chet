@@ -94,6 +94,10 @@ struct TweakDetailView: View {
         VStack(spacing: 0) {
             DefinitionRow(label: "Current state", value: TweakCopy.state(reading?.state ?? .unknown("Not read")))
             Hairline()
+            DefinitionRow(
+                label: "Default state",
+                value: TweakCopy.defaultValue(tweak.defaultValue))
+            Hairline()
             DefinitionRow(label: "System impact", value: tweak.impact)
             Hairline()
             DefinitionRow(label: "Risk", value: TweakCopy.risk(tweak.risk))

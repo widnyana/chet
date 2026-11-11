@@ -59,6 +59,24 @@ struct TweaksTests {
         #expect(TweakReading(tweak: tweak, state: .on, current: .boolean(true)).isCustomized)
     }
 
+    @Test func defaultDisplayRendersTheDeclaredValue() {
+        let on: TweakValue? = .boolean(true)
+        let format: TweakValue? = .string("Dark")
+        let count: TweakValue? = .integer(3)
+        let missing: TweakValue? = nil
+        #expect(on.defaultDisplay == "On")
+        #expect(format.defaultDisplay == "Dark")
+        #expect(count.defaultDisplay == "3")
+        #expect(missing.defaultDisplay == "Not set")
+    }
+
+    @Test func absentKeyIsNotCustomized() {
+        let tweak = toggleTweak(domain: domain())
+        let reading = TweakReading(
+            tweak: tweak, state: TweakEngine.state(for: tweak, current: nil), current: nil)
+        #expect(!reading.isCustomized)
+    }
+
     @Test func choiceStateUsesOptionLabels() {
         let tweak = Tweak(
             id: "test.choice", category: .screenshots, name: "Format", summary: "Summary",

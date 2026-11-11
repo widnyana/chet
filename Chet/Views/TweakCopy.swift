@@ -59,6 +59,10 @@ enum TweakCopy {
         value?.display ?? "the macOS default"
     }
 
+    static func defaultValue(_ value: TweakValue?) -> String {
+        value.defaultDisplay
+    }
+
     static func riskTone(_ risk: TweakRisk) -> StatusTone {
         switch risk {
         case .low: .neutral

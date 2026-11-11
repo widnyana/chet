@@ -24,6 +24,9 @@ enum Theme {
     static let hairline = dynamic(
         light: NSColor(srgbRed: 0.867, green: 0.851, blue: 0.816, alpha: 1),
         dark: NSColor(srgbRed: 0.173, green: 0.180, blue: 0.196, alpha: 1))
+    static let changedRow = dynamic(
+        light: NSColor(srgbRed: 0.918, green: 0.910, blue: 0.890, alpha: 1),
+        dark: NSColor(srgbRed: 0.145, green: 0.141, blue: 0.133, alpha: 1))
     static let accent = dynamic(
         light: NSColor(srgbRed: 0.141, green: 0.298, blue: 0.604, alpha: 1),
         dark: NSColor(srgbRed: 0.561, green: 0.659, blue: 0.910, alpha: 1))
