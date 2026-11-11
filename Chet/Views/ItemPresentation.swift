@@ -1,6 +1,7 @@
 import AppKit
 import ChetCore
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Caches workspace icons by path so row renders stay cheap.
 @MainActor
@@ -32,6 +33,14 @@ enum AppInfo {
         }
         cache[bundleID] = .some(found)
         return found
+    }
+}
+
+enum FileKind {
+    static func label(for url: URL) -> String {
+        let ext = url.pathExtension
+        guard !ext.isEmpty else { return "File" }
+        return UTType(filenameExtension: ext)?.localizedDescription ?? ext.uppercased()
     }
 }
 

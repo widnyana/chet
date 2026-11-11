@@ -82,6 +82,11 @@ Safe to remove rows are selected after a scan. Check first rows are never select
 3. Press **Remove selected**.
 4. Read the confirmation and confirm.
 
+Right-click anywhere on a row for **Reveal in Finder**, **Quick Look**, and **Copy Path**. The
+whole row takes the click, including the blank space after the name.
+
+Large files rows also name the file kind, such as Image, PDF document, or Archive.
+
 The clean sheet then shows progress and ends with a summary. It cannot be dismissed while
 cleaning. The summary lists what moved, what was skipped, and the space recovered.
 

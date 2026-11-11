@@ -19,6 +19,16 @@ struct CategoryDetailView: View {
         CategoryCopy.section(category.id, risk: category.items.first?.risk)
     }
 
+    private var bodyState: CategoryBodyState {
+        CategoryBodyState.resolve(
+            itemCount: category.items.count,
+            groupRows: model.groups[category.id]?.map(\.items.count))
+    }
+
+    private var countedItems: String {
+        category.items.count == 1 ? "1 item" : "\(category.items.count) items"
+    }
+
     private var sortedItems: [ScanItem] {
         let ordered: [ScanItem]
         switch sort {
@@ -55,10 +65,21 @@ struct CategoryDetailView: View {
                 )
             },
             content: {
-                if category.items.isEmpty {
+                if bodyState == .empty {
                     EmptyStateView(
                         title: "No entries in this category",
                         message: "Scan again to look for new items.",
+                        actionIsPrimary: false,
+                        actionTitle: "Back to Home",
+                        action: onBack
+                    )
+                    .pageHorizontalPadding()
+                    Spacer()
+                } else if bodyState == .emptyMismatch {
+                    EmptyStateView(
+                        title: "No rows for this category",
+                        message:
+                            "\(countedItems) counted here, but the list is empty. Scan again to rebuild this category.",
                         actionIsPrimary: false,
                         actionTitle: "Back to Home",
                         action: onBack
@@ -77,7 +98,7 @@ struct CategoryDetailView: View {
                         .padding(.bottom, Spacing.s2)
                     }
                     ListHeaderBar(items: category.items)
-                    if let groups = model.groups[category.id] {
+                    if bodyState == .grouped, let groups = model.groups[category.id] {
                         GroupedItemsView(groups: groups)
                     } else {
                         table
@@ -96,10 +117,9 @@ struct CategoryDetailView: View {
     }
 
     private var riskSentence: String {
-        let count = category.items.count == 1 ? "1 item" : "\(category.items.count) items"
         switch section {
-        case .safe: return "\(count). Apps rebuild this data."
-        case .review: return "\(count). Review each item. Removed items go to the Trash."
+        case .safe: return "\(countedItems). Apps rebuild this data."
+        case .review: return "\(countedItems). Review each item. Removed items go to the Trash."
         case .informational: return "Protected. Chet never removes this."
         }
     }
@@ -138,6 +158,10 @@ struct CategoryDetailView: View {
                 Color.clear.frame(width: ColumnRegistry.spec(.mark).width)
                 sortButton("Name", .name)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                if category.id == "large-files" {
+                    Text("Kind")
+                        .frame(width: ColumnRegistry.spec(.kind).width, alignment: .leading)
+                }
                 sortButton("Size", .size)
                     .frame(width: ColumnRegistry.spec(.size).width, alignment: .trailing)
                 sortButton("Modified", .modified)
@@ -188,6 +212,13 @@ struct CategoryDetailView: View {
                     }
                     ItemNameCell(item: item)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                    if category.id == "large-files" {
+                        Text(FileKind.label(for: item.url))
+                            .font(Typography.caption)
+                            .foregroundStyle(Theme.inkSecondary)
+                            .lineLimit(1)
+                            .frame(width: ColumnRegistry.spec(.kind).width, alignment: .leading)
+                    }
                     SizeColumn(bytes: item.reclaimableBytes, width: ColumnRegistry.spec(.size).width)
                     Text(item.stamp.modified, format: .relative(presentation: .named))
                         .font(Typography.row)
@@ -198,17 +229,19 @@ struct CategoryDetailView: View {
                     riskLabel(item)
                         .frame(width: ColumnRegistry.spec(.risk).width, alignment: .trailing)
                 }
-                .contextMenu {
-                    Button("Reveal in Finder") {
-                        NSWorkspace.shared.activateFileViewerSelecting([item.url])
-                    }
-                    Button("Quick Look") { preview = item.url }
-                    Button("Copy Path") {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(item.url.path, forType: .string)
-                    }
-                }
-            })
+            }
+        )
+        .contentShape(Rectangle())
+        .contextMenu {
+            Button("Reveal in Finder") {
+                NSWorkspace.shared.activateFileViewerSelecting([item.url])
+            }
+            Button("Quick Look") { preview = item.url }
+            Button("Copy Path") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(item.url.path, forType: .string)
+            }
+        }
     }
 
     @ViewBuilder private func riskLabel(_ item: ScanItem) -> some View {

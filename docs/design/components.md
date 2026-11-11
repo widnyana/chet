@@ -90,6 +90,11 @@ Two rules follow from this:
 
 - A column width lives in the screen's `*Columns` enum, never inline.
 - A row does not set height, padding, wash, or a double click. Only `TableRow` does.
+- The row shell owns the context menu and the shape that makes the whole
+  rectangle clickable. A cell never carries its own menu, or only the rendered
+  text takes the right click.
+- A presentation-only column, such as the file kind on Large files, is added at
+  the call site and never stored on the item.
 
 ## RowActionButton
 
