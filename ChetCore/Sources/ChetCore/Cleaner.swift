@@ -95,6 +95,8 @@ public struct CleanReport: Sendable {
     public var dryRun = false
     /// Set when the batch was refused before the first removal; `results` is then empty.
     public var refusal: RefusalReason?
+    /// True when the pass stopped after the current item because the user cancelled.
+    public var cancelled = false
 
     public var freedBytes: Int64 {
         results.reduce(0) { total, result in
@@ -119,6 +121,8 @@ public struct Cleaner: Sendable {
     public let dryRun: Bool
     /// Every root a batch may touch. The batch guard refuses a path outside all of them.
     public var roots: [URL]
+    /// Cooperative cancel: checked before each item. Items already removed stay removed.
+    public var isCancelled: @Sendable () -> Bool = { false }
     /// Bundle ID of the app that owns an item, if any.
     public var owner: @Sendable (ScanItem) -> String? = { _ in nil }
     public var isRunning: @Sendable (String) -> Bool = { id in
@@ -170,6 +174,7 @@ public struct Cleaner: Sendable {
         var removed = 0
         var trashed = 0
         var dryRunCount = 0
+        var processedCount = 0
         let started = Date()
 
         VerboseLog.event(
@@ -179,6 +184,10 @@ public struct Cleaner: Sendable {
         VerboseLog.flush()
 
         for (index, item) in items.enumerated() {
+            if isCancelled() {
+                report.cancelled = true
+                break
+            }
             progress?(
                 CleanProgress(
                     processed: index, total: items.count, processedBytes: processedBytes,
@@ -204,14 +213,23 @@ public struct Cleaner: Sendable {
                 failed += 1
             }
             processedBytes += max(0, item.reclaimableBytes)
+            processedCount += 1
             if let recorder, (index + 1) % 16 == 0 {
                 recorder.record(step: "clean", "progress: \(index + 1)/\(items.count) items")
             }
         }
 
+        if report.cancelled {
+            VerboseLog.event(
+                .info, .clean, .cleanCancelled,
+                .count(.removed, removed), .count(.skipped, skipped), .count(.failed, failed),
+                .code(.outcome, .outcomeCancelled))
+            VerboseLog.flush()
+        }
+
         progress?(
             CleanProgress(
-                processed: items.count, total: items.count, processedBytes: totalBytes,
+                processed: processedCount, total: items.count, processedBytes: processedBytes,
                 totalBytes: totalBytes, freedBytes: freedBytes, skipped: skipped, failed: failed,
                 currentPath: "", currentBytes: 0, currentMode: .permanent, isFinal: true))
 

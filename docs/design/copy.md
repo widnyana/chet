@@ -343,3 +343,9 @@ does not retype these strings.
 
 Summary row: `N of M items would be cleaned. Nothing was deleted.` in a dry
 run, and `N of M items cleaned.` after a real run.
+
+## Clean progress
+
+- Cancel: `Cancel`, accessibility label `Cancel the clean pass`, help
+  `Stop after the current item`.
+- The pass stops after the item in flight. Items already removed stay removed.

@@ -1,6 +1,7 @@
 import ChetCore
 import Foundation
 import Observation
+import Synchronization
 
 /// One sidebar row: every item sharing a category id.
 struct CategoryState: Identifiable {
@@ -223,6 +224,7 @@ final class ScanModel {
     var snapshots: [LocalSnapshot] = []
     var isScanning = false
     var isCleaning = false
+    private let cancelFlag = CancelFlag()
     /// Live per-item progress of the running clean pass.
     var cleanProgress: CleanProgress?
     /// Snapshot deletions in the current clean pass; the progress box names them.
@@ -458,10 +460,15 @@ final class ScanModel {
         confirmSnapshots = confirmItems.isEmpty ? Array(selectedSnapshots) : []
     }
 
+    func cancelClean() {
+        cancelFlag.set()
+    }
+
     func clean() {
         let items = confirmItems
         let chosenSnapshots = confirmSnapshots
         let totalBytes = items.reduce(0) { $0 + max(0, $1.reclaimableBytes) }
+        cancelFlag.reset()
         report = nil
         cleanProgress = CleanProgress.preparing(total: items.count, totalBytes: totalBytes)
         cleanSnapshotCount = chosenSnapshots.count
@@ -472,6 +479,7 @@ final class ScanModel {
         let roots = BatchGuard.roots(
             for: scope.normalized(), rules: Rule.catalog, home: TestEnvironment.paths.root,
             externalRoots: [])
+        let cancelFlag = self.cancelFlag
         Task {
             let (stream, continuation) = AsyncStream<CleanProgress>.makeStream(
                 bufferingPolicy: .bufferingNewest(1))
@@ -480,7 +488,10 @@ final class ScanModel {
                     self.cleanProgress = progress
                 }
             }
-            let result = await Self.runClean(items, helperLifetimeMinutes: approval, roots: roots) {
+            let result = await Self.runClean(
+                items, helperLifetimeMinutes: approval, roots: roots,
+                isCancelled: { cancelFlag.isSet }
+            ) {
                 continuation.yield($0)
             }
             continuation.finish()
@@ -764,6 +775,7 @@ final class ScanModel {
         _ items: [ScanItem],
         helperLifetimeMinutes: Int?,
         roots: [URL],
+        isCancelled: @escaping @Sendable () -> Bool,
         progress: @escaping @Sendable (CleanProgress) -> Void
     ) async -> CleanReport {
         var cleaner = Cleaner(
@@ -772,6 +784,7 @@ final class ScanModel {
                 excludedPaths: TestEnvironment.defaults.stringArray(forKey: excludedKey) ?? []),
             log: TestEnvironment.auditLog, recorder: FlightRecorder.shared, dryRun: DryRun.enabled)
         cleaner.roots = roots
+        cleaner.isCancelled = isCancelled
         cleaner.owner = { $0.ownerBundleID }
         if let minutes = helperLifetimeMinutes {
             let lifetime = TimeInterval(min(60, max(1, minutes)) * 60)
@@ -880,4 +893,12 @@ final class ScanModel {
             return "\(error)"
         }
     }
+}
+
+private final class CancelFlag: Sendable {
+    private let mutex = Mutex(false)
+
+    func set() { mutex.withLock { $0 = true } }
+    func reset() { mutex.withLock { $0 = false } }
+    var isSet: Bool { mutex.withLock { $0 } }
 }

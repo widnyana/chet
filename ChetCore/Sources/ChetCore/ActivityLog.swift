@@ -39,6 +39,7 @@ public enum LogMessage: String, Sendable, Encodable {
     case indexFinished = "index.finished"
     case cleanRefused = "clean.refused"
     case cleanRefusedBatch = "clean.refusedBatch"
+    case cleanCancelled = "clean.cancelled"
     case cleanStarted = "clean.started"
     case cleanFinished = "clean.finished"
     case cleanSummary = "clean.summary"

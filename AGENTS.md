@@ -37,7 +37,7 @@ Window minimum: `960 x 632`.
   Tweak controls stay disabled and the key unchanged. Confirm and revert sheets need
   `CHET_TWEAK_PREVIEW=confirm` or `revert`.
 - Cover: access (granted, denied, skipped), scan (never, running, paused, done, empty), dry run,
-  sidebar, sheets (Cancel, Escape, blocked while cleaning).
+  sidebar, sheets (Cancel, Escape, blocked while cleaning, cancel stops the pass).
 
 ## Dev activity log
 
@@ -81,7 +81,7 @@ Identifiers: `apps.select.<id>` `cleaner.select.<id>` `grouped.select.<id>` `twe
 `go.toolchain` `mise.header` `mise.page` `mise.refresh` `mise.empty` `mise.config` `mise.cache`
 `mise.tool.<tool>.<version>` `scan.scope` `scan.scope.category.<category id>` `scan.scope.add`
 `scan.scope.remove.<index>` `scan.scope.remember` `scan.scope.apply` `scan.scope.cancel`
-`home.stop` `home.pause` `home.resume` `home.scan` `home.empty` `home.rescan` `homebrew.header`
+`home.stop` `home.pause` `home.resume` `home.scan` `home.empty` `home.rescan` `clean.cancel` `homebrew.header`
 `homebrew.select.<id>` `homebrew.search.field` `homebrew.tap.field` `homebrew.sort.<col>`
 `homebrew.install` `homebrew.install.<id>` `homebrew.uninstall.<id>` `homebrew.installer.status`
 `settings.helper.toggle` `settings.helper.openSettings` `settings.helper.lifetime`.

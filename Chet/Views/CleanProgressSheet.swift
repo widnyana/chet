@@ -46,6 +46,14 @@ struct CleanProgressSheet: View {
                         .font(Typography.metric)
                         .monospacedDigit()
                         .foregroundStyle(Theme.ink)
+                    SecondaryActionButton(
+                        title: "Cancel",
+                        isEnabled: model.isCleaning,
+                        help: "Stop after the current item",
+                        accessibilityLabel: "Cancel the clean pass",
+                        action: { model.cancelClean() }
+                    )
+                    .accessibilityIdentifier("clean.cancel")
                 }
                 ProgressView(value: itemFraction)
                     .tint(Theme.accent)

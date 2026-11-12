@@ -320,6 +320,35 @@ struct CleanerTests {
         #expect(text.contains("\"key\":\"refusal\""))
         #expect(text.contains("\"status\":306"))
     }
+
+    @Test func cancelStopsAfterTheCurrentItem() throws {
+        let dir = try TempDir()
+        let first = try dir.file("cache/a", bytes: 1000)
+        let second = try dir.file("cache/b", bytes: 1000)
+        let third = try dir.file("cache/c", bytes: 1000)
+        let items = [try item(first), try item(second), try item(third)]
+        var worker = cleaner(dir)
+        let calls = Counter()
+        worker.isCancelled = { calls.next() > 0 }
+        let sink = ProgressRecorder()
+        let report = worker.clean(items) { sink.append($0) }
+        #expect(report.cancelled)
+        #expect(report.results.count == 1)
+        #expect(!FileManager.default.fileExists(atPath: first.path))
+        #expect(FileManager.default.fileExists(atPath: second.path))
+        #expect(FileManager.default.fileExists(atPath: third.path))
+        #expect(sink.values.last?.isFinal == true)
+        let logURL = dir.url.appendingPathComponent("audit.log")
+        let lines = try String(contentsOf: logURL, encoding: .utf8).split(separator: "\n")
+        #expect(lines.count == 1)
+    }
+
+    @Test func aFullPassIsNotCancelled() throws {
+        let dir = try TempDir()
+        let file = try dir.file("cache/x", bytes: 1000)
+        let report = cleaner(dir).clean([try item(file)])
+        #expect(!report.cancelled)
+    }
 }
 
 private final class ProgressRecorder: @unchecked Sendable {
@@ -353,5 +382,18 @@ private final class Visits: @unchecked Sendable {
         lock.lock()
         urls.append(url)
         lock.unlock()
+    }
+}
+
+private final class Counter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = 0
+
+    func next() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        let current = value
+        value += 1
+        return current
     }
 }

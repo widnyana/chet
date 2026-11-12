@@ -60,6 +60,22 @@ final class SheetTests: UITestCase {
     }
 
     @MainActor
+    func testCleanCancelStopsThePass() throws {
+        let driver = UITestDriver(app: app)
+        try openCleanConfirm(driver, items: 2500)
+        let clean = try driver.waitFor(AXSelector(["role=AXButton", "Delete"]), timeout: 20)
+        try driver.requireFocus()
+        clean.element.click()
+        _ = try driver.waitFor(AXSelector(["value=Simulating clean"]), timeout: 60)
+        let cancel = try driver.waitFor(AXSelector(["id=clean.cancel"]), timeout: 20)
+        XCTAssertTrue(cancel.isEnabled)
+        try driver.requireFocus()
+        cancel.element.click()
+        _ = try driver.waitFor(AXSelector(["value=Dry run complete"]), timeout: 120)
+        assertMissing(AXSelector(["id=clean.cancel"]), driver)
+    }
+
+    @MainActor
     func testRevertDialogStaysHiddenWithoutTheHook() throws {
         let driver = UITestDriver(app: app)
         try openTweakDetails(driver)
