@@ -84,6 +84,7 @@ Identifiers: `apps.select.<id>` `cleaner.select.<id>` `grouped.select.<id>` `twe
 `home.stop` `home.pause` `home.resume` `home.scan` `home.empty` `home.rescan` `home.coverage` `clean.cancel` `clean.restore` `storage.restore` `storage.restore.<op>` `homebrew.header`
 `homebrew.select.<id>` `homebrew.search.field` `homebrew.tap.field` `homebrew.sort.<col>`
 `homebrew.install` `homebrew.install.<id>` `homebrew.uninstall.<id>` `homebrew.installer.status`
+`tweak.automation.<tweak id>` `tweak.automation.app.<tweak id>` `tweak.automation.desired.<tweak id>` `tweak.automation.add.<tweak id>` `tweak.automation.remove.<tweak id>` `tweak.automation.badge.<tweak id>` `settings.automation.count` `settings.automation.revertAll`
 `settings.helper.toggle` `settings.helper.openSettings` `settings.helper.lifetime`.
 
 `python3 scripts/ui_selectors.py --pid <pid> --screen <name>` writes `docs/ui-selectors.json`

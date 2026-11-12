@@ -1196,3 +1196,18 @@ extension View {
         modifier(FocusRing())
     }
 }
+
+struct AutomationBadge: View {
+    let text: String
+    let identifier: String
+
+    var body: some View {
+        Text(text)
+            .font(Typography.caption)
+            .foregroundStyle(Theme.accent)
+            .padding(.horizontal, Spacing.s2)
+            .padding(.vertical, Spacing.s1)
+            .background(Theme.accent.opacity(0.12), in: .capsule)
+            .accessibilityIdentifier(identifier)
+    }
+}

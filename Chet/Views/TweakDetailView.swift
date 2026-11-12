@@ -10,6 +10,8 @@ struct TweakDetailView: View {
     @Environment(\.dismiss) private var dismiss
     let tweak: Tweak
     @State private var revertRecord: TweakRecord?
+    @State private var automationApp = ""
+    @State private var automationDesired = TweakDesired.on
 
     private var reading: TweakReading? { model.reading(for: tweak.id) }
     private var isSupported: Bool { reading?.isSupported == true }
@@ -43,6 +45,7 @@ struct TweakDetailView: View {
                         tone: .neutral)
                 }
                 facts
+                automation
                 actions
                     .disabled(model.isGated || !isSupported)
             }
@@ -126,6 +129,76 @@ struct TweakDetailView: View {
         guard let record = model.lastChange(for: tweak.id) else { return "Never" }
         let when = record.at.formatted(date: .abbreviated, time: .shortened)
         return "\(TweakCopy.action(record.action)), \(when)"
+    }
+
+    @ViewBuilder private var automation: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            Text(TweakCopy.automationTitle)
+                .font(Typography.section)
+                .foregroundStyle(Theme.ink)
+            if let rule = model.automationRule(for: tweak.id) {
+                HStack(spacing: Spacing.s3) {
+                    Text(rule.trigger.name)
+                        .font(Typography.row)
+                        .foregroundStyle(Theme.ink)
+                    Text(rule.desired == .on ? "On" : "Off")
+                        .font(Typography.caption)
+                        .foregroundStyle(Theme.inkSecondary)
+                    Spacer(minLength: Spacing.s3)
+                    SecondaryActionButton(
+                        title: "Remove",
+                        isEnabled: !model.isGated,
+                        action: { Task { await model.deleteAutomationRule(rule.id) } }
+                    )
+                    .accessibilityIdentifier("tweak.automation.remove.\(tweak.id)")
+                }
+                .accessibilityIdentifier("tweak.automation.\(tweak.id)")
+            } else {
+                HStack(spacing: Spacing.s3) {
+                    Text(TweakCopy.automationPickerLabel)
+                        .font(Typography.caption)
+                        .foregroundStyle(Theme.inkSecondary)
+                    Picker("", selection: $automationApp) {
+                        ForEach(automationApps, id: \.bundleID) { app in
+                            Text(app.name).tag(app.bundleID)
+                        }
+                    }
+                    .labelsHidden()
+                    .accessibilityIdentifier("tweak.automation.app.\(tweak.id)")
+                    Picker("", selection: $automationDesired) {
+                        Text("On").tag(TweakDesired.on)
+                        Text("Off").tag(TweakDesired.off)
+                    }
+                    .labelsHidden()
+                    .accessibilityIdentifier("tweak.automation.desired.\(tweak.id)")
+                    SecondaryActionButton(
+                        title: "Add",
+                        isEnabled: !model.isGated,
+                        action: addAutomationRule
+                    )
+                    .accessibilityIdentifier("tweak.automation.add.\(tweak.id)")
+                }
+            }
+        }
+    }
+
+    private var automationApps: [(bundleID: String, name: String)] {
+        NSWorkspace.shared.runningApplications
+            .filter { $0.activationPolicy == .regular }
+            .compactMap { app in
+                guard let bundleID = app.bundleIdentifier else { return nil }
+                return (bundleID, app.localizedName ?? bundleID)
+            }
+            .sorted { $0.name < $1.name }
+    }
+
+    private func addAutomationRule() {
+        guard !automationApp.isEmpty else { return }
+        let name = automationApps.first { $0.bundleID == automationApp }?.name ?? automationApp
+        let rule = TweakRule(
+            tweakID: tweak.id, trigger: .app(bundleID: automationApp, name: name),
+            desired: automationDesired, isEnabled: true)
+        Task { await model.setAutomationRule(rule) }
     }
 
     @ViewBuilder private var actions: some View {

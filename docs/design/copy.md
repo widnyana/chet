@@ -372,3 +372,18 @@ operations, each with its date and entry count.
 - Caption: `Accounted for X of Y. The rest is space macOS does not report.`
 - Headings: `Hidden`, `Excluded`, `Not reported`.
 - The caption never claims the buckets add up to the used space.
+
+## Automation copy
+
+`TweakCopy` owns every automation sentence.
+
+- Section title: `Automation`.
+- Picker label: `When this app runs`.
+- Badge: `Automated`.
+- Filter: `Automated`.
+- Settings title: `Automation`.
+- Count: `1 rule` or `N rules`.
+- Action: `Revert all automated changes`.
+- Orphan: `This rule points at a tweak that no longer exists.`
+- Conflict: `The value changed outside Chet, so the rule left it alone.`
+- Corrupt state: `The automation file could not be read. Chet started with no rules.`

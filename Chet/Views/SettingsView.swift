@@ -381,6 +381,21 @@ struct SettingsView: View {
                     }
                 }
             }
+            SettingsPanel(title: TweakCopy.automationSettingsTitle) {
+                SettingsRow(
+                    label: TweakCopy.automationCount(tweaks.automationRuleCount), detail: nil
+                ) {
+                    SecondaryActionButton(
+                        title: TweakCopy.automationRevertAll,
+                        isEnabled: !tweaks.isGated && tweaks.automationRuleCount > 0,
+                        help: "Put every automated tweak back to its earlier value"
+                    ) {
+                        Task { await tweaks.revertAllAutomated() }
+                    }
+                    .accessibilityIdentifier("settings.automation.revertAll")
+                }
+                .accessibilityIdentifier("settings.automation.count")
+            }
             SettingsPanel(title: "Reset") {
                 SettingsNote(
                     "Reset puts every changed tweak back to the macOS default. It does not touch files, caches, or apps."

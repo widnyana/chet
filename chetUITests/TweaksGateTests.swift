@@ -67,6 +67,49 @@ final class TweaksGateTests: UITestCase {
     }
 
     @MainActor
+    func testAutomationSurfacesUnderTheGate() throws {
+        let driver = UITestDriver(app: app)
+        let directory = scratchRoot.appendingPathComponent(
+            "Application Support/Chet", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let rule = TweakRule(
+            tweakID: "appearance.dark",
+            trigger: .app(bundleID: "com.example.app", name: "Example"),
+            desired: .on, isEnabled: true)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(AutomationFile(version: 1, payload: [rule]))
+        try data.write(to: directory.appendingPathComponent("tweak-automation-rules.json"))
+        try relaunch(environment: [:])
+        try driver.requireFocus()
+        try selectSidebar("sidebar.tweaks", probe: try AXProbe(root: scratchRoot), driver: driver)
+        _ = try driver.waitFor(AXSelector(["id=tweaks.page"]), timeout: 60)
+        let badge = try driver.waitFor(
+            AXSelector(["id=tweak.automation.badge.appearance.dark"]), timeout: 20)
+        XCTAssertEqual(badge.elementTypeName, "AXStaticText")
+        let details = try driver.waitFor(
+            AXSelector(["id=tweak.details.appearance.dark"]), timeout: 20)
+        try driver.requireFocus()
+        details.element.click()
+        _ = try driver.waitFor(
+            AXSelector(["id=tweak.automation.appearance.dark"]), timeout: 20)
+        let remove = try driver.waitFor(
+            AXSelector(["id=tweak.automation.remove.appearance.dark"]), timeout: 20)
+        XCTAssertFalse(remove.isEnabled)
+        try driver.requireFocus()
+        app.typeKey(.escape, modifierFlags: [])
+        try driver.requireFocus()
+        app.typeKey(",", modifierFlags: .command)
+        let count = try driver.waitFor(
+            AXSelector(["id=settings.automation.count"]), timeout: 20)
+        XCTAssertTrue(count.value.contains("1 rule"), count.value)
+        let revert = try driver.waitFor(
+            AXSelector(["id=settings.automation.revertAll"]), timeout: 20)
+        XCTAssertFalse(revert.isEnabled)
+    }
+
+    @MainActor
     func testConfirmSheetAppearsOnlyWithThePreviewHook() throws {
         let driver = UITestDriver(app: app)
         try driver.requireFocus()

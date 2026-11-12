@@ -8,6 +8,12 @@ public enum TriggerKind: Codable, Sendable, Hashable {
         case .app(let bundleID, _): bundleID
         }
     }
+
+    public var name: String {
+        switch self {
+        case .app(_, let name): name
+        }
+    }
 }
 
 public struct TweakRule: Codable, Sendable, Identifiable, Equatable {

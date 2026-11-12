@@ -216,7 +216,18 @@ private struct TweakRow: View {
             ? "Sign out and back in" : "Restart \(TweakCopy.processName(reading.tweak.restart))"
     }
 
-    @ViewBuilder private var control: some View {
+    private var control: some View {
+        HStack(spacing: Spacing.s2) {
+            if model.isAutomated(reading.id) {
+                AutomationBadge(
+                    text: TweakCopy.automationBadge,
+                    identifier: "tweak.automation.badge.\(reading.id)")
+            }
+            controlBody
+        }
+    }
+
+    @ViewBuilder private var controlBody: some View {
         if model.busy.contains(reading.id) {
             ActivitySpinner()
         } else if !reading.isSupported {

@@ -849,3 +849,18 @@ The strip is a caption, not a block: Home keeps one focal point.
 520 pt tall. The caption comes first, then `Hidden` buckets, then `Excluded`
 buckets, then the `Not reported` row. Each bucket is a label, a size, and a
 reason. No chart, no drill-in, no second identifier.
+
+## AutomationSection
+
+Sits between the facts table and the action row in the tweak detail sheet. It
+shows the current rule (app name, on or off, remove) or the add form (app
+picker, on or off, add). Every control is disabled under the dry-run gate, not
+hidden. Identifiers: `tweak.automation.<tweak id>`,
+`tweak.automation.app.<tweak id>`, `tweak.automation.desired.<tweak id>`,
+`tweak.automation.add.<tweak id>`, `tweak.automation.remove.<tweak id>`.
+
+## AutomationBadge
+
+A capsule that names an automated tweak. It reuses `Spacing`, `Typography`, and
+`Theme.accent`; it adds no token. The row passes the identifier
+`tweak.automation.badge.<tweak id>`; the component does not mint one.

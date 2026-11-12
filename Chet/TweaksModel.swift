@@ -6,6 +6,7 @@ import Observation
 enum TweakFilter: String, CaseIterable, Identifiable {
     case all
     case changed
+    case automated
 
     var id: String { rawValue }
 
@@ -13,6 +14,7 @@ enum TweakFilter: String, CaseIterable, Identifiable {
         switch self {
         case .all: "All"
         case .changed: "Changed"
+        case .automated: TweakCopy.automationFilterTitle
         }
     }
 }
@@ -88,6 +90,10 @@ final class TweaksModel {
 
     func isAutomated(_ id: String) -> Bool {
         automatedTweakIDs.contains(id)
+    }
+
+    func automationRule(for tweakID: String) -> TweakRule? {
+        automation.currentRules.first { $0.tweakID == tweakID }
     }
 
     func setAutomationRule(_ rule: TweakRule) async {
@@ -177,6 +183,7 @@ final class TweaksModel {
         switch filter {
         case .all: break
         case .changed: guard reading.isCustomized else { return false }
+        case .automated: guard automatedTweakIDs.contains(reading.id) else { return false }
         }
         let text = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !text.isEmpty else { return true }

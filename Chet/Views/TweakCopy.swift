@@ -71,3 +71,19 @@ enum TweakCopy {
         }
     }
 }
+
+extension TweakCopy {
+    static let automationTitle = "Automation"
+    static let automationPickerLabel = "When this app runs"
+    static let automationBadge = "Automated"
+    static let automationFilterTitle = "Automated"
+    static let automationSettingsTitle = "Automation"
+    static let automationRevertAll = "Revert all automated changes"
+    static let automationOrphan = "This rule points at a tweak that no longer exists."
+    static let automationConflict = "The value changed outside Chet, so the rule left it alone."
+    static let automationCorrupt = "The automation file could not be read. Chet started with no rules."
+
+    static func automationCount(_ count: Int) -> String {
+        count == 1 ? "1 rule" : "\(count) rules"
+    }
+}
