@@ -161,6 +161,74 @@ struct TweaksTests {
         #expect(change.record.after == .string("~/Desktop"))
     }
 
+    @Test func typeGuardRefusesAMismatchedValue() {
+        let booleanTarget = TweakTarget.defaults(domain: "d", key: "k", type: .boolean)
+        #expect(TweakEngine.typeGuard(nil, booleanTarget) == nil)
+        #expect(TweakEngine.typeGuard(.boolean(true), booleanTarget) == nil)
+        #expect(
+            TweakEngine.typeGuard(.string("x"), booleanTarget)
+                == .typeMismatch("Expected a boolean value but got a string."))
+        #expect(TweakEngine.typeGuard(.boolean(true), .fileHidden(path: "/tmp/x")) == nil)
+        #expect(
+            TweakEngine.typeGuard(.string("x"), .fileHidden(path: "/tmp/x"))
+                == .typeMismatch("Expected a boolean value but got a string."))
+        #expect(
+            TweakEngine.typeGuard(.boolean(true), .probe(.firewall))
+                == .typeMismatch("This target is read-only."))
+    }
+
+    @Test func typeGuardRefusesBeforeTheWrite() throws {
+        let dir = try TempDir()
+        let history = TweakHistory(url: dir.url.appendingPathComponent("tweaks.log"))
+        let probe = try prefsDomain(dir)
+        let tweak = toggleTweak(domain: probe)
+        let change = TweakEngine.set(tweak, to: .string("x"), history: history, dryRun: false)
+        #expect(
+            change.record.error
+                == TweakError.typeMismatch("Expected a boolean value but got a string.").message)
+        #expect(TweakEngine.read(tweak).current == nil)
+    }
+
+    @Test func catalogLookupReturnsNilForAnUnknownID() throws {
+        let known = try #require(TweakCatalog.all.first)
+        #expect(TweakCatalog.tweak(id: known.id) == known)
+        #expect(TweakCatalog.tweak(id: "no.such.tweak") == nil)
+        for tweak in TweakCatalog.all {
+            #expect(TweakCatalog.tweak(id: tweak.id) == tweak)
+        }
+    }
+
+    @Test func minorVersionGateRefusesAtTheEarlierMinor() {
+        let tweak = Tweak(
+            id: "test.minor", category: .appearance, name: "Name", summary: "Summary",
+            detail: "Detail", impact: "Impact",
+            target: .defaults(domain: "com.chet.tweaks.tests", key: "probe", type: .boolean),
+            control: .toggle(on: .boolean(true), off: .boolean(false)),
+            minimumMajorVersion: 15, minimumMinorVersion: 1)
+        #expect(
+            TweakEngine.supported(
+                tweak, osVersion: OperatingSystemVersion(majorVersion: 15, minorVersion: 0, patchVersion: 0))
+                == .unsupported("Needs macOS 15.1 or later."))
+        #expect(
+            TweakEngine.supported(
+                tweak, osVersion: OperatingSystemVersion(majorVersion: 15, minorVersion: 1, patchVersion: 0))
+                == nil)
+        #expect(
+            TweakEngine.supported(
+                tweak, osVersion: OperatingSystemVersion(majorVersion: 16, minorVersion: 0, patchVersion: 0))
+                == nil)
+        let majorOnly = Tweak(
+            id: "test.major", category: .appearance, name: "Name", summary: "Summary",
+            detail: "Detail", impact: "Impact",
+            target: .defaults(domain: "com.chet.tweaks.tests", key: "probe", type: .boolean),
+            control: .toggle(on: .boolean(true), off: .boolean(false)),
+            minimumMajorVersion: 15)
+        #expect(
+            TweakEngine.supported(
+                majorOnly, osVersion: OperatingSystemVersion(majorVersion: 14, minorVersion: 6, patchVersion: 0))
+                == .unsupported("Needs macOS 15 or later."))
+    }
+
     @Test func catalogIsCompleteAndConsistent() {
         let all = TweakCatalog.all
         #expect(all.count >= 25)

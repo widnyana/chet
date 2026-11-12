@@ -188,6 +188,20 @@ public enum TweakControl: Sendable, Hashable {
     case inspect
 }
 
+public enum TweakDesired: String, Codable, Sendable {
+    case on, off
+}
+
+extension TweakControl {
+    public func resolvedValue(for desired: TweakDesired) -> TweakValue? {
+        guard case .toggle(let on, let off) = self else { return nil }
+        switch desired {
+        case .on: return on
+        case .off: return off
+        }
+    }
+}
+
 extension TweakTarget {
     /// The domain and key, path, or check this target reads and writes.
     public var configurationLabel: String {
@@ -218,12 +232,14 @@ public struct Tweak: Identifiable, Sendable, Hashable {
     /// The value macOS ships with. Nil means the key is absent by default.
     public let defaultValue: TweakValue?
     public let minimumMajorVersion: Int?
+    public let minimumMinorVersion: Int?
 
     public init(
         id: String, category: TweakCategory, name: String, summary: String, detail: String,
         impact: String, risk: TweakRisk = .low, target: TweakTarget, control: TweakControl,
         companions: [TweakTarget] = [], defaultValue: TweakValue? = nil,
-        restart: TweakRestart = .none, minimumMajorVersion: Int? = nil
+        restart: TweakRestart = .none, minimumMajorVersion: Int? = nil,
+        minimumMinorVersion: Int? = nil
     ) {
         self.id = id
         self.category = category
@@ -238,6 +254,7 @@ public struct Tweak: Identifiable, Sendable, Hashable {
         self.companions = companions
         self.defaultValue = defaultValue
         self.minimumMajorVersion = minimumMajorVersion
+        self.minimumMinorVersion = minimumMinorVersion
     }
 
     /// The preferences domain and key, or the path, for the details sheet.
@@ -378,6 +395,7 @@ public enum TweakError: Error, Equatable {
     case verificationFailed(String)
     case gated
     case inspectionOnly
+    case typeMismatch(String)
 }
 
 extension TweakError {
@@ -392,6 +410,7 @@ extension TweakError {
         case .verificationFailed(let text): text
         case .gated: Self.gatedCopy
         case .inspectionOnly: "This is a read-only check. Open System Settings to change it."
+        case .typeMismatch(let text): text
         }
     }
 }
@@ -442,11 +461,21 @@ public enum TweakEngine {
         return readings
     }
 
+    static func supported(_ tweak: Tweak, osVersion: OperatingSystemVersion) -> TweakError? {
+        if let major = tweak.minimumMajorVersion, osVersion.majorVersion < major {
+            return .unsupported("Needs macOS \(major) or later.")
+        }
+        if let major = tweak.minimumMajorVersion, let minor = tweak.minimumMinorVersion,
+            osVersion.majorVersion == major, osVersion.minorVersion < minor
+        {
+            return .unsupported("Needs macOS \(major).\(minor) or later.")
+        }
+        return nil
+    }
+
     public static func read(_ tweak: Tweak) -> TweakReading {
-        let version = ProcessInfo.processInfo.operatingSystemVersion
-        if let minimum = tweak.minimumMajorVersion, version.majorVersion < minimum {
-            return TweakReading(
-                tweak: tweak, state: .unsupported("Needs macOS \(minimum) or later."), current: nil)
+        if let error = supported(tweak, osVersion: ProcessInfo.processInfo.operatingSystemVersion) {
+            return TweakReading(tweak: tweak, state: .unsupported(error.message), current: nil)
         }
 
         switch tweak.target {
@@ -547,6 +576,9 @@ public enum TweakEngine {
         if case .probe = tweak.target {
             return (refused(tweak, before, .inspectionOnly, action), .verificationSkipped)
         }
+        if let error = supported(tweak, osVersion: ProcessInfo.processInfo.operatingSystemVersion) {
+            return (failed(tweak, before, error, action, history), .verificationSkipped)
+        }
         if case .unsupported(let reason) = before.state {
             return (failed(tweak, before, .unsupported(reason), action, history), .verificationSkipped)
         }
@@ -570,6 +602,14 @@ public enum TweakEngine {
         }
 
         let beforeCompanions = companionValues(tweak)
+        if let error = typeGuard(plan.primary, tweak.target) {
+            return (failed(tweak, before, error, action, history), .verificationSkipped)
+        }
+        for (target, value) in zip(tweak.companions, plan.companions) {
+            if let error = typeGuard(value, target) {
+                return (failed(tweak, before, error, action, history), .verificationSkipped)
+            }
+        }
         let desired = normalized(plan.primary, for: tweak.control)
         let alreadyThere =
             matches(before.current, desired)
@@ -670,17 +710,26 @@ public enum TweakEngine {
     public static func rollback(
         _ record: TweakRecord, history: TweakHistory = TweakHistory(), dryRun: Bool = DryRun.enabled
     ) -> TweakChange? {
-        guard let tweak = TweakCatalog.all.first(where: { $0.id == record.tweakID }) else { return nil }
+        guard let tweak = TweakCatalog.tweak(id: record.tweakID) else { return nil }
         return rollback(record, tweak: tweak, history: history, dryRun: dryRun)
     }
 
-    static func typeMatches(_ value: TweakValue?, _ target: TweakTarget) -> Bool {
-        guard let value else { return true }
+    static func typeGuard(_ value: TweakValue?, _ target: TweakTarget) -> TweakError? {
+        guard let value else { return nil }
         switch target {
-        case .defaults(_, _, let type): return value.type == type
-        case .fileHidden: return value.type == .boolean
-        case .probe: return false
+        case .defaults(_, _, let type):
+            guard value.type != type else { return nil }
+            return .typeMismatch("Expected a \(type.rawValue) value but got a \(value.type.rawValue).")
+        case .fileHidden:
+            guard value.type != .boolean else { return nil }
+            return .typeMismatch("Expected a boolean value but got a \(value.type.rawValue).")
+        case .probe:
+            return .typeMismatch("This target is read-only.")
         }
+    }
+
+    static func typeMatches(_ value: TweakValue?, _ target: TweakTarget) -> Bool {
+        typeGuard(value, target) == nil
     }
 
     static func companionValues(_ tweak: Tweak) -> [TweakValue?] {
@@ -987,6 +1036,10 @@ public enum TweakCatalog {
     public static let all: [Tweak] =
         finder + dock + keyboard + trackpad + screenshots + appearance + windows + security
         + developer
+
+    public static func tweak(id: String) -> Tweak? {
+        all.first { $0.id == id }
+    }
 
     // MARK: Finder
 
