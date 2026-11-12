@@ -8,18 +8,27 @@ struct OverviewView: View {
     @Binding var selection: String?
     let onClean: () -> Void
     @State private var showingScope = false
+    @State private var showingCoverage = false
 
     var body: some View {
         PageScreen(
             header: { pageHeader },
             content: {
                 capacity
+                if let coverage = model.coverage {
+                    CoverageStrip(report: coverage) { showingCoverage = true }
+                }
                 if model.isPartialScan { scopeNotice }
                 content
             },
             bar: { commandBar }
         )
         .sheet(isPresented: $showingScope) { ScanScopeSheet() }
+        .sheet(isPresented: $showingCoverage) {
+            if let coverage = model.coverage {
+                CoverageSheet(report: coverage)
+            }
+        }
         .onAppear {
             VerboseLog.event(.debug, .ui, .uiViewAppeared, .code(.view, .viewHome))
         }

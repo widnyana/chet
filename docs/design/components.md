@@ -837,3 +837,15 @@ truncated in the middle, for a path or a secondary fact. The value wraps to two
 lines at most, so a long token cannot stretch the row. Used by the tweak details
 sheet and the Go page. The component owns its padding, so a sheet never sets row
 geometry at the call site.
+
+## CoverageStrip
+
+One caption line under the capacity bar, plus a `Details` button with id
+`home.coverage`. Renders only when a finished scan produced a coverage report.
+The strip is a caption, not a block: Home keeps one focal point.
+
+## CoverageSheet
+
+520 pt tall. The caption comes first, then `Hidden` buckets, then `Excluded`
+buckets, then the `Not reported` row. Each bucket is a label, a size, and a
+reason. No chart, no drill-in, no second identifier.

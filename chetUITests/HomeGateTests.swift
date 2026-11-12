@@ -49,6 +49,28 @@ final class HomeGateTests: UITestCase {
     }
 
     @MainActor
+    func testCoverageOpensTheSheet() throws {
+        let driver = UITestDriver(app: app)
+        try driver.requireFocus()
+        try skipAccessGate(driver)
+        try makeCacheFixture(count: 3)
+        let scan = try driver.waitFor(AXSelector(["id=home.scan"]), timeout: 20)
+        try driver.requireFocus()
+        scan.element.click()
+        _ = try driver.waitFor(AXSelector(["id=home.rescan"]), timeout: 180)
+        let coverage = try driver.waitFor(AXSelector(["id=home.coverage"]), timeout: 30)
+        try driver.requireFocus()
+        coverage.element.click()
+        let caption = try driver.waitFor(AXSelector(["Accounted for"]), timeout: 20)
+        XCTAssertEqual(caption.elementTypeName, "AXStaticText")
+        XCTAssertTrue(caption.value.contains(" of "), caption.value)
+        try driver.requireFocus()
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(
+            waitUntilMissing(AXSelector(["Accounted for"]), driver: driver, timeout: 10))
+    }
+
+    @MainActor
     func testRescanReturnsHomeToIdle() throws {
         let driver = UITestDriver(app: app)
         try driver.requireFocus()

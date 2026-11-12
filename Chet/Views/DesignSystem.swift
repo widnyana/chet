@@ -60,6 +60,7 @@ enum Metrics {
     static let iconGutter: CGFloat = 22
     static let controlColumn: CGFloat = 150
     static let sheetWidth: CGFloat = 520
+    static let coverageSheetHeight: CGFloat = 520
     static let detailSheetWidth: CGFloat = 540
     static let byteColumnWidth: CGFloat = 88
     static let chevronIconSize: CGFloat = 8
@@ -772,6 +773,28 @@ struct SizeBasisBadge: View {
             .font(Typography.caption)
             .foregroundStyle(Theme.inkSecondary)
             .help(SizeBasisCopy.annotation)
+    }
+}
+
+struct CoverageStrip: View {
+    let report: CoverageReport
+    let action: () -> Void
+
+    var body: some View {
+        HStack(spacing: Spacing.s2) {
+            Text(CoverageCopy.caption(report))
+                .font(Typography.caption)
+                .foregroundStyle(Theme.inkSecondary)
+                .lineLimit(1)
+            Spacer(minLength: Spacing.s2)
+            QuietActionButton(
+                title: "Details",
+                help: "See what the scan cannot see",
+                action: action
+            )
+            .accessibilityIdentifier("home.coverage")
+        }
+        .pageHorizontalPadding()
     }
 }
 

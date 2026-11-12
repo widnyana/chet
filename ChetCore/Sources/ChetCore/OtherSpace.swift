@@ -2,32 +2,66 @@ import Darwin
 import Foundation
 
 /// A folder the scan skipped, labeled by why, for the "other space" accounting.
-enum SpaceSkipReason: Sendable { case user, always, cloud, network }
+public enum SpaceSkipReason: String, Sendable {
+    case user, always, cloud, network
+
+    public var word: String {
+        switch self {
+        case .user: "Folder left out of the scan"
+        case .always: "Folder the scan never reads"
+        case .cloud: "Cloud folder"
+        case .network: "Network volume"
+        }
+    }
+}
 
 /// What the disk scan cannot see but still takes space on the startup disk: sibling APFS
 /// volumes, local snapshots, swap, and folders the scan left out.
-struct OtherSpaceInfo: Sendable {
-    struct Volume: Sendable {
-        let name: String
-        let role: String
-        let size: Int64
+public struct OtherSpaceInfo: Sendable {
+    public struct Volume: Sendable {
+        public let name: String
+        public let role: String
+        public let size: Int64
+
+        public init(name: String, role: String, size: Int64) {
+            self.name = name
+            self.role = role
+            self.size = size
+        }
     }
-    struct Folder: Sendable {
-        let path: String
-        let size: Int64
-        let reason: SpaceSkipReason
+    public struct Folder: Sendable {
+        public let path: String
+        public let size: Int64
+        public let reason: SpaceSkipReason
+
+        public init(path: String, size: Int64, reason: SpaceSkipReason) {
+            self.path = path
+            self.size = size
+            self.reason = reason
+        }
     }
 
-    var volumes: [Volume] = []
-    var snapshots = 0
-    var swapUsed: Int64 = 0
-    var folders: [Folder] = []
-    var cloudFolders: [String] = []
+    public var volumes: [Volume] = []
+    public var snapshots = 0
+    public var swapUsed: Int64 = 0
+    public var folders: [Folder] = []
+    public var cloudFolders: [String] = []
+
+    public init(
+        volumes: [Volume] = [], snapshots: Int = 0, swapUsed: Int64 = 0,
+        folders: [Folder] = [], cloudFolders: [String] = []
+    ) {
+        self.volumes = volumes
+        self.snapshots = snapshots
+        self.swapUsed = swapUsed
+        self.folders = folders
+        self.cloudFolders = cloudFolders
+    }
 }
 
-enum OtherSpace {
+public enum OtherSpace {
     /// Slow (runs diskutil and tmutil, walks skipped folders): call off the main thread.
-    static func measure(skipped: [(path: String, reason: SpaceSkipReason)]) -> OtherSpaceInfo {
+    public static func measure(skipped: [(path: String, reason: SpaceSkipReason)]) -> OtherSpaceInfo {
         var info = OtherSpaceInfo()
         info.volumes = siblingVolumes()
         info.snapshots = localSnapshots()

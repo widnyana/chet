@@ -235,6 +235,7 @@ final class ScanModel {
     var selected: Set<URL> { ledger.selected }
     var selectedSnapshots: Set<LocalSnapshot> = []
     var report: CleanReport?
+    private(set) var coverage: CoverageReport?
     var snapshotErrors: [String] = []
     /// Phases of the current or last scan.
     var steps: [ScanStepState] = []
@@ -357,6 +358,7 @@ final class ScanModel {
         confirmItems = []
         confirmSnapshots = []
         report = nil
+        coverage = nil
         folderTrees = []
         liveTree = nil
         partialTrees = []
@@ -699,6 +701,18 @@ final class ScanModel {
             TestEnvironment.defaults.set(Int(totalBytes), forKey: Self.lastScanBytesKey)
             if !snapshots.isEmpty {
                 categories.append(CategoryState(id: "snapshots", title: Self.titles["snapshots"] ?? "Snapshots"))
+            }
+            let scanned = totalBytes
+            let gen = generation
+            Task.detached(priority: .utility) {
+                let capacity = VolumeCapacity.current()
+                let otherSpace = OtherSpace.measure(skipped: [])
+                let report = CoverageAccounting.measure(
+                    scannedBytes: scanned, capacity: capacity, otherSpace: otherSpace)
+                await MainActor.run { [weak self] in
+                    guard let self, self.generation == gen else { return }
+                    self.coverage = report
+                }
             }
         }
     }

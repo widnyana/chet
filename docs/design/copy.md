@@ -364,3 +364,11 @@ run, and `N of M items cleaned.` after a real run.
 
 Summary row: `N items restored`. The history sheet lists the newest 10
 operations, each with its date and entry count.
+
+## Coverage copy
+
+`CoverageCopy` owns the coverage sheet's words.
+
+- Caption: `Accounted for X of Y. The rest is space macOS does not report.`
+- Headings: `Hidden`, `Excluded`, `Not reported`.
+- The caption never claims the buckets add up to the used space.
