@@ -17,14 +17,14 @@ public struct AutomationLoad<Payload: Sendable>: Sendable {
 
 public struct WALState: Codable, Sendable, Equatable {
     public struct Applied: Codable, Sendable, Equatable {
-        public let ruleID: UUID
-        public let tweakID: String
-        public let appliedValue: TweakValue?
-        public let baseline: TweakValue?
-        public let baselineSource: String
-        public let phase: String
-        public let appliedAt: Date
-        public let conflict: String?
+        public var ruleID: UUID
+        public var tweakID: String
+        public var appliedValue: TweakValue?
+        public var baseline: TweakValue?
+        public var baselineSource: String
+        public var phase: String
+        public var appliedAt: Date
+        public var conflict: String?
 
         public init(
             ruleID: UUID, tweakID: String, appliedValue: TweakValue?, baseline: TweakValue?,

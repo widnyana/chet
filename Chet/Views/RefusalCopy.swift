@@ -46,4 +46,14 @@ enum RefusalCopy {
         case .batchOutsideRoot: "The selection held a path outside the scan."
         }
     }
+
+    static func restore(_ reason: RestoreRefusal) -> String {
+        switch reason {
+        case .trashedItemMissing: "The Trash copy is gone"
+        case .originalPathOccupied: "Something else is at the original path"
+        case .parentMissing: "The original folder is gone"
+        case .outsideHome: "The original path is outside your home folder"
+        case .nameMismatch: "The file name does not match"
+        }
+    }
 }
