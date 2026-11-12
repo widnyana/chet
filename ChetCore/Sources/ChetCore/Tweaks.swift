@@ -452,7 +452,8 @@ public enum TweakEngine {
         switch tweak.target {
         case .defaults(let domain, let key, let type):
             switch readDefaults(domain: domain, key: key, type: type) {
-            case .success(let value):
+            case .success(let raw):
+                let value = normalized(raw, for: tweak.control)
                 return TweakReading(
                     tweak: tweak, state: state(for: tweak, current: value), current: value)
             case .failure(let error):
@@ -569,8 +570,9 @@ public enum TweakEngine {
         }
 
         let beforeCompanions = companionValues(tweak)
+        let desired = normalized(plan.primary, for: tweak.control)
         let alreadyThere =
-            matches(before.current, plan.primary)
+            matches(before.current, desired)
             && zip(beforeCompanions, plan.companions).allSatisfy { matches($0.0, $0.1) }
         if alreadyThere {
             let record = TweakRecord(
@@ -603,13 +605,13 @@ public enum TweakEngine {
         let after = read(tweak)
         let afterCompanions = companionValues(tweak)
         let verified =
-            after.isSupported && matches(after.current, plan.primary)
+            after.isSupported && matches(after.current, desired)
             && zip(afterCompanions, plan.companions).allSatisfy { matches($0.0, $0.1) }
         guard verified else {
             restore(tweak, before: before.current, companions: beforeCompanions)
             let restored = read(tweak)
             let detail =
-                "Expected \(plan.primary?.display ?? "the system default") but read "
+                "Expected \(desired?.display ?? "the system default") but read "
                 + "\(after.current?.display ?? "nothing"). Restored the earlier value."
             return (
                 failed(tweak, restored, .verificationFailed(detail), action, history),
@@ -749,6 +751,12 @@ public enum TweakEngine {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         guard path.hasPrefix(home) else { return path }
         return "~" + path.dropFirst(home.count)
+    }
+
+    static func normalized(_ value: TweakValue?, for control: TweakControl) -> TweakValue? {
+        guard case .folder = control else { return value }
+        guard case .string(let path)? = value else { return value }
+        return .string(abbreviate(path))
     }
 
     static func matches(_ actual: TweakValue?, _ expected: TweakValue?) -> Bool {
@@ -1164,17 +1172,6 @@ public enum TweakCatalog {
             ]),
             defaultValue: .string("genie"), restart: .dock),
         Tweak(
-            id: "dock.hidden-apps",
-            category: .dock,
-            name: "Show hidden apps in the Dock",
-            summary: "Keep a hidden app in the Dock as a dimmed icon.",
-            detail:
-                "A hidden app keeps running. This leaves its icon visible so you can bring it back.",
-            impact: "Dock",
-            target: .defaults(domain: "com.apple.dock", key: "showhidden", type: .boolean),
-            control: .toggle(on: .boolean(true), off: .boolean(false)),
-            defaultValue: .boolean(false), restart: .dock),
-        Tweak(
             id: "dock.autohide-speed",
             category: .dock,
             name: "Dock hide speed",
@@ -1192,11 +1189,11 @@ public enum TweakCatalog {
             name: "Dock reveal delay",
             summary: "Choose how long a hidden Dock waits before it appears.",
             detail:
-                "Lower values reveal the Dock sooner. macOS uses about half a second until you change it.",
+                "Lower values reveal the Dock sooner.",
             impact: "Dock animation",
             target: .defaults(domain: "com.apple.dock", key: "autohide-delay", type: .number),
             control: .range(min: 0, max: 1.5, step: 0.1, unit: "s"),
-            defaultValue: .number(0.5), restart: .dock),
+            defaultValue: .number(0.2), restart: .dock),
     ]
 
     // MARK: Keyboard
@@ -1373,7 +1370,7 @@ public enum TweakCatalog {
             impact: "New screenshots",
             target: .defaults(domain: "com.apple.screencapture", key: "location", type: .string),
             control: .folder,
-            defaultValue: .string(home.appendingPathComponent("Desktop").path)),
+            defaultValue: .string("~/Desktop"), restart: .systemUI),
         Tweak(
             id: "screenshots.shadow",
             category: .screenshots,

@@ -56,9 +56,8 @@ struct TweakCatalogFixtureTests {
         "dock.mineffect": row(
             "defaults:com.apple.dock:mineffect", .string("genie"),
             [option("Genie", .string("genie")), option("Scale", .string("scale"))]),
-        "dock.hidden-apps": row("defaults:com.apple.dock:showhidden", .boolean(false)),
         "dock.autohide-speed": row("defaults:com.apple.dock:autohide-time-modifier", .number(0.5)),
-        "dock.reveal-delay": row("defaults:com.apple.dock:autohide-delay", .number(0.5)),
+        "dock.reveal-delay": row("defaults:com.apple.dock:autohide-delay", .number(0.2)),
         "keyboard.repeat": row("defaults:NSGlobalDomain:ApplePressAndHoldEnabled", .boolean(true)),
         "keyboard.full-access": row("defaults:NSGlobalDomain:AppleKeyboardUIMode", .integer(0)),
         "keyboard.smart-quotes": row(
@@ -88,7 +87,7 @@ struct TweakCatalogFixtureTests {
                 option("PDF", .string("pdf")),
             ]),
         "screenshots.location": row(
-            "defaults:com.apple.screencapture:location", .string("\(home)/Desktop")),
+            "defaults:com.apple.screencapture:location", .string("~/Desktop")),
         "screenshots.shadow": row("defaults:com.apple.screencapture:disable-shadow", .boolean(false)),
         "screenshots.thumbnail": row("defaults:com.apple.screencapture:show-thumbnail", .boolean(true)),
         "screenshots.filename": row("defaults:com.apple.screencapture:name", .string("Screenshot")),

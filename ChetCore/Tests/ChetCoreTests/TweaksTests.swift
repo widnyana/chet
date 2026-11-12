@@ -118,6 +118,49 @@ struct TweaksTests {
 
     // MARK: Catalog
 
+    @Test func resolvedRowsCarryTheMeasuredDefaults() throws {
+        let reveal = try #require(TweakCatalog.all.first { $0.id == "dock.reveal-delay" })
+        #expect(reveal.defaultValue == .number(0.2))
+        #expect(!reveal.detail.contains { $0.isNumber })
+        #expect(!reveal.detail.lowercased().contains("second"))
+
+        let location = try #require(TweakCatalog.all.first { $0.id == "screenshots.location" })
+        #expect(location.defaultValue == .string("~/Desktop"))
+        #expect(location.restart == .systemUI)
+
+        #expect(!TweakCatalog.all.contains { $0.id == "dock.hidden-apps" })
+    }
+
+    @Test func normalizedMapsHomePathsToTilde() {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        #expect(
+            TweakEngine.normalized(.string("\(home)/Desktop"), for: .folder) == .string("~/Desktop"))
+        #expect(TweakEngine.normalized(.string("~/Desktop"), for: .folder) == .string("~/Desktop"))
+        #expect(
+            TweakEngine.normalized(.string("/Volumes/Other"), for: .folder)
+                == .string("/Volumes/Other"))
+        #expect(
+            TweakEngine.normalized(.string("\(home)/Desktop"), for: .text(placeholder: "x"))
+                == .string("\(home)/Desktop"))
+    }
+
+    @Test func folderRoundTripRecordsTildeForm() throws {
+        let dir = try TempDir()
+        let history = TweakHistory(url: dir.url.appendingPathComponent("tweaks.log"))
+        let probe = try prefsDomain(dir)
+        let tweak = Tweak(
+            id: "test.folder-round-trip", category: .screenshots, name: "Folder",
+            summary: "Summary", detail: "Detail", impact: "Impact",
+            target: .defaults(domain: probe, key: "location", type: .string),
+            control: .folder)
+        let desktop = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Desktop").path
+        let change = TweakEngine.set(tweak, to: .string(desktop), history: history, dryRun: false)
+        #expect(change.record.error == nil)
+        #expect(change.reading.current == .string("~/Desktop"))
+        #expect(change.record.after == .string("~/Desktop"))
+    }
+
     @Test func catalogIsCompleteAndConsistent() {
         let all = TweakCatalog.all
         #expect(all.count >= 25)
