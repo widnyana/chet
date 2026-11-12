@@ -54,6 +54,31 @@ final class ScanModel {
         let status = FullDiskAccess.status()
         access = status
         accessWasGranted = status == .granted
+        restoreSnapshot()
+    }
+
+    private let snapshotStore = ScanSnapshotStore(
+        url: TestEnvironment.paths.applicationSupport.appendingPathComponent("Chet/scan-snapshot.json"))
+    private var restoredScopeSummary: String?
+
+    private func restoreSnapshot() {
+        guard let snapshot = snapshotStore.load() else { return }
+        for category in snapshot.categories {
+            add(category.id, items: category.items)
+        }
+        for (id, savedGroups) in snapshot.groups {
+            let restored = savedGroups.compactMap { group -> ItemGroup? in
+                guard let keeper = itemsByURL[group.keeper] else { return nil }
+                let items = group.itemURLs.compactMap { itemsByURL[$0] }
+                guard items.count == group.itemURLs.count else { return nil }
+                return ItemGroup(keeper: keeper.url, items: items)
+            }
+            if !restored.isEmpty { groups[id] = restored }
+        }
+        lastScan = snapshot.date
+        lastScanBytes = ledger.totalBytes
+        coverage = snapshot.coverage
+        restoredScopeSummary = snapshot.scopeSummary
     }
 
     /// Session-only: the user chose "Continue without Full Disk Access", so this launch
@@ -359,6 +384,7 @@ final class ScanModel {
         confirmSnapshots = []
         report = nil
         coverage = nil
+        restoredScopeSummary = nil
         folderTrees = []
         liveTree = nil
         partialTrees = []
@@ -702,6 +728,20 @@ final class ScanModel {
             if !snapshots.isEmpty {
                 categories.append(CategoryState(id: "snapshots", title: Self.titles["snapshots"] ?? "Snapshots"))
             }
+            let snapshot = ScanSnapshot(
+                date: finishedAt,
+                scopeSummary: Self.summary(for: resultScope),
+                categories: categories.map {
+                    ScanSnapshot.Category(id: $0.id, title: $0.title, items: $0.items)
+                },
+                groups: groups.mapValues { saved in
+                    saved.map { ScanSnapshot.Group(keeper: $0.keeper, itemURLs: $0.items.map(\.url)) }
+                },
+                coverage: coverage)
+            let store = snapshotStore
+            Task.detached(priority: .utility) {
+                store.save(snapshot)
+            }
             let scanned = totalBytes
             let gen = generation
             Task.detached(priority: .utility) {
@@ -820,8 +860,8 @@ final class ScanModel {
         return cleaner.clean(items, progress: progress)
     }
 
-    /// Steps that will run: everything except the ones switched off. Rules and the folder
-    /// index always run; they feed the sidebar and the disk map.
+    /// Steps that will run: everything except the ones switched off. Rules always run; the
+    /// index runs when the scope needs measurement.
     var enabledScanSteps: Set<ScanStep> {
         Set(ScanStep.allCases.filter { !disabledSteps.contains($0.rawValue) })
     }
@@ -830,7 +870,7 @@ final class ScanModel {
     var scopeSummary: String { Self.summary(for: scope) }
 
     /// The scope the results on screen came from, in words.
-    var resultScopeSummary: String { Self.summary(for: resultScope) }
+    var resultScopeSummary: String { restoredScopeSummary ?? Self.summary(for: resultScope) }
 
     static func summary(for scope: ScanScope) -> String {
         let scoped = scope.normalized()

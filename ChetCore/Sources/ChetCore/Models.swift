@@ -14,7 +14,7 @@ public enum DeleteMode: String, Sendable, Codable {
 }
 
 /// lstat snapshot of a path, taken at scan time and compared again before deletion.
-public struct FileStamp: Hashable, Sendable {
+public struct FileStamp: Hashable, Sendable, Codable {
     public let inode: UInt64
     public let size: Int64
     public let modified: Date
@@ -46,7 +46,7 @@ public struct FileStamp: Hashable, Sendable {
 }
 
 /// One reclaimable file or folder found by a scanner.
-public struct ScanItem: Identifiable, Hashable, Sendable {
+public struct ScanItem: Identifiable, Hashable, Sendable, Codable {
     public var id: URL { url }
     public let url: URL
     public let categoryID: String
