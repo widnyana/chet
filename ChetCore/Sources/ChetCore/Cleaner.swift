@@ -91,6 +91,8 @@ public struct CleanReport: Sendable {
     /// True when every row was simulated by the dry-run gate; UI and logs must never
     /// present a dry-run report as a real deletion.
     public var dryRun = false
+    /// Set when the batch was refused before the first removal; `results` is then empty.
+    public var refusal: RefusalReason?
 
     public var freedBytes: Int64 {
         results.reduce(0) { total, result in
@@ -113,6 +115,8 @@ public struct Cleaner: Sendable {
     /// is removed or trashed. Required, not defaulted: every composition root must decide
     /// explicitly, so an unwired cleaner cannot silently mutate.
     public let dryRun: Bool
+    /// Every root a batch may touch. The batch guard refuses a path outside all of them.
+    public var roots: [URL]
     /// Bundle ID of the app that owns an item, if any.
     public var owner: @Sendable (ScanItem) -> String? = { _ in nil }
     public var isRunning: @Sendable (String) -> Bool = { id in
@@ -126,18 +130,34 @@ public struct Cleaner: Sendable {
     public var privileged: (@Sendable (ScanItem) -> CleanOutcome)?
 
     public init(
-        policy: SafetyPolicy, log: AuditLog = AuditLog(), recorder: FlightRecorder? = nil, dryRun: Bool
+        policy: SafetyPolicy, log: AuditLog = AuditLog(), recorder: FlightRecorder? = nil, dryRun: Bool,
+        roots: [URL]? = nil
     ) {
         self.policy = policy
         self.log = log
         self.recorder = recorder
         self.dryRun = dryRun
+        self.roots =
+            roots
+            ?? ([URL(fileURLWithPath: policy.home)]
+                + policy.externalRoots.sorted().map(URL.init(fileURLWithPath:)))
     }
 
     public func clean(
         _ items: [ScanItem],
         progress: (@Sendable (CleanProgress) -> Void)? = nil
     ) -> CleanReport {
+        let guardReport = BatchGuard.validate(items, policy: policy, roots: roots)
+        if let refusal = guardReport.refusal {
+            var report = CleanReport()
+            report.dryRun = dryRun
+            report.refusal = refusal
+            VerboseLog.event(
+                .warn, .clean, .cleanRefusedBatch,
+                .count(.items, items.count), .code(.outcome, .outcomeRefused))
+            VerboseLog.flush()
+            return report
+        }
         var report = CleanReport()
         report.dryRun = dryRun
         let totalBytes = items.reduce(0) { $0 + max(0, $1.reclaimableBytes) }

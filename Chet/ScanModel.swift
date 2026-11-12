@@ -469,6 +469,9 @@ final class ScanModel {
         isCleaning = true
         // Read on the main actor: the daemon status is a main-thread fact, and the gate wins.
         let approval = HelperService.isAvailable ? helperLifetimeMinutes : nil
+        let roots = BatchGuard.roots(
+            for: scope.normalized(), rules: Rule.catalog, home: TestEnvironment.paths.root,
+            externalRoots: [])
         Task {
             let (stream, continuation) = AsyncStream<CleanProgress>.makeStream(
                 bufferingPolicy: .bufferingNewest(1))
@@ -477,7 +480,9 @@ final class ScanModel {
                     self.cleanProgress = progress
                 }
             }
-            let result = await Self.runClean(items, helperLifetimeMinutes: approval) { continuation.yield($0) }
+            let result = await Self.runClean(items, helperLifetimeMinutes: approval, roots: roots) {
+                continuation.yield($0)
+            }
             continuation.finish()
             await consumer.value
             var errors: [String] = []
@@ -758,6 +763,7 @@ final class ScanModel {
     @concurrent nonisolated static func runClean(
         _ items: [ScanItem],
         helperLifetimeMinutes: Int?,
+        roots: [URL],
         progress: @escaping @Sendable (CleanProgress) -> Void
     ) async -> CleanReport {
         var cleaner = Cleaner(
@@ -765,6 +771,7 @@ final class ScanModel {
                 allowsOutsideHome: TestEnvironment.defaults.bool(forKey: outsideHomeKey),
                 excludedPaths: TestEnvironment.defaults.stringArray(forKey: excludedKey) ?? []),
             log: TestEnvironment.auditLog, recorder: FlightRecorder.shared, dryRun: DryRun.enabled)
+        cleaner.roots = roots
         cleaner.owner = { $0.ownerBundleID }
         if let minutes = helperLifetimeMinutes {
             let lifetime = TimeInterval(min(60, max(1, minutes)) * 60)

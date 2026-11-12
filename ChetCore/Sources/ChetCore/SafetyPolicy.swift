@@ -48,16 +48,28 @@ public struct SafetyPolicy: Sendable {
     }
 
     /// `~/x` resolves against `home`, `/x` stays absolute, anything else is dropped: a relative
-    /// entry would silently exclude nothing.
+    /// entry would silently exclude nothing. Both the standardized and the symlink-resolved
+    /// spelling are kept, because the rule walk and the deletion check build paths differently.
     static func normalize(_ paths: [String], home: URL) -> [String] {
         let base = home.standardizedFileURL.path
-        return paths.compactMap { raw in
+        return paths.flatMap { raw -> [String] in
             let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.isEmpty { return nil }
-            if trimmed == "~" { return base }
-            if trimmed.hasPrefix("~/") { return base + "/" + trimmed.dropFirst(2) }
-            guard trimmed.hasPrefix("/") else { return nil }
-            return URL(fileURLWithPath: trimmed).standardizedFileURL.path
+            if trimmed.isEmpty { return [] }
+            let resolved: String
+            if trimmed == "~" {
+                resolved = base
+            } else if trimmed.hasPrefix("~/") {
+                resolved = base + "/" + trimmed.dropFirst(2)
+            } else if trimmed.hasPrefix("/") {
+                resolved = trimmed
+            } else {
+                return []
+            }
+            let url = URL(fileURLWithPath: resolved)
+            let standardized = url.standardizedFileURL.path
+            let symlinked = url.deletingLastPathComponent().resolvingSymlinksInPath()
+                .appendingPathComponent(url.lastPathComponent).path
+            return standardized == symlinked ? [standardized] : [standardized, symlinked]
         }
     }
 
@@ -68,27 +80,27 @@ public struct SafetyPolicy: Sendable {
         return excludedPaths.contains { path == $0 || path.hasPrefix($0 + "/") }
     }
 
-    /// The path-string rules shared by `isDeletable` and `scanGateAllows`, in one place so the
-    /// scan gate can never drift out of the policy. Returns the denial reason, or nil when no
-    /// path rule denies the file.
-    private func pathDenialReason(
+    /// The path-string rules shared by `denialReason(for:)` and `scanGateAllows`, in one place
+    /// so the scan gate can never drift out of the policy. Returns the denial reason, or nil
+    /// when no path rule denies the file.
+    private func denialReason(
         path: String, rel: String?, parts: [String], inVolumeTrash: Bool
-    ) -> String? {
+    ) -> RefusalReason? {
         if !excludedPaths.isEmpty, excludedPaths.contains(where: { path == $0 || path.hasPrefix($0 + "/") }) {
-            return "excluded folder"
+            return .excludedFolder
         }
-        if rel == nil && !inVolumeTrash && !isExternal(path) && !allowsOutsideHome { return "outside home" }
+        if rel == nil && !inVolumeTrash && !isExternal(path) && !allowsOutsideHome { return .outsideHome }
         if let rel {
-            if Self.containerRoots.contains(rel) { return "container folder" }
+            if Self.containerRoots.contains(rel) { return .containerFolder }
             if Self.protectedInHome.contains(where: { rel == $0 || rel.hasPrefix($0 + "/") }) {
-                return "protected folder"
+                return .protectedFolder
             }
         }
         let inTrash = inVolumeTrash || rel?.hasPrefix(".Trash/") == true
         if !inTrash {
-            if parts.contains(".git") { return "git repository" }
-            if Self.containsAppBundle(parts) { return "app bundle" }
-            if parts.contains(where: { $0.hasSuffix(".photoslibrary") }) { return "Photos library" }
+            if parts.contains(".git") { return .gitRepository }
+            if Self.containsAppBundle(parts) { return .appBundle }
+            if parts.contains(where: { $0.hasSuffix(".photoslibrary") }) { return .photosLibrary }
         }
         return nil
     }
@@ -118,7 +130,9 @@ public struct SafetyPolicy: Sendable {
         return homePrefixes.contains { rel == $0 || rel.hasPrefix($0 + "/") }
     }
 
-    public func isDeletable(_ url: URL) -> Verdict {
+    /// The full verdict for one path: the path rules, then the `lstat` symlink and mount-point
+    /// checks. `isDeletable` and the batch guard both read this, so there is one authority.
+    public func denialReason(for url: URL) -> RefusalReason? {
         let standard = url.standardizedFileURL
         let path = standard.deletingLastPathComponent().resolvingSymlinksInPath()
             .appendingPathComponent(standard.lastPathComponent).path
@@ -128,21 +142,25 @@ public struct SafetyPolicy: Sendable {
         // and the external-root test pins its behavior on that spelling.
         let rel = relative(path, bases: [home])
 
-        if let reason = pathDenialReason(
+        if let reason = denialReason(
             path: path, rel: rel, parts: parts, inVolumeTrash: inVolumeTrash
         ) {
-            return .denied(reason)
+            return reason
         }
 
         var st = stat()
         var parent = stat()
         if lstat(path, &st) == 0 {
-            if (st.st_mode & S_IFMT) == S_IFLNK { return .denied("symlink") }
+            if (st.st_mode & S_IFMT) == S_IFLNK { return .symlink }
             if lstat((path as NSString).deletingLastPathComponent, &parent) == 0, st.st_dev != parent.st_dev {
-                return .denied("mount point")
+                return .mountPoint
             }
         }
-        return .allowed
+        return nil
+    }
+
+    public func isDeletable(_ url: URL) -> Verdict {
+        denialReason(for: url).map { Verdict.denied($0.rawValue) } ?? .allowed
     }
 
     /// Scan-time narrowing gate for the bulk walk: mirrors `isDeletable`'s bulk-visible rules —
@@ -158,7 +176,7 @@ public struct SafetyPolicy: Sendable {
         let inVolumeTrash = parts.count > 4 && parts[0] == "Volumes" && parts[2] == ".Trashes"
         // Walk paths use the realpath(3) spelling, so the gate accepts both.
         let rel = relative(path, bases: [home, realHome])
-        if pathDenialReason(path: path, rel: rel, parts: parts, inVolumeTrash: inVolumeTrash) != nil {
+        if denialReason(path: path, rel: rel, parts: parts, inVolumeTrash: inVolumeTrash) != nil {
             return false
         }
         if isSymlink { return false }

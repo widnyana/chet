@@ -50,8 +50,19 @@ struct StorageTrashTests {
         try dir.file("Library/Keychains/login.keychain", bytes: 10)
         #expect(trasher(dir, dryRun: true).check(entry(folder)) == .denied("protected folder"))
         let result = trasher(dir, dryRun: true).trash([entry(folder)])
+        #expect(result.refusal == .protectedFolder)
         #expect(result.wouldMove.isEmpty)
-        #expect(result.failed.count == 1)
+        #expect(result.failed.isEmpty)
+    }
+
+    @Test func refusedBatchMovesNothing() throws {
+        let dir = try TempDir()
+        let other = try TempDir()
+        let file = try other.file("Downloads/old/a.txt", bytes: 10)
+        let result = trasher(dir).trash([entry(file.deletingLastPathComponent())])
+        #expect(result.refusal == .batchOutsideRoot)
+        #expect(result.moved.isEmpty)
+        #expect(FileManager.default.fileExists(atPath: file.path))
     }
 
     @Test func refusesSymlink() throws {

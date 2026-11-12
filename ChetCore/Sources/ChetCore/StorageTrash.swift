@@ -45,6 +45,8 @@ public struct StorageTrashResult: Sendable, Equatable {
     public var wouldMove: [StorageEntry] = []
     public var failed: [Failure] = []
     public var freedBytes: Int64 = 0
+    /// Set when the batch was refused before the first move; nothing is moved.
+    public var refusal: RefusalReason?
 }
 
 /// Moves collected folders to the Trash. Every entry is re-checked at trash time with
@@ -58,24 +60,32 @@ public struct StorageTrasher: Sendable {
     public let policy: SafetyPolicy
     public let appFolders: [URL]
     public let dryRun: Bool
+    /// Every root a batch may touch. The batch guard refuses a path outside all of them.
+    public var roots: [URL]
     public var trash: @Sendable (URL) throws -> Void
 
     public init(
         policy: SafetyPolicy,
         appFolders: [URL]? = nil,
         dryRun: Bool,
+        roots: [URL]? = nil,
         trash: @escaping @Sendable (URL) throws -> Void = { url in
             try FileManager.default.trashItem(at: url, resultingItemURL: nil)
         }
     ) {
         self.policy = policy
-        self.appFolders =
+        let folders =
             appFolders
             ?? [
                 URL(fileURLWithPath: "/Applications"),
                 FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications"),
             ]
+        self.appFolders = folders
         self.dryRun = dryRun
+        self.roots =
+            roots
+            ?? ([URL(fileURLWithPath: policy.home)]
+                + policy.externalRoots.sorted().map(URL.init(fileURLWithPath:)) + folders)
         self.trash = trash
     }
 
@@ -110,6 +120,16 @@ public struct StorageTrasher: Sendable {
     }
 
     public func trash(_ entries: [StorageEntry]) -> StorageTrashResult {
+        let guardReport = BatchGuard.validate(paths: entries.map(\.url), policy: policy, roots: roots)
+        if let refusal = guardReport.refusal {
+            var result = StorageTrashResult(dryRun: dryRun)
+            result.refusal = refusal
+            VerboseLog.event(
+                .warn, .storage, .cleanRefusedBatch,
+                .count(.entries, entries.count), .code(.outcome, .outcomeRefused))
+            VerboseLog.flush()
+            return result
+        }
         var result = StorageTrashResult(dryRun: dryRun)
         var failureErrno: Int32?
         VerboseLog.flush()

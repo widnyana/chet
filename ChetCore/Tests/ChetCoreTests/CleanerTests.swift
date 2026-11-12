@@ -112,14 +112,16 @@ struct CleanerTests {
         #expect(FileManager.default.fileExists(atPath: file.path))
     }
 
-    @Test func fileReplacedBySymlinkIsSkipped() throws {
+    @Test func fileReplacedBySymlinkRefusesTheBatch() throws {
         let dir = try TempDir()
         let file = try dir.file("cache/x", bytes: 1000)
         let target = try dir.file("keep/important", bytes: 1000)
         let scanned = try item(file)
         try FileManager.default.removeItem(at: file)
         try FileManager.default.createSymbolicLink(at: file, withDestinationURL: target)
-        #expect(cleaner(dir).clean([scanned]).results.first?.outcome == .skipped(.changed))
+        let report = cleaner(dir).clean([scanned])
+        #expect(report.refusal == .symlink)
+        #expect(report.results.isEmpty)
         #expect(FileManager.default.fileExists(atPath: target.path))
     }
 
@@ -131,12 +133,26 @@ struct CleanerTests {
         #expect(cleaner(dir).clean([scanned]).results.first?.outcome == .skipped(.missing))
     }
 
-    @Test func policyDeniedPathIsSkipped() throws {
+    @Test func policyDeniedPathRefusesTheBatch() throws {
         let dir = try TempDir()
         try dir.file("Library/Caches/a", bytes: 10)
         let caches = dir.url.appendingPathComponent("Library/Caches")
-        #expect(cleaner(dir).clean([try item(caches)]).results.first?.outcome == .skipped(.policy))
+        let logURL = dir.url.appendingPathComponent("audit.log")
+        let report = cleaner(dir).clean([try item(caches)])
+        #expect(report.refusal == .containerFolder)
+        #expect(report.results.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: logURL.path))
         #expect(FileManager.default.fileExists(atPath: caches.path))
+    }
+
+    @Test func outsideRootRefusesTheBatch() throws {
+        let dir = try TempDir()
+        let other = try TempDir()
+        let file = try other.file("cache/x", bytes: 1000)
+        let report = cleaner(dir).clean([try item(file)])
+        #expect(report.refusal == .batchOutsideRoot)
+        #expect(report.results.isEmpty)
+        #expect(FileManager.default.fileExists(atPath: file.path))
     }
 
     @Test func runningOwnerAppIsSkipped() throws {
