@@ -95,6 +95,10 @@ public struct Rule: Sendable, Identifiable {
 extension Rule {
     static let day: TimeInterval = 86_400
 
+    static let projectRoots = [
+        "Development", "Projects", "Documents", "Desktop", "src", "code", "work", "repos",
+    ]
+
     public static let catalog: [Rule] = [
         Rule(id: "trash", title: "Trash", roots: [".Trash"], risk: .safe, mode: .permanent),
         Rule(
@@ -131,6 +135,18 @@ extension Rule {
                 "Library/Caches/CocoaPods", "Library/Caches/go-build", "Library/Caches/Yarn", "Library/Caches/pnpm",
                 ".npm/_cacache", ".cargo/registry/cache", ".gradle/caches", ".cache/uv", ".cache/nix",
             ], risk: .safe, mode: .permanent, wholeRoots: true, discovery: .pnpmStore),
+        Rule(
+            id: "pkg-bun", category: "package-caches", title: "Bun cache",
+            roots: [".bun/install/cache"], risk: .safe, mode: .permanent, wholeRoots: true),
+        Rule(
+            id: "pkg-deno", category: "package-caches", title: "Deno cache",
+            roots: ["Library/Caches/deno"], risk: .safe, mode: .permanent, wholeRoots: true),
+        Rule(
+            id: "pkg-maven", category: "package-caches", title: "Maven cache",
+            roots: [".m2/repository"], risk: .safe, mode: .permanent, wholeRoots: true),
+        Rule(
+            id: "pkg-huggingface", category: "package-caches", title: "Hugging Face cache",
+            roots: [".cache/huggingface/hub"], risk: .safe, mode: .permanent, wholeRoots: true),
         Rule(
             id: "browser-safari", category: "browser", title: "Safari cache",
             roots: ["Library/Caches/com.apple.Safari"], risk: .safe, mode: .permanent,
@@ -177,12 +193,12 @@ extension Rule {
             risk: .review, mode: .trash),
         Rule(
             id: "dev-garbage", title: "Project build dirs",
-            roots: ["Development", "Projects", "Documents", "Desktop"], risk: .review, mode: .trash,
+            roots: Rule.projectRoots, risk: .review, mode: .trash,
             recursiveArtifacts: BuildArtifact.catalog,
             prunedNames: [".terraform", ".terragrunt-cache"], matchesVirtualEnvironments: true),
         Rule(
             id: "terraform-build-dirs", category: "dev-garbage", title: "Terraform build dirs",
-            roots: ["Development", "Projects", "Documents", "Desktop"], risk: .safe, mode: .permanent,
+            roots: Rule.projectRoots, risk: .safe, mode: .permanent,
             recursiveNames: [".terraform"],
             prunedNames: DuplicateScope.regenerableNames.union([".terragrunt-cache"])),
         Rule(
@@ -190,7 +206,7 @@ extension Rule {
             roots: [".terraform.d/plugin-cache"], risk: .safe, mode: .permanent, wholeRoots: true),
         Rule(
             id: "terragrunt-cache", category: "dev-garbage", title: "Terragrunt cache",
-            roots: ["Development", "Projects", "Documents", "Desktop"], risk: .review, mode: .trash,
+            roots: Rule.projectRoots, risk: .review, mode: .trash,
             recursiveNames: [".terragrunt-cache"],
             prunedNames: DuplicateScope.regenerableNames.union([".terraform"])),
         Rule(

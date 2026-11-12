@@ -624,6 +624,79 @@ struct RuleScannerTests {
         #expect(result.items.allSatisfy { dir.policy.isDeletable($0.url) == .allowed })
         #expect(result.items.allSatisfy { $0.mode == .trash })
     }
+
+    @Test func packageRulesCarryTheirMetadata() throws {
+        let expected: [(id: String, root: String)] = [
+            ("pkg-bun", ".bun/install/cache"),
+            ("pkg-deno", "Library/Caches/deno"),
+            ("pkg-maven", ".m2/repository"),
+            ("pkg-huggingface", ".cache/huggingface/hub"),
+        ]
+        for entry in expected {
+            let rule = try rule(entry.id)
+            #expect(rule.category == "package-caches")
+            #expect(rule.risk == .safe)
+            #expect(rule.mode == .permanent)
+            #expect(rule.wholeRoots == true)
+            #expect(rule.listOnly == false)
+            #expect(rule.requiresAdmin == false)
+            #expect(rule.roots == [entry.root])
+        }
+    }
+
+    @Test func devRulesShareTheProjectRoots() throws {
+        #expect(
+            Rule.projectRoots == [
+                "Development", "Projects", "Documents", "Desktop", "src", "code", "work", "repos",
+            ])
+        for id in ["dev-garbage", "terraform-build-dirs", "terragrunt-cache"] {
+            #expect(try rule(id).roots == Rule.projectRoots)
+        }
+        #expect(try rule("dev-garbage").prunedNames.isSuperset(of: [".terraform", ".terragrunt-cache"]))
+        #expect(try rule("terraform-build-dirs").prunedNames.contains(".terragrunt-cache"))
+        #expect(try rule("terragrunt-cache").prunedNames.contains(".terraform"))
+    }
+
+    @Test func denoCacheIsNotDoubleListed() async throws {
+        let dir = try TempDir()
+        try dir.file("Library/Caches/deno/blob", bytes: 1_000)
+        try dir.file("Library/Caches/foo/x", bytes: 1_000)
+        let caches = try await RuleScanner(home: dir.url).scan(try rule("caches"))
+        #expect(caches.items.map(\.url.lastPathComponent) == ["foo"])
+        let deno = try await RuleScanner(home: dir.url).scan(try rule("pkg-deno"))
+        #expect(deno.items.count == 1)
+        #expect(deno.items.first?.url.path == dir.url.appendingPathComponent("Library/Caches/deno").path)
+    }
+
+    @Test func packageRulesFindTheirRoots() async throws {
+        let cases: [(id: String, root: String, fixture: String)] = [
+            ("pkg-bun", ".bun/install/cache", ".bun/install/cache/hash/payload"),
+            ("pkg-maven", ".m2/repository", ".m2/repository/org/example/lib/1.0/lib.jar"),
+            ("pkg-huggingface", ".cache/huggingface/hub", ".cache/huggingface/hub/models--x/blobs/y"),
+        ]
+        for entry in cases {
+            let dir = try TempDir()
+            try dir.file(entry.fixture, bytes: 1_000)
+            let result = try await RuleScanner(home: dir.url).scan(try rule(entry.id))
+            #expect(result.items.count == 1)
+            #expect(result.items.first?.url.path == dir.url.appendingPathComponent(entry.root).path)
+            #expect((result.items.first?.reclaimableBytes ?? 0) > 0)
+            #expect(result.items.allSatisfy { dir.policy.isDeletable($0.url) == .allowed })
+        }
+    }
+
+    @Test func devRulesFindTheirArtifacts() async throws {
+        let dir = try TempDir()
+        try dir.file("src/demo/target/debug/out", bytes: 1_000)
+        try dir.file("work/infra/.terraform/plugins/x", bytes: 1_000)
+        try dir.file("repos/app/.terragrunt-cache/a/b", bytes: 1_000)
+        let builds = try await RuleScanner(home: dir.url).scan(try rule("dev-garbage"))
+        #expect(builds.items.contains { $0.url.lastPathComponent == "target" })
+        let terraform = try await RuleScanner(home: dir.url).scan(try rule("terraform-build-dirs"))
+        #expect(terraform.items.contains { $0.url.lastPathComponent == ".terraform" })
+        let terragrunt = try await RuleScanner(home: dir.url).scan(try rule("terragrunt-cache"))
+        #expect(terragrunt.items.contains { $0.url.lastPathComponent == ".terragrunt-cache" })
+    }
 }
 
 private final class ScanCallCounter: @unchecked Sendable {
