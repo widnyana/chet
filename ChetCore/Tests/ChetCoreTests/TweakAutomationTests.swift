@@ -297,6 +297,63 @@ struct TweakAutomationTests {
         _ = await session.start()
         #expect(order.values == ["rules", "state", "running", "reconcile"])
     }
+
+    @Test func writerSerializesConcurrentRuns() async {
+        let writer = TweakWriter()
+        let recorder = ConcurrencyRecorder()
+        let tweak = TweakCatalog.all[0]
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<8 {
+                group.addTask {
+                    _ = await writer.run {
+                        recorder.enter()
+                        Thread.sleep(forTimeInterval: 0.01)
+                        recorder.leave()
+                        return TweakChange(
+                            record: TweakRecord(
+                                tweakID: tweak.id, action: .set, before: nil, after: nil),
+                            reading: TweakReading(tweak: tweak, state: .off, current: nil))
+                    }
+                }
+            }
+        }
+        #expect(recorder.maxConcurrency == 1)
+    }
+
+    @Test func rollbackPolicyExcludesRuleOwnedTweaks() {
+        let record = TweakRecord(
+            tweakID: "finder.hidden-files", action: .set, before: .boolean(false),
+            after: .boolean(true))
+        #expect(RollbackPolicy.target(history: [], ruleOwned: []) == nil)
+        #expect(
+            RollbackPolicy.target(history: [record], ruleOwned: ["finder.hidden-files"]) == nil)
+        #expect(RollbackPolicy.target(history: [record], ruleOwned: []) == record)
+    }
+}
+
+private final class ConcurrencyRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var current = 0
+    private var peak = 0
+
+    var maxConcurrency: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return peak
+    }
+
+    func enter() {
+        lock.lock()
+        current += 1
+        peak = max(peak, current)
+        lock.unlock()
+    }
+
+    func leave() {
+        lock.lock()
+        current -= 1
+        lock.unlock()
+    }
 }
 
 private actor FakeEngine: TweakAutomationEngine {

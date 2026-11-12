@@ -57,13 +57,15 @@ final class TweaksModel {
     /// disabled and the model refuses a write before it reaches the engine.
     let isGated = DryRun.enabled
 
+    private let writer = TweakWriter()
     private let automation: TweakAutomationController
     private(set) var automationRuleCount = 0
     private(set) var automatedTweakIDs: Set<String> = []
     private(set) var automationError: String?
 
     init() {
-        let engine = TweakEngineAutomationEngine(history: historyStore, dryRun: isGated)
+        let engine = TweakEngineAutomationEngine(
+            history: historyStore, writer: writer, dryRun: isGated)
         automation = TweakAutomationController(
             ruleStore: TriggerStore(
                 url: TestEnvironment.paths.applicationSupport.appendingPathComponent(
@@ -156,8 +158,9 @@ final class TweaksModel {
 
     /// The last recorded value before a change, when a rollback is possible.
     func rollbackTarget(for id: String) -> TweakRecord? {
-        guard let last = lastChange(for: id), !busy.contains(id) else { return nil }
-        return last
+        guard !busy.contains(id) else { return nil }
+        return RollbackPolicy.target(
+            history: history.filter { $0.tweakID == id }, ruleOwned: automatedTweakIDs)
     }
 
     func tweaks(in category: TweakCategory) -> [TweakReading] {
@@ -218,9 +221,9 @@ final class TweaksModel {
         busy.insert(tweak.id)
         let store = historyStore
         Task {
-            let change = await Task.detached(priority: .userInitiated) {
+            let change = await writer.run {
                 TweakEngine.set(tweak, to: value, history: store)
-            }.value
+            }
             finish(change, tweak: tweak, requested: value)
         }
     }
@@ -245,9 +248,9 @@ final class TweaksModel {
         busy.insert(tweak.id)
         let store = historyStore
         Task {
-            let change = await Task.detached(priority: .userInitiated) {
+            let change = await writer.run {
                 TweakEngine.reset(tweak, history: store)
-            }.value
+            }
             finish(change, tweak: tweak, requested: nil)
         }
     }
@@ -261,10 +264,10 @@ final class TweaksModel {
         busy.insert(pending.tweak.id)
         let store = historyStore
         Task {
-            let change = await Task.detached(priority: .userInitiated) {
+            let change = await writer.run {
                 TweakEngine.set(
                     pending.tweak, to: pending.value, confirmed: true, history: store)
-            }.value
+            }
             finish(change, tweak: pending.tweak, requested: pending.value)
         }
     }
@@ -279,9 +282,9 @@ final class TweaksModel {
         busy.insert(tweak.id)
         let store = historyStore
         Task {
-            let change = await Task.detached(priority: .userInitiated) {
+            let change = await writer.run {
                 TweakEngine.rollback(record, tweak: tweak, history: store)
-            }.value
+            }
             finish(change, tweak: tweak, requested: record.before)
         }
     }
@@ -310,9 +313,11 @@ final class TweaksModel {
         let targets = readings.filter { $0.isCustomized && $0.isSupported }.map(\.tweak)
         guard !targets.isEmpty else { return 0 }
         let store = historyStore
-        let changes = await Task.detached(priority: .userInitiated) {
-            targets.map { TweakEngine.reset($0, confirmed: true, history: store) }
-        }.value
+        var changes: [TweakChange] = []
+        for target in targets {
+            changes.append(
+                await writer.run { TweakEngine.reset(target, confirmed: true, history: store) })
+        }
         var failuresCount = 0
         for change in changes {
             if let index = readings.firstIndex(where: { $0.id == change.record.tweakID }) {
@@ -383,6 +388,7 @@ final class TweaksModel {
 
 struct TweakEngineAutomationEngine: TweakAutomationEngine {
     let history: TweakHistory
+    let writer: TweakWriter
     let dryRun: Bool
 
     func current(tweakID: String) async -> TweakCurrent? {
@@ -394,7 +400,9 @@ struct TweakEngineAutomationEngine: TweakAutomationEngine {
         guard let tweak = TweakCatalog.tweak(id: tweakID) else {
             return .refused("Unknown tweak.")
         }
-        let change = TweakEngine.set(tweak, to: value, history: history, dryRun: dryRun)
+        let change = await writer.run {
+            TweakEngine.set(tweak, to: value, history: history, dryRun: dryRun)
+        }
         if let error = change.record.error { return .failed(error) }
         if change.unchanged { return .unchanged }
         return .applied(recorded: change.record)
@@ -404,7 +412,9 @@ struct TweakEngineAutomationEngine: TweakAutomationEngine {
         guard let tweak = TweakCatalog.tweak(id: tweakID) else {
             return .refused("Unknown tweak.")
         }
-        let change = TweakEngine.set(tweak, to: value, history: history, dryRun: dryRun)
+        let change = await writer.run {
+            TweakEngine.set(tweak, to: value, history: history, dryRun: dryRun)
+        }
         if let error = change.record.error { return .failed(error) }
         if change.unchanged { return .unchanged }
         return .applied(recorded: change.record)
