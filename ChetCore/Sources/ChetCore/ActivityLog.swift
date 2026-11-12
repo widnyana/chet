@@ -46,6 +46,7 @@ public enum LogMessage: String, Sendable, Encodable {
     case storageSnapshotCreated = "storage.snapshotCreated"
     case storageSnapshotDeleted = "storage.snapshotDeleted"
     case storageTrashMove = "storage.trashMove"
+    case storageRestore = "storage.restore"
     case storageEmptyTrash = "storage.emptyTrash"
     case uninstallFinished = "uninstall.finished"
     case tweakRead = "tweak.read"
@@ -84,6 +85,8 @@ public enum LogFieldKey: String, Sendable, Encodable {
     case freed
     case removed
     case trashed
+    case restored
+    case unavailable
     case skipped
     case failed
     case dryRunCount

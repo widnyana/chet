@@ -97,6 +97,8 @@ public struct CleanReport: Sendable {
     public var refusal: RefusalReason?
     /// True when the pass stopped after the current item because the user cancelled.
     public var cancelled = false
+    /// The ledger operation this pass wrote, when it moved anything to the Trash.
+    public var operationID: UUID?
 
     public var freedBytes: Int64 {
         results.reduce(0) { total, result in
@@ -123,13 +125,17 @@ public struct Cleaner: Sendable {
     public var roots: [URL]
     /// Cooperative cancel: checked before each item. Items already removed stay removed.
     public var isCancelled: @Sendable () -> Bool = { false }
+    /// Records every Trash-mode removal. Nil disables the ledger.
+    public var ledger: TrashLedger?
     /// Bundle ID of the app that owns an item, if any.
     public var owner: @Sendable (ScanItem) -> String? = { _ in nil }
     public var isRunning: @Sendable (String) -> Bool = { id in
         !NSRunningApplication.runningApplications(withBundleIdentifier: id).isEmpty
     }
-    public var trash: @Sendable (URL) throws -> Void = { url in
-        try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+    public var trash: @Sendable (URL) throws -> URL? = { url in
+        var resulting: NSURL?
+        try FileManager.default.trashItem(at: url, resultingItemURL: &resulting)
+        return resulting as URL?
     }
     /// Root-owned items. Set only when the helper is registered and the dry-run gate is off;
     /// without it a `requiresAdmin` item is a policy skip.
@@ -175,6 +181,7 @@ public struct Cleaner: Sendable {
         var trashed = 0
         var dryRunCount = 0
         var processedCount = 0
+        var trashedEntries: [(item: ScanItem, url: URL)] = []
         let started = Date()
 
         VerboseLog.event(
@@ -194,7 +201,7 @@ public struct Cleaner: Sendable {
                     totalBytes: totalBytes, freedBytes: freedBytes, skipped: skipped, failed: failed,
                     currentPath: item.url.path, currentBytes: max(0, item.reclaimableBytes),
                     currentMode: item.mode, currentIsDirectory: !item.stamp.isRegularFile && !item.stamp.isSymlink))
-            let (outcome, refusal) = clean(item)
+            let (outcome, refusal, trashedURL) = clean(item)
             log.append(item, outcome, dryRun: dryRun, reason: refusal)
             report.results.append(
                 CleanResult(item: item, outcome: outcome, dryRun: dryRun, refusal: refusal))
@@ -207,6 +214,7 @@ public struct Cleaner: Sendable {
                 freedBytes += bytes
                 trashed += 1
                 if dryRun { dryRunCount += 1 }
+                if let trashedURL { trashedEntries.append((item, trashedURL)) }
             case .skipped:
                 skipped += 1
             case .failed:
@@ -217,6 +225,19 @@ public struct Cleaner: Sendable {
             if let recorder, (index + 1) % 16 == 0 {
                 recorder.record(step: "clean", "progress: \(index + 1)/\(items.count) items")
             }
+        }
+
+        if let ledger, !dryRun, !trashedEntries.isEmpty {
+            let operation = TrashOperation(
+                entries: trashedEntries.map { entry in
+                    TrashOperation.Entry(
+                        originalPath: entry.item.url.path,
+                        trashedPath: entry.url.path,
+                        bytes: entry.item.reclaimableBytes,
+                        categoryID: entry.item.categoryID)
+                })
+            ledger.append(operation)
+            report.operationID = operation.id
         }
 
         if report.cancelled {
@@ -255,44 +276,44 @@ public struct Cleaner: Sendable {
         return report
     }
 
-    func clean(_ item: ScanItem) -> (CleanOutcome, RefusalReason?) {
-        guard item.risk != .informational else { return (.skipped(.policy), .informational) }
-        guard let current = FileStamp.read(item.url) else { return (.skipped(.missing), .missing) }
+    func clean(_ item: ScanItem) -> (CleanOutcome, RefusalReason?, URL?) {
+        guard item.risk != .informational else { return (.skipped(.policy), .informational, nil) }
+        guard let current = FileStamp.read(item.url) else { return (.skipped(.missing), .missing, nil) }
         guard !current.isSymlink, current.inode == item.stamp.inode, current.size == item.stamp.size,
             current.modified == item.stamp.modified
-        else { return (.skipped(.changed), .changed) }
+        else { return (.skipped(.changed), .changed, nil) }
         let denial = policy.denialReason(for: item.url)
         guard denial == nil else {
             VerboseLog.event(
                 .warn, .clean, .cleanRefused,
                 .basename(.item, Basename(path: item.url.path)), .code(.refusal, .refusal))
-            return (.skipped(.policy), denial)
+            return (.skipped(.policy), denial, nil)
         }
         // Local Terraform state is user data: providers re-download, state does not. Refused in
         // both modes so a Trash sweep cannot lose it either.
-        if TerraformState.holdsLocalState(item.url) { return (.skipped(.localState), .localState) }
-        if let owner = owner(item), isRunning(owner) { return (.skipped(.appRunning), .appRunning) }
+        if TerraformState.holdsLocalState(item.url) { return (.skipped(.localState), .localState, nil) }
+        if let owner = owner(item), isRunning(owner) { return (.skipped(.appRunning), .appRunning, nil) }
         if item.requiresAdmin {
-            if dryRun { return (.removed(item.reclaimableBytes), nil) }
-            guard let privileged else { return (.skipped(.policy), .protectedFolder) }
-            return (privileged(item), nil)
+            if dryRun { return (.removed(item.reclaimableBytes), nil, nil) }
+            guard let privileged else { return (.skipped(.policy), .protectedFolder, nil) }
+            return (privileged(item), nil, nil)
         }
         if dryRun {
             return item.mode == .permanent
-                ? (.removed(item.reclaimableBytes), nil)
-                : (.trashed(item.reclaimableBytes), nil)
+                ? (.removed(item.reclaimableBytes), nil, nil)
+                : (.trashed(item.reclaimableBytes), nil, nil)
         }
         do {
             switch item.mode {
             case .permanent:
                 try FileManager.default.removeItem(at: item.url)
-                return (.removed(item.reclaimableBytes), nil)
+                return (.removed(item.reclaimableBytes), nil, nil)
             case .trash:
-                try trash(item.url)
-                return (.trashed(item.reclaimableBytes), nil)
+                let trashed = try trash(item.url)
+                return (.trashed(item.reclaimableBytes), nil, trashed)
             }
         } catch {
-            return (.failed(error.localizedDescription), nil)
+            return (.failed(error.localizedDescription), nil, nil)
         }
     }
 }

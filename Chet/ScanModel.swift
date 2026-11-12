@@ -225,6 +225,8 @@ final class ScanModel {
     var isScanning = false
     var isCleaning = false
     private let cancelFlag = CancelFlag()
+    let trashLedger = TrashLedger(
+        url: TestEnvironment.paths.applicationSupport.appendingPathComponent("Chet/trash-ledger.jsonl"))
     /// Live per-item progress of the running clean pass.
     var cleanProgress: CleanProgress?
     /// Snapshot deletions in the current clean pass; the progress box names them.
@@ -489,7 +491,7 @@ final class ScanModel {
                 }
             }
             let result = await Self.runClean(
-                items, helperLifetimeMinutes: approval, roots: roots,
+                items, helperLifetimeMinutes: approval, roots: roots, ledger: trashLedger,
                 isCancelled: { cancelFlag.isSet }
             ) {
                 continuation.yield($0)
@@ -775,6 +777,7 @@ final class ScanModel {
         _ items: [ScanItem],
         helperLifetimeMinutes: Int?,
         roots: [URL],
+        ledger: TrashLedger?,
         isCancelled: @escaping @Sendable () -> Bool,
         progress: @escaping @Sendable (CleanProgress) -> Void
     ) async -> CleanReport {
@@ -784,6 +787,7 @@ final class ScanModel {
                 excludedPaths: TestEnvironment.defaults.stringArray(forKey: excludedKey) ?? []),
             log: TestEnvironment.auditLog, recorder: FlightRecorder.shared, dryRun: DryRun.enabled)
         cleaner.roots = roots
+        cleaner.ledger = ledger
         cleaner.isCancelled = isCancelled
         cleaner.owner = { $0.ownerBundleID }
         if let minutes = helperLifetimeMinutes {

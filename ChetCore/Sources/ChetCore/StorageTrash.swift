@@ -47,6 +47,8 @@ public struct StorageTrashResult: Sendable, Equatable {
     public var freedBytes: Int64 = 0
     /// Set when the batch was refused before the first move; nothing is moved.
     public var refusal: RefusalReason?
+    /// The ledger operation this pass wrote, when it moved anything to the Trash.
+    public var operationID: UUID?
 }
 
 /// Moves collected folders to the Trash. Every entry is re-checked at trash time with
@@ -62,15 +64,20 @@ public struct StorageTrasher: Sendable {
     public let dryRun: Bool
     /// Every root a batch may touch. The batch guard refuses a path outside all of them.
     public var roots: [URL]
-    public var trash: @Sendable (URL) throws -> Void
+    /// Records every Trash-mode move. Nil disables the ledger.
+    public var ledger: TrashLedger?
+    public var trash: @Sendable (URL) throws -> URL?
 
     public init(
         policy: SafetyPolicy,
         appFolders: [URL]? = nil,
         dryRun: Bool,
         roots: [URL]? = nil,
-        trash: @escaping @Sendable (URL) throws -> Void = { url in
-            try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+        ledger: TrashLedger? = nil,
+        trash: @escaping @Sendable (URL) throws -> URL? = { url in
+            var resulting: NSURL?
+            try FileManager.default.trashItem(at: url, resultingItemURL: &resulting)
+            return resulting as URL?
         }
     ) {
         self.policy = policy
@@ -86,6 +93,7 @@ public struct StorageTrasher: Sendable {
             roots
             ?? ([URL(fileURLWithPath: policy.home)]
                 + policy.externalRoots.sorted().map(URL.init(fileURLWithPath:)) + folders)
+        self.ledger = ledger
         self.trash = trash
     }
 
@@ -132,6 +140,7 @@ public struct StorageTrasher: Sendable {
         }
         var result = StorageTrashResult(dryRun: dryRun)
         var failureErrno: Int32?
+        var movedEntries: [(entry: StorageEntry, url: URL)] = []
         VerboseLog.flush()
         // A parent and its child cannot both be moved. Keep the shallowest entry and
         // let the child go with it.
@@ -145,9 +154,10 @@ public struct StorageTrasher: Sendable {
                     continue
                 }
                 do {
-                    try trash(entry.url)
+                    let trashed = try trash(entry.url)
                     result.moved.append(entry)
                     result.freedBytes += max(0, entry.bytes)
+                    if let trashed { movedEntries.append((entry, trashed)) }
                 } catch {
                     let failure = error as NSError
                     if failure.domain == NSPOSIXErrorDomain { failureErrno = Int32(failure.code) }
@@ -155,6 +165,18 @@ public struct StorageTrasher: Sendable {
                         .init(url: entry.url, name: entry.name, reason: error.localizedDescription))
                 }
             }
+        }
+        if let ledger, !dryRun, !movedEntries.isEmpty {
+            let operation = TrashOperation(
+                entries: movedEntries.map { moved in
+                    TrashOperation.Entry(
+                        originalPath: moved.entry.url.path,
+                        trashedPath: moved.url.path,
+                        bytes: moved.entry.bytes,
+                        categoryID: "storage")
+                })
+            ledger.append(operation)
+            result.operationID = operation.id
         }
         VerboseLog.event(
             .info, .storage, .storageTrashMove,

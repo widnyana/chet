@@ -25,7 +25,9 @@ struct CleanerTests {
         let fakeTrash = dir.url.appendingPathComponent("FakeTrash")
         cleaner.trash = { url in
             try FileManager.default.createDirectory(at: fakeTrash, withIntermediateDirectories: true)
-            try FileManager.default.moveItem(at: url, to: fakeTrash.appendingPathComponent(url.lastPathComponent))
+            let destination = fakeTrash.appendingPathComponent(url.lastPathComponent)
+            try FileManager.default.moveItem(at: url, to: destination)
+            return destination
         }
         cleaner.isRunning = { _ in false }
         return cleaner
@@ -311,7 +313,7 @@ struct CleanerTests {
         defer { VerboseLog.install(nil) }
         try dir.file("Library/Caches/a", bytes: 10)
         let caches = dir.url.appendingPathComponent("Library/Caches")
-        let (outcome, reason) = cleaner(dir).clean(try item(caches))
+        let (outcome, reason, _) = cleaner(dir).clean(try item(caches))
         VerboseLog.flush()
         #expect(outcome == .skipped(.policy))
         #expect(reason == .containerFolder)
@@ -348,6 +350,43 @@ struct CleanerTests {
         let file = try dir.file("cache/x", bytes: 1000)
         let report = cleaner(dir).clean([try item(file)])
         #expect(!report.cancelled)
+    }
+
+    @Test func trashCleanWritesOneLedgerRowPerMovedItem() throws {
+        let dir = try TempDir()
+        let ledger = TrashLedger(url: dir.url.appendingPathComponent("ledger.jsonl"))
+        let first = try dir.file("photos/a.jpg", bytes: 1000)
+        let second = try dir.file("photos/b.jpg", bytes: 2000)
+        var worker = cleaner(dir)
+        worker.ledger = ledger
+        let report = worker.clean([try item(first, .trash), try item(second, .trash)])
+        #expect(report.operationID != nil)
+        let operations = ledger.operations()
+        #expect(operations.count == 1)
+        #expect(operations.first?.entries.count == 2)
+        #expect(operations.first?.entries.allSatisfy { !$0.trashedPath.isEmpty } == true)
+    }
+
+    @Test func dryRunTrashWritesNoLedgerRow() throws {
+        let dir = try TempDir()
+        let ledger = TrashLedger(url: dir.url.appendingPathComponent("ledger.jsonl"))
+        let file = try dir.file("photos/a.jpg", bytes: 1000)
+        var worker = cleaner(dir, dryRun: true)
+        worker.ledger = ledger
+        let report = worker.clean([try item(file, .trash)])
+        #expect(report.operationID == nil)
+        #expect(ledger.operations().isEmpty)
+    }
+
+    @Test func permanentCleanWritesNoLedgerRow() throws {
+        let dir = try TempDir()
+        let ledger = TrashLedger(url: dir.url.appendingPathComponent("ledger.jsonl"))
+        let file = try dir.file("cache/x", bytes: 1000)
+        var worker = cleaner(dir)
+        worker.ledger = ledger
+        let report = worker.clean([try item(file)])
+        #expect(report.operationID == nil)
+        #expect(ledger.operations().isEmpty)
     }
 }
 

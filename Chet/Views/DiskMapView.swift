@@ -321,7 +321,7 @@ struct DiskMapView: View {
             home: TestEnvironment.paths.root,
             allowsOutsideHome: model.scanOutsideHome,
             excludedPaths: model.excludedPaths)
-        let result = StorageTrasher(policy: policy, dryRun: DryRun.enabled)
+        let result = StorageTrasher(policy: policy, dryRun: DryRun.enabled, ledger: model.trashLedger)
             .trash(trashRequest?.entries ?? [])
         trashReport = result
         collection.removeAll()

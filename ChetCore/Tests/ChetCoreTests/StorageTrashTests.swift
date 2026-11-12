@@ -16,7 +16,9 @@ struct StorageTrashTests {
         let fakeTrash = dir.url.appendingPathComponent("FakeTrash")
         trasher.trash = { url in
             try FileManager.default.createDirectory(at: fakeTrash, withIntermediateDirectories: true)
-            try FileManager.default.moveItem(at: url, to: fakeTrash.appendingPathComponent(url.lastPathComponent))
+            let destination = fakeTrash.appendingPathComponent(url.lastPathComponent)
+            try FileManager.default.moveItem(at: url, to: destination)
+            return destination
         }
         return trasher
     }
@@ -118,5 +120,31 @@ struct StorageTrashTests {
         #expect(result.wouldMove.count == 1)
         #expect(result.wouldMove.first?.url == parent)
         #expect(result.failed.isEmpty)
+    }
+
+    @Test func trashWritesOneLedgerRowPerMovedItem() throws {
+        let dir = try TempDir()
+        let ledger = TrashLedger(url: dir.url.appendingPathComponent("ledger.jsonl"))
+        let folder = dir.url.appendingPathComponent("Downloads/old")
+        try dir.file("Downloads/old/a.txt", bytes: 10)
+        var worker = trasher(dir)
+        worker.ledger = ledger
+        let result = worker.trash([entry(folder)])
+        #expect(result.operationID != nil)
+        let operations = ledger.operations()
+        #expect(operations.count == 1)
+        #expect(operations.first?.entries.first?.trashedPath.hasSuffix("old") == true)
+    }
+
+    @Test func dryRunWritesNoLedgerRow() throws {
+        let dir = try TempDir()
+        let ledger = TrashLedger(url: dir.url.appendingPathComponent("ledger.jsonl"))
+        let folder = dir.url.appendingPathComponent("Downloads/old")
+        try dir.file("Downloads/old/a.txt", bytes: 10)
+        var worker = trasher(dir, dryRun: true)
+        worker.ledger = ledger
+        let result = worker.trash([entry(folder)])
+        #expect(result.operationID == nil)
+        #expect(ledger.operations().isEmpty)
     }
 }
