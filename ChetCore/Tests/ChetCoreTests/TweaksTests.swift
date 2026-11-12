@@ -229,6 +229,36 @@ struct TweaksTests {
                 == .unsupported("Needs macOS 15 or later."))
     }
 
+    @Test func tilingRowsCarryTheVersionGate() throws {
+        let ids = [
+            "windows.tiling-edge", "windows.tiling-top-edge",
+            "windows.tiling-option", "windows.tiling-margins",
+        ]
+        for id in ids {
+            let tweak = try #require(TweakCatalog.tweak(id: id))
+            #expect(tweak.minimumMajorVersion == 15)
+            #expect(tweak.control == .toggle(on: .boolean(false), off: nil))
+            #expect(tweak.defaultValue == nil)
+            #expect(tweak.risk == .medium)
+        }
+        for id in ["windows.tiling-top-edge", "windows.tiling-option", "windows.tiling-margins"] {
+            #expect(try #require(TweakCatalog.tweak(id: id)).minimumMinorVersion == 1)
+        }
+        #expect(try #require(TweakCatalog.tweak(id: "windows.tiling-edge")).minimumMinorVersion == nil)
+    }
+
+    @Test func tilingGateRefusesAtFifteenZero() throws {
+        let tweak = try #require(TweakCatalog.tweak(id: "windows.tiling-top-edge"))
+        #expect(
+            TweakEngine.supported(
+                tweak, osVersion: OperatingSystemVersion(majorVersion: 15, minorVersion: 0, patchVersion: 0))
+                == .unsupported("Needs macOS 15.1 or later."))
+        #expect(
+            TweakEngine.supported(
+                tweak, osVersion: OperatingSystemVersion(majorVersion: 15, minorVersion: 1, patchVersion: 0))
+                == nil)
+    }
+
     @Test func catalogIsCompleteAndConsistent() {
         let all = TweakCatalog.all
         #expect(all.count >= 25)

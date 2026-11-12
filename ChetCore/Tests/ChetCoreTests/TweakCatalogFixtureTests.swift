@@ -75,6 +75,11 @@ struct TweakCatalogFixtureTests {
         "finder.desktop-icons": row("defaults:com.apple.finder:CreateDesktop"),
         "security.siri-sharing": row(
             "defaults:com.apple.assistant.support:Siri Data Sharing Opt-In Status"),
+        "windows.tiling-edge": row("defaults:com.apple.WindowManager:EnableTilingByEdgeDrag"),
+        "windows.tiling-top-edge": row("defaults:com.apple.WindowManager:EnableTopTilingByEdgeDrag"),
+        "windows.tiling-option": row(
+            "defaults:com.apple.WindowManager:EnableTilingOptionAccelerator"),
+        "windows.tiling-margins": row("defaults:com.apple.WindowManager:EnableTiledWindowMargins"),
         "keyboard.repeat": row("defaults:NSGlobalDomain:ApplePressAndHoldEnabled", .boolean(true)),
         "keyboard.full-access": row("defaults:NSGlobalDomain:AppleKeyboardUIMode", .integer(0)),
         "keyboard.smart-quotes": row(

@@ -1678,6 +1678,57 @@ public enum TweakCatalog {
             target: .defaults(domain: "com.apple.WindowManager", key: "GloballyEnabled", type: .boolean),
             control: .toggle(on: .boolean(true), off: .boolean(false)), defaultValue: .boolean(false),
             minimumMajorVersion: 13),
+        Tweak(
+            id: "windows.tiling-edge",
+            category: .windows,
+            name: "Disable edge tiling",
+            summary: "Stop dragging a window to the screen edge from tiling it.",
+            detail:
+                "macOS 15 tiles a window when you drag it to an edge. Turning this off keeps the window where you drop it.",
+            impact: "Window layout",
+            risk: .medium,
+            target: .defaults(domain: "com.apple.WindowManager", key: "EnableTilingByEdgeDrag", type: .boolean),
+            control: .toggle(on: .boolean(false), off: nil),
+            minimumMajorVersion: 15),
+        Tweak(
+            id: "windows.tiling-top-edge",
+            category: .windows,
+            name: "Disable top edge tiling",
+            summary: "Stop dragging a window to the menu bar from tiling it.",
+            detail:
+                "macOS 15.1 tiles a window when you drag it to the top edge. Turning this off keeps the window where you drop it.",
+            impact: "Window layout",
+            risk: .medium,
+            target: .defaults(
+                domain: "com.apple.WindowManager", key: "EnableTopTilingByEdgeDrag", type: .boolean),
+            control: .toggle(on: .boolean(false), off: nil),
+            minimumMajorVersion: 15, minimumMinorVersion: 1),
+        Tweak(
+            id: "windows.tiling-option",
+            category: .windows,
+            name: "Disable the tiling option key",
+            summary: "Stop the Option key from offering tiling choices while you drag.",
+            detail:
+                "macOS 15.1 shows tiling options when you hold Option during a drag. Turning this off removes them.",
+            impact: "Window layout",
+            risk: .medium,
+            target: .defaults(
+                domain: "com.apple.WindowManager", key: "EnableTilingOptionAccelerator", type: .boolean),
+            control: .toggle(on: .boolean(false), off: nil),
+            minimumMajorVersion: 15, minimumMinorVersion: 1),
+        Tweak(
+            id: "windows.tiling-margins",
+            category: .windows,
+            name: "Remove tiled window margins",
+            summary: "Let tiled windows use the full screen edge.",
+            detail:
+                "macOS 15.1 leaves a margin around tiled windows. Turning this off removes it.",
+            impact: "Window layout",
+            risk: .medium,
+            target: .defaults(
+                domain: "com.apple.WindowManager", key: "EnableTiledWindowMargins", type: .boolean),
+            control: .toggle(on: .boolean(false), off: nil),
+            minimumMajorVersion: 15, minimumMinorVersion: 1),
     ]
 
     // MARK: Security
