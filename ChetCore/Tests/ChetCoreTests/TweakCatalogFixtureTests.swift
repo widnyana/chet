@@ -58,6 +58,20 @@ struct TweakCatalogFixtureTests {
             [option("Genie", .string("genie")), option("Scale", .string("scale"))]),
         "dock.autohide-speed": row("defaults:com.apple.dock:autohide-time-modifier", .number(0.5)),
         "dock.reveal-delay": row("defaults:com.apple.dock:autohide-delay", .number(0.2)),
+        "dock.mru-spaces": row("defaults:com.apple.dock:mru-spaces"),
+        "dock.orientation": row(
+            "defaults:com.apple.dock:orientation", .string("bottom"),
+            [
+                option("Left", .string("left")),
+                option("Bottom", .string("bottom")),
+                option("Right", .string("right")),
+            ]),
+        "dock.tilesize": row("defaults:com.apple.dock:tilesize", .integer(64)),
+        "dock.expose-group-apps": row("defaults:com.apple.dock:expose-group-apps"),
+        "global.natural-scrolling": row(
+            "defaults:NSGlobalDomain:com.apple.swipescrolldirection", .boolean(true)),
+        "appearance.clock-format": row("defaults:com.apple.menuextra.clock:DateFormat"),
+        "finder.posix-path": row("defaults:com.apple.finder:_FXShowPosixPathInTitle"),
         "keyboard.repeat": row("defaults:NSGlobalDomain:ApplePressAndHoldEnabled", .boolean(true)),
         "keyboard.full-access": row("defaults:NSGlobalDomain:AppleKeyboardUIMode", .integer(0)),
         "keyboard.smart-quotes": row(

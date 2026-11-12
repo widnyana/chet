@@ -1168,6 +1168,17 @@ public enum TweakCatalog {
                 TweakOption(label: "Gallery", value: .string("glyv")),
             ]),
             defaultValue: .string("icnv"), restart: .finder),
+        Tweak(
+            id: "finder.posix-path",
+            category: .finder,
+            name: "Show the full path in the title",
+            summary: "Show the POSIX path instead of the folder name in Finder titles.",
+            detail:
+                "The window title shows the full path from the volume root. Long paths take the space of the folder name.",
+            impact: "Finder windows",
+            target: .defaults(domain: "com.apple.finder", key: "_FXShowPosixPathInTitle", type: .boolean),
+            control: .toggle(on: .boolean(true), off: nil),
+            restart: .finder),
     ]
 
     // MARK: Dock
@@ -1247,6 +1258,52 @@ public enum TweakCatalog {
             target: .defaults(domain: "com.apple.dock", key: "autohide-delay", type: .number),
             control: .range(min: 0, max: 1.5, step: 0.1, unit: "s"),
             defaultValue: .number(0.2), restart: .dock),
+        Tweak(
+            id: "dock.mru-spaces",
+            category: .dock,
+            name: "Keep Spaces in a fixed order",
+            summary: "Stop macOS from reordering Spaces by recent use.",
+            detail:
+                "macOS moves the Space you used last to the front. Turning this off keeps every Space where you put it.",
+            impact: "Spaces and Mission Control",
+            target: .defaults(domain: "com.apple.dock", key: "mru-spaces", type: .boolean),
+            control: .toggle(on: .boolean(false), off: nil),
+            restart: .dock),
+        Tweak(
+            id: "dock.orientation",
+            category: .dock,
+            name: "Dock position",
+            summary: "Place the Dock on the left, bottom, or right edge.",
+            detail: "The Dock moves to the chosen edge. The bottom edge is the macOS default.",
+            impact: "Dock",
+            target: .defaults(domain: "com.apple.dock", key: "orientation", type: .string),
+            control: .choice([
+                TweakOption(label: "Left", value: .string("left")),
+                TweakOption(label: "Bottom", value: .string("bottom")),
+                TweakOption(label: "Right", value: .string("right")),
+            ]),
+            defaultValue: .string("bottom"), restart: .dock),
+        Tweak(
+            id: "dock.tilesize",
+            category: .dock,
+            name: "Dock icon size",
+            summary: "Set how large Dock icons appear.",
+            detail: "The slider sets the icon size in points. The Dock redraws at the new size.",
+            impact: "Dock",
+            target: .defaults(domain: "com.apple.dock", key: "tilesize", type: .integer),
+            control: .range(min: 16, max: 128, step: 1, unit: "pt"),
+            defaultValue: .integer(64), restart: .dock),
+        Tweak(
+            id: "dock.expose-group-apps",
+            category: .dock,
+            name: "Group windows by app in Mission Control",
+            summary: "Keep each app's windows together in Mission Control.",
+            detail:
+                "Mission Control groups windows by app instead of by Space order. The Dock redraws after the change.",
+            impact: "Mission Control",
+            target: .defaults(domain: "com.apple.dock", key: "expose-group-apps", type: .boolean),
+            control: .toggle(on: .boolean(true), off: nil),
+            restart: .dock),
     ]
 
     // MARK: Keyboard
@@ -1393,6 +1450,17 @@ public enum TweakCatalog {
                     key: "TrackpadThreeFingerDrag", type: .boolean)
             ],
             defaultValue: .boolean(false)),
+        Tweak(
+            id: "global.natural-scrolling",
+            category: .trackpad,
+            name: "Natural scrolling",
+            summary: "Move content in the same direction as your fingers.",
+            detail:
+                "Content follows the gesture instead of the scroll bar. Turning it off restores the traditional direction.",
+            impact: "Scrolling on every pointing device",
+            target: .defaults(domain: global, key: "com.apple.swipescrolldirection", type: .boolean),
+            control: .toggle(on: .boolean(true), off: .boolean(false)),
+            defaultValue: .boolean(true)),
     ]
 
     // MARK: Screenshots
@@ -1521,6 +1589,17 @@ public enum TweakCatalog {
             risk: .medium,
             target: .defaults(domain: global, key: "_HIHideMenuBar", type: .boolean),
             control: .toggle(on: .boolean(true), off: .boolean(false)), restart: .login),
+        Tweak(
+            id: "appearance.clock-format",
+            category: .appearance,
+            name: "Menu bar clock format",
+            summary: "Choose the date and time pattern the clock uses.",
+            detail:
+                "The pattern follows the Unicode date format. The menu bar needs a restart to redraw.",
+            impact: "Menu bar clock",
+            target: .defaults(domain: "com.apple.menuextra.clock", key: "DateFormat", type: .string),
+            control: .text(placeholder: "EEE d MMM HH:mm"),
+            restart: .systemUI),
     ]
 
     // MARK: Windows
