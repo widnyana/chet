@@ -86,6 +86,8 @@ the Trash, where you can put them back. Time Machine snapshots are removed with 
 Every item is written to `~/Library/Logs/chet/clean.log`, one line per removal, with its
 category, path, size, and result.
 
+Chet has no network access, no telemetry, and no crash reporter. Nothing leaves this Mac.
+
 ## Storage
 
 Storage ranks the folders in your home folder by size and draws them as a map. Open a folder

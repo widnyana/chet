@@ -93,6 +93,13 @@ cleaning. The summary lists what moved, what was skipped, and the space recovere
 Every cleanup is written to `~/Library/Logs/chet/clean.log`, one JSON line per item with its
 category, path, size, mode, and result.
 
+A refused item names one reason: an excluded folder, a protected folder, a git repository, an
+app bundle, a Photos library, a symlink, a mounted volume, or a path outside your home folder.
+The summary and the audit row carry the same reason.
+
+The last 10 Trash operations can be restored from the Storage page or from the clean summary.
+Restore is offered only when the Trash copy and the original folder both still exist.
+
 ## What Chet cleans
 
 Safe to remove items are selected after a scan. Check first items are never selected for you.
@@ -217,6 +224,10 @@ pending restart, and pending confirmation.
 Each tweak row states the value macOS ships with. Rows that differ from it carry a tinted body, so a
 changed setting is visible without opening it. `Not set` means the key is absent by default.
 
+A rule runs a tweak when a chosen app is running. Add a rule from a tweak's details sheet: pick
+the app, pick on or off, and add. The `Automated` filter lists every tweak with a rule. The
+Settings window counts the rules and can revert every automated change at once.
+
 ## Uninstall apps
 
 Pick **Apps** in the sidebar, search for an app, and select it. Chet reads the app bundle, then
@@ -262,6 +273,7 @@ path applies before you act.
   is checked again right before it moves.
 - Every cleanup is written to `~/Library/Logs/chet/clean.log`.
 - Every tweak write is read back and verified, then recorded in the tweak log.
+- Chet has no network access, no telemetry, and no crash reporter. Nothing leaves this Mac.
 
 Each app row states when you last used it, from Spotlight. Apps Spotlight has not seen launch read
 `Last used: not recorded`. Sort by last used to bring the newest to the top.

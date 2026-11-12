@@ -140,6 +140,21 @@ Rules for new code:
 - A privileged removal is always a request through `ChetHelperProtocol`. No engine gains a
   second root path, and `HelperGuard` is the only place that decides what root may touch.
 
+## Stores
+
+Four files live under `~/Library/Application Support/Chet/`:
+
+| File | Owner | Contents |
+|---|---|---|
+| `trash-ledger.jsonl` | `TrashLedger` | one Trash operation per line |
+| `scan-snapshot.json` | `ScanSnapshotStore` | the last scan result |
+| `tweak-automation-rules.json` | `TriggerStore` | the automation rules |
+| `tweak-automation-state.json` | `WALStore` | the applied baseline per tweak |
+
+A save copies the existing file to `.bak` before the atomic replace. A decode failure or an
+unknown version copies the file to `.corrupt` and starts empty. `TweakWriter` is the only write
+path for the model and the controller. `Cleaner` and `StorageTrasher` share one batch guard.
+
 ## Metal
 
 Chet uses the GPU through Metal for the heavy work: perceptual hashes and blur scores for

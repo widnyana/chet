@@ -223,6 +223,18 @@ Rules:
   language. It exists because the operation is a foreground, destructive task.
 - No per-item animation. The linear bars and the current path update in place.
 
+### Refusal and undo
+
+A refusal is one closed reason, named in the summary and the audit row. The
+cleaner refuses a malformed batch before the first removal. Restore is offered
+only for a Trash operation whose endpoints verify.
+
+### Coverage
+
+Coverage reconciles four buckets with a reason each: scanned, hidden, excluded,
+and not reported. The sheet says `Accounted for X of Y` and never asserts that
+the buckets add up.
+
 ### Tweaks
 
 A preference list, not a card grid. The page answers what a setting does, what it
@@ -244,6 +256,12 @@ The catalog is plain data in `TweakCatalog`; every entry is one preference key o
 one file flag. `TweakEngine` reads, writes, verifies by reading back, restores on a
 failed verification, and records to `~/Library/Application Support/Chet/tweaks.log`.
 An unknown value is shown with its reason and is never drawn as Off.
+
+### Tweak automation
+
+Automation is desired-state first. A rule stores the control state, not a raw
+value. Under the gate, reconcile is compute-only: it reads, plans, and writes
+nothing.
 
 ### Apps
 
@@ -492,6 +510,11 @@ Why this shape:
 - `SettingsPanel`, `SettingsRow`, `SettingsActionRow`, `SettingsNote`,
   `SettingsDivider`: the settings pattern. `SettingsGrid` owns the row height and the row
   padding, and each panel's `Grid` sizes the control column. No pane styles a row.
+- `CoverageStrip` and `CoverageSheet`: one caption under the capacity bar and a
+  520 pt sheet with four buckets and a reason each.
+- `AutomationSection` and `AutomationBadge`: the detail sheet's rule form and the
+  row's automated capsule.
+- `TrashHistorySheet`: the newest 10 Trash operations, one restore control each.
 
 Detailed anatomy and states are in [design/components.md](design/components.md).
 
@@ -508,8 +531,10 @@ or claims. Empty and error states name the cause and the next action.
 
 Each noun has one source in code: `CategoryCopy` for category names and
 reasons, `ScanStepCopy` for scan steps, `AppCopy` for app parts, ownership, and
-skip reasons, `TweakCopy` for tweak state, risk, restart, and history words.
-A view shows those strings; it does not retype them.
+skip reasons, `TweakCopy` for tweak state, risk, restart, history, and
+automation words, `CoverageCopy` for the coverage sheet, and `RefusalCopy` for
+every refusal and restore sentence. A view shows those strings; it does not
+retype them.
 
 Full copy is in [design/copy.md](design/copy.md).
 

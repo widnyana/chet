@@ -59,7 +59,7 @@ Window minimum: `960 x 632`.
 
 - Buttons only from `DesignSystem.swift`; compose shared components; geometry lives in the component.
 - Tokens only: `Spacing`, `Metrics`, `Typography`. No literal next to a view.
-- Copy has one owner: `CategoryCopy`, `ScanStepCopy`, `AppCopy`, `TweakCopy`, `CoverageCopy`.
+- Copy has one owner: `CategoryCopy`, `ScanStepCopy`, `AppCopy`, `TweakCopy`, `CoverageCopy`, `RefusalCopy`.
 - A pattern seen a third time is extracted, not copied.
 
 ## Selectors
