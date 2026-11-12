@@ -557,6 +557,73 @@ struct RuleScannerTests {
             .scan(try rule("package-caches"))
         #expect(calls.value == 1)
     }
+
+    @Test func browserCacheRulesCarryTheirMetadata() throws {
+        let expected: [(id: String, root: String, bundle: String)] = [
+            ("browser-vivaldi", "Library/Caches/Vivaldi", "com.vivaldi.Vivaldi"),
+            ("browser-opera", "Library/Caches/com.operasoftware.Opera", "com.operasoftware.Opera"),
+            ("browser-chromium", "Library/Caches/Chromium", "org.chromium.Chromium"),
+        ]
+        for entry in expected {
+            let rule = try rule(entry.id)
+            #expect(rule.category == "browser")
+            #expect(rule.risk == .safe)
+            #expect(rule.mode == .permanent)
+            #expect(rule.wholeRoots == false)
+            #expect(rule.owningBundleID == entry.bundle)
+            #expect(rule.roots == [entry.root])
+        }
+    }
+
+    @Test func crashReportRuleCarriesItsMetadata() throws {
+        let rule = try rule("logs-crash-reports")
+        #expect(rule.category == "logs")
+        #expect(rule.risk == .review)
+        #expect(rule.mode == .trash)
+        #expect(rule.roots == ["Library/Logs/DiagnosticReports"])
+        #expect(rule.minAge == nil)
+    }
+
+    @Test func crashReportsAreReviewItemsAndTheLogsRuleSkipsThem() async throws {
+        let dir = try TempDir()
+        try dir.file("Library/Logs/DiagnosticReports/Chess.app-2024.ips", bytes: 100)
+        let crash = try await RuleScanner(home: dir.url).scan(try rule("logs-crash-reports"))
+        #expect(crash.items.count == 1)
+        #expect(crash.items.first?.risk == .review)
+        #expect(crash.items.first?.mode == .trash)
+        let logs = try await RuleScanner(home: dir.url).scan(try rule("logs"))
+        #expect(!logs.items.contains { $0.url.lastPathComponent == "DiagnosticReports" })
+    }
+
+    @Test func browserCacheRulesFindTheirCacheSubfolders() async throws {
+        let expected: [(id: String, root: String, bundle: String)] = [
+            ("browser-vivaldi", "Library/Caches/Vivaldi", "com.vivaldi.Vivaldi"),
+            ("browser-opera", "Library/Caches/com.operasoftware.Opera", "com.operasoftware.Opera"),
+            ("browser-chromium", "Library/Caches/Chromium", "org.chromium.Chromium"),
+        ]
+        for entry in expected {
+            let dir = try TempDir()
+            try dir.file("\(entry.root)/Cache/data_0", bytes: 1_000)
+            let result = try await RuleScanner(home: dir.url).scan(try rule(entry.id))
+            #expect(result.items.count == 1)
+            #expect(result.items.first?.url.lastPathComponent == "Cache")
+            #expect(result.items.first?.ownerBundleID == entry.bundle)
+        }
+    }
+
+    @Test func installersCoverTheDesktopAndSkipZip() async throws {
+        let dir = try TempDir()
+        let oldDMG = try dir.file("Desktop/old.dmg", bytes: 1_000)
+        let oldZIP = try dir.file("Desktop/old.zip", bytes: 1_000)
+        let newDMG = try dir.file("Desktop/new.dmg", bytes: 1_000)
+        try setMTime(oldDMG, daysAgo: 40)
+        try setMTime(oldZIP, daysAgo: 40)
+        try setMTime(newDMG, daysAgo: 10)
+        let result = try await RuleScanner(home: dir.url).scan(try rule("installers"))
+        #expect(result.items.map(\.url.lastPathComponent) == ["old.dmg"])
+        #expect(result.items.allSatisfy { dir.policy.isDeletable($0.url) == .allowed })
+        #expect(result.items.allSatisfy { $0.mode == .trash })
+    }
 }
 
 private final class ScanCallCounter: @unchecked Sendable {

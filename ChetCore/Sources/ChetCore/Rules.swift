@@ -111,6 +111,9 @@ extension Rule {
             id: "logs", title: "Logs and crash reports", roots: ["Library/Logs"], risk: .safe, mode: .permanent,
             excluded: ["chet", "DiagnosticReports"]),
         Rule(
+            id: "logs-crash-reports", category: "logs", title: "Crash reports",
+            roots: ["Library/Logs/DiagnosticReports"], risk: .review, mode: .trash),
+        Rule(
             id: "xcode", title: "Xcode build data",
             roots: ["Library/Developer/Xcode/DerivedData", "Library/Developer/CoreSimulator/Caches"],
             risk: .safe, mode: .permanent, owningBundleID: "com.apple.dt.Xcode"),
@@ -151,11 +154,23 @@ extension Rule {
             roots: ["Library/Caches/company.thebrowser.Browser"], risk: .safe, mode: .permanent,
             owningBundleID: "company.thebrowser.Browser"),
         Rule(
+            id: "browser-vivaldi", category: "browser", title: "Vivaldi cache",
+            roots: ["Library/Caches/Vivaldi"], risk: .safe, mode: .permanent,
+            owningBundleID: "com.vivaldi.Vivaldi"),
+        Rule(
+            id: "browser-opera", category: "browser", title: "Opera cache",
+            roots: ["Library/Caches/com.operasoftware.Opera"], risk: .safe, mode: .permanent,
+            owningBundleID: "com.operasoftware.Opera"),
+        Rule(
+            id: "browser-chromium", category: "browser", title: "Chromium cache",
+            roots: ["Library/Caches/Chromium"], risk: .safe, mode: .permanent,
+            owningBundleID: "org.chromium.Chromium"),
+        Rule(
             id: "mail-downloads", title: "Mail downloads",
             roots: ["Library/Containers/com.apple.mail/Data/Library/Mail Downloads"], risk: .safe, mode: .permanent,
             owningBundleID: "com.apple.mail"),
         Rule(
-            id: "installers", title: "Old installers", roots: ["Downloads"], risk: .review, mode: .trash,
+            id: "installers", title: "Old installers", roots: ["Downloads", "Desktop"], risk: .review, mode: .trash,
             minAge: 30 * day, extensions: ["dmg", "pkg", "mpkg", "xip", "iso"]),
         Rule(
             id: "ios-backups", title: "iOS device backups", roots: ["Library/Application Support/MobileSync/Backup"],
