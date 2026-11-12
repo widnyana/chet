@@ -60,10 +60,13 @@ public struct ScanItem: Identifiable, Hashable, Sendable {
     public let requiresAdmin: Bool
     /// Tool behind a build directory, for example `Rust target`. Nil outside build artifacts.
     public let kind: String?
+    /// What `reclaimableBytes` measures. `.allocated` unless the producer walked the index.
+    public let sizeBasis: SizeBasis
 
     public init(
         url: URL, categoryID: String, risk: Risk, mode: DeleteMode, reclaimableBytes: Int64, stamp: FileStamp,
-        ownerBundleID: String? = nil, requiresAdmin: Bool = false, kind: String? = nil
+        ownerBundleID: String? = nil, requiresAdmin: Bool = false, kind: String? = nil,
+        sizeBasis: SizeBasis = .allocated
     ) {
         self.url = url
         self.categoryID = categoryID
@@ -74,17 +77,29 @@ public struct ScanItem: Identifiable, Hashable, Sendable {
         self.ownerBundleID = ownerBundleID
         self.requiresAdmin = requiresAdmin
         self.kind = kind
+        self.sizeBasis = sizeBasis
     }
 
     public func resolved(with other: ScanItem) -> ScanItem {
         guard url == other.url else { return self }
+        let mergedBasis: SizeBasis =
+            sizeBasis == .allocated || other.sizeBasis == .allocated ? .allocated : .reclaimable
+        let chosen: ScanItem
         if other.conservation != conservation {
-            return other.conservation > conservation ? other : self
+            chosen = other.conservation > conservation ? other : self
+        } else if other.mode != mode {
+            chosen = other.mode == .trash ? other : self
+        } else {
+            chosen = self
         }
-        if other.mode != mode {
-            return other.mode == .trash ? other : self
-        }
-        return self
+        return chosen.sizeBasis == mergedBasis ? chosen : chosen.withSizeBasis(mergedBasis)
+    }
+
+    private func withSizeBasis(_ basis: SizeBasis) -> ScanItem {
+        ScanItem(
+            url: url, categoryID: categoryID, risk: risk, mode: mode, reclaimableBytes: reclaimableBytes,
+            stamp: stamp, ownerBundleID: ownerBundleID, requiresAdmin: requiresAdmin, kind: kind,
+            sizeBasis: basis)
     }
 
     private var conservation: Int {

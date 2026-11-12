@@ -113,6 +113,20 @@ struct ScanSessionTests {
         #expect(tagged.count == 1)
         #expect(tagged.first?.url.lastPathComponent == "target")
         #expect(tagged.first?.categoryID == "tagged-caches")
+        #expect(tagged.first?.sizeBasis == .reclaimable)
+    }
+
+    @Test func ruleItemsCarryTheAllocatedBasis() async throws {
+        let dir = try TempDir()
+        try dir.file("Library/Caches/a/x", bytes: 5_000_000)
+        try dir.file("Library/Caches/b/y", bytes: 3_000_000)
+        let events = await collect(ScanSession(home: dir.url, enabledSteps: [.rules]))
+        let caches = events.compactMap { event -> [ScanItem]? in
+            if case .rules(let result) = event, result.category == "caches" { result.items } else { nil }
+        }.flatMap { $0 }
+        #expect(caches.count == 2)
+        #expect(caches.allSatisfy { $0.sizeBasis == .allocated })
+        #expect(caches.reduce(0) { $0 + $1.reclaimableBytes } > 7_900_000)
     }
 
     @Test func taggedVirtualEnvironmentStaysInBuildCategory() async throws {

@@ -29,6 +29,18 @@ struct RuleScannerTests {
         #expect(result.totalBytes > 7_900_000 && result.totalBytes < 8_200_000)
     }
 
+    @Test func ruleItemsCarryTheAllocatedBasis() async throws {
+        let dir = try TempDir()
+        try dir.file("Library/Caches/a/x", bytes: 5_000_000)
+        let installer = try dir.file("Downloads/old.dmg", bytes: 3_000_000)
+        try setMTime(installer, daysAgo: 60)
+        let caches = try await RuleScanner(home: dir.url).scan(try rule("caches"))
+        let installers = try await RuleScanner(home: dir.url).scan(try rule("installers"))
+        #expect(caches.items.allSatisfy { $0.sizeBasis == .allocated })
+        #expect(installers.items.allSatisfy { $0.sizeBasis == .allocated })
+        #expect(caches.totalBytes > 4_900_000 && caches.totalBytes < 5_200_000)
+    }
+
     @Test func cachesSkipDotDSStore() async throws {
         let dir = try TempDir()
         try dir.file("Library/Caches/.DS_Store", bytes: 100)

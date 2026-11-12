@@ -20,10 +20,11 @@ public enum ScanStep: String, Sendable, CaseIterable {
 
 /// What a folder-size number measures. `.allocated` is the du-convention basis (blocks on disk,
 /// hard links once); blocks shared by APFS clones inside the same folder are counted for each
-/// clone, so folders full of clones can overstate what deleting them frees. Per-file
-/// `reclaimableBytes` carries the clone-aware number.
-public enum SizeBasis: Sendable, Equatable {
+/// clone, so folders full of clones can overstate what deleting them frees. `.reclaimable` is the
+/// clone-aware number from the index walk, which counts a shared block once.
+public enum SizeBasis: String, Sendable, Codable, Equatable {
     case allocated
+    case reclaimable
 }
 
 /// Closed mapping from a rule catalog label to the numeric code a log record carries.
@@ -277,7 +278,8 @@ public final class ScanSession: Sendable {
                                 }
                                 return ScanItem(
                                     url: tagged.url, categoryID: "tagged-caches", risk: .safe,
-                                    mode: .permanent, reclaimableBytes: tagged.bytes, stamp: stamp)
+                                    mode: .permanent, reclaimableBytes: tagged.bytes, stamp: stamp,
+                                    sizeBasis: .reclaimable)
                             }))
                 }
             }

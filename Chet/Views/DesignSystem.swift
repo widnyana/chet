@@ -736,14 +736,42 @@ struct SizeColumn: View {
     let bytes: Int64
     var width: CGFloat?
     var foreground: Color = Theme.ink
+    var basis: SizeBasis?
 
     var body: some View {
-        Text(bytes.formatted(.byteCount(style: .file)))
-            .font(Typography.row)
-            .monospacedDigit()
-            .foregroundStyle(foreground)
-            .lineLimit(1)
-            .frame(width: width, alignment: .trailing)
+        HStack(spacing: Spacing.s1) {
+            Text(bytes.formatted(.byteCount(style: .file)))
+                .font(Typography.row)
+                .monospacedDigit()
+                .foregroundStyle(foreground)
+                .lineLimit(1)
+                .frame(width: width, alignment: .trailing)
+            if let basis {
+                SizeBasisBadge(basis: basis)
+            }
+        }
+    }
+}
+
+enum SizeBasisCopy {
+    static func badge(_ basis: SizeBasis) -> String {
+        switch basis {
+        case .allocated: "Allocated"
+        case .reclaimable: "Freed"
+        }
+    }
+
+    static let annotation = "Allocated size. Shared blocks can free less."
+}
+
+struct SizeBasisBadge: View {
+    let basis: SizeBasis
+
+    var body: some View {
+        Text(SizeBasisCopy.badge(basis))
+            .font(Typography.caption)
+            .foregroundStyle(Theme.inkSecondary)
+            .help(SizeBasisCopy.annotation)
     }
 }
 
