@@ -93,6 +93,20 @@ public struct TrashLedger: Sendable {
         allOperations().first { $0.id == id }
     }
 
+    public func restorableEntries(in operation: TrashOperation) -> [TrashOperation.Entry] {
+        operation.entries.filter { entry in
+            let trashed = URL(fileURLWithPath: entry.trashedPath)
+            let original = URL(fileURLWithPath: entry.originalPath)
+            return FileManager.default.fileExists(atPath: trashed.path)
+                && !FileManager.default.fileExists(atPath: original.path)
+                && FileManager.default.fileExists(atPath: original.deletingLastPathComponent().path)
+        }
+    }
+
+    public func restorableOperations(limit: Int = TrashLedger.keptOperations) -> [TrashOperation] {
+        operations(limit: limit).filter { !restorableEntries(in: $0).isEmpty }
+    }
+
     public func restore(_ operation: TrashOperation) -> RestoreReport {
         var report = RestoreReport()
         let homePath = Self.resolvedPath(home)

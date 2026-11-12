@@ -8,6 +8,14 @@ struct SummaryView: View {
     // showing the confirmation again. Done has to dismiss it.
     @Environment(\.dismiss) private var dismiss
     let report: CleanReport
+    @State private var restoreReport: RestoreReport?
+
+    private var restorableOperation: TrashOperation? {
+        guard let id = report.operationID, let operation = model.trashLedger.operation(id: id) else {
+            return nil
+        }
+        return model.trashLedger.restorableEntries(in: operation).isEmpty ? nil : operation
+    }
 
     private var problems: [CleanResult] {
         report.results.filter { result in
@@ -84,10 +92,31 @@ struct SummaryView: View {
                         }
                     }
                 }
+                if let restoreReport {
+                    VStack(alignment: .leading, spacing: Spacing.s1) {
+                        Text("\(restoreReport.restored) items restored")
+                            .font(Typography.body)
+                            .foregroundStyle(Theme.ink)
+                        ForEach(restoreReport.unavailable, id: \.entry.originalPath) { item in
+                            Text(RefusalCopy.restore(item.reason))
+                                .font(Typography.caption)
+                                .foregroundStyle(Theme.inkSecondary)
+                        }
+                    }
+                }
                 HStack {
                     SecondaryActionButton(
                         title: "Show audit log",
                         action: { NSWorkspace.shared.open(TestEnvironment.auditLog.url) })
+                    if let operation = restorableOperation {
+                        SecondaryActionButton(
+                            title: "Restore",
+                            isEnabled: !DryRun.enabled,
+                            help: "Restore the items this pass moved to the Trash",
+                            action: { restoreReport = model.trashLedger.restore(operation) }
+                        )
+                        .accessibilityIdentifier("clean.restore")
+                    }
                     Spacer()
                     PrimaryActionButton(
                         title: "Done",

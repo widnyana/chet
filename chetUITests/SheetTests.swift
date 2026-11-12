@@ -104,6 +104,61 @@ final class SheetTests: UITestCase {
     }
 
     @MainActor
+    func testTrashHistoryOffersOnlyRestorableOperations() throws {
+        let driver = UITestDriver(app: app)
+        let restorableID = "11111111-1111-1111-1111-111111111111"
+        let goneID = "22222222-2222-2222-2222-222222222222"
+        let trashed = scratchRoot.appendingPathComponent("Trash/keep.txt")
+        try FileManager.default.createDirectory(
+            at: trashed.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("keep".utf8).write(to: trashed)
+        let original = scratchRoot.appendingPathComponent("Library/Caches/keep.txt")
+        try FileManager.default.createDirectory(
+            at: original.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let goneTrashed = scratchRoot.appendingPathComponent("Trash/gone.txt")
+        let goneOriginal = scratchRoot.appendingPathComponent("Library/Caches/gone.txt")
+        try seedTrashLedger([
+            (restorableID, trashed, original),
+            (goneID, goneTrashed, goneOriginal),
+        ])
+        try relaunch(environment: [:])
+        try driver.requireFocus()
+        try skipAccessGate(driver)
+        try makeCacheFixture(count: 1)
+        let scan = try driver.waitFor(AXSelector(["id=home.scan"]), timeout: 20)
+        try driver.requireFocus()
+        scan.element.click()
+        _ = try driver.waitFor(AXSelector(["id=home.rescan"]), timeout: 240)
+        let probe = try AXProbe(root: scratchRoot)
+        try selectSidebar("sidebar.disk-map", probe: probe, driver: driver)
+        _ = try driver.waitFor(AXSelector(["id=storage.ledger.header"]), timeout: 20)
+        let restore = try driver.waitFor(AXSelector(["id=storage.restore"]), timeout: 20)
+        XCTAssertFalse(restore.isEnabled)
+    }
+
+    private func seedTrashLedger(_ operations: [(id: String, trashed: URL, original: URL)]) throws {
+        let directory = scratchRoot.appendingPathComponent("Application Support/Chet", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        encoder.dateEncodingStrategy = .iso8601
+        var data = Data()
+        for operation in operations {
+            let record = TrashOperation(
+                id: UUID(uuidString: operation.id)!,
+                date: Date(timeIntervalSince1970: 1_700_000_000),
+                entries: [
+                    TrashOperation.Entry(
+                        originalPath: operation.original.path, trashedPath: operation.trashed.path,
+                        bytes: 10, categoryID: "test")
+                ])
+            data.append(try encoder.encode(record))
+            data.append(0x0A)
+        }
+        try data.write(to: directory.appendingPathComponent("trash-ledger.jsonl"))
+    }
+
+    @MainActor
     private func openCleanConfirm(_ driver: UITestDriver, items: Int) throws {
         try driver.requireFocus()
         try skipAccessGate(driver)

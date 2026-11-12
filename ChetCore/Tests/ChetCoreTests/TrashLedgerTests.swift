@@ -111,4 +111,45 @@ struct TrashLedgerTests {
         #expect(report.restored == 0)
         #expect(report.unavailable.first?.reason == .parentMissing)
     }
+
+    @Test func restorableEntriesExcludeAMissingTrashCopy() throws {
+        let dir = try TempDir()
+        let ledger = TrashLedger(url: dir.url.appendingPathComponent("ledger.jsonl"), home: dir.url)
+        let original = try dir.file("cache/a", bytes: 10)
+        let trashed = dir.url.appendingPathComponent("Trash/a")
+        try FileManager.default.createDirectory(
+            at: trashed.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.moveItem(at: original, to: trashed)
+        let op = TrashOperation(entries: [
+            .init(originalPath: original.path, trashedPath: trashed.path, bytes: 10, categoryID: "test")
+        ])
+        #expect(ledger.restorableEntries(in: op).count == 1)
+        try FileManager.default.removeItem(at: trashed)
+        #expect(ledger.restorableEntries(in: op).isEmpty)
+        let report = ledger.restore(op)
+        #expect(report.unavailable.first?.reason == .trashedItemMissing)
+        #expect(!FileManager.default.fileExists(atPath: original.path))
+    }
+
+    @Test func restorableOperationsOmitAnEmptyOperation() throws {
+        let dir = try TempDir()
+        let ledger = TrashLedger(url: dir.url.appendingPathComponent("ledger.jsonl"), home: dir.url)
+        let original = try dir.file("cache/a", bytes: 10)
+        let trashed = dir.url.appendingPathComponent("Trash/a")
+        try FileManager.default.createDirectory(
+            at: trashed.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.moveItem(at: original, to: trashed)
+        let restorable = TrashOperation(entries: [
+            .init(originalPath: original.path, trashedPath: trashed.path, bytes: 10, categoryID: "test")
+        ])
+        let gone = TrashOperation(entries: [
+            .init(
+                originalPath: dir.url.appendingPathComponent("cache/b").path,
+                trashedPath: dir.url.appendingPathComponent("Trash/b").path,
+                bytes: 10, categoryID: "test")
+        ])
+        ledger.append(restorable)
+        ledger.append(gone)
+        #expect(ledger.restorableOperations().map(\.id) == [restorable.id])
+    }
 }

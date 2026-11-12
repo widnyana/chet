@@ -349,3 +349,18 @@ run, and `N of M items cleaned.` after a real run.
 - Cancel: `Cancel`, accessibility label `Cancel the clean pass`, help
   `Stop after the current item`.
 - The pass stops after the item in flight. Items already removed stay removed.
+
+## Restore copy
+
+`RefusalCopy.restore` is the only place a restore refusal becomes a sentence.
+
+| Reason | Sentence |
+|---|---|
+| `trashedItemMissing` | `The Trash copy is gone` |
+| `originalPathOccupied` | `Something else is at the original path` |
+| `parentMissing` | `The original folder is gone` |
+| `outsideHome` | `The original path is outside your home folder` |
+| `nameMismatch` | `The file name does not match` |
+
+Summary row: `N items restored`. The history sheet lists the newest 10
+operations, each with its date and entry count.

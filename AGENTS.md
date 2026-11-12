@@ -81,7 +81,7 @@ Identifiers: `apps.select.<id>` `cleaner.select.<id>` `grouped.select.<id>` `twe
 `go.toolchain` `mise.header` `mise.page` `mise.refresh` `mise.empty` `mise.config` `mise.cache`
 `mise.tool.<tool>.<version>` `scan.scope` `scan.scope.category.<category id>` `scan.scope.add`
 `scan.scope.remove.<index>` `scan.scope.remember` `scan.scope.apply` `scan.scope.cancel`
-`home.stop` `home.pause` `home.resume` `home.scan` `home.empty` `home.rescan` `clean.cancel` `homebrew.header`
+`home.stop` `home.pause` `home.resume` `home.scan` `home.empty` `home.rescan` `clean.cancel` `clean.restore` `storage.restore` `storage.restore.<op>` `homebrew.header`
 `homebrew.select.<id>` `homebrew.search.field` `homebrew.tap.field` `homebrew.sort.<col>`
 `homebrew.install` `homebrew.install.<id>` `homebrew.uninstall.<id>` `homebrew.installer.status`
 `settings.helper.toggle` `settings.helper.openSettings` `settings.helper.lifetime`.

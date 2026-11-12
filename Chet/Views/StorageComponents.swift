@@ -193,6 +193,8 @@ struct StorageMetric: View {
 /// The folder's children, sorted largest first. The swatch repeats the block's ramp
 /// colour, so the list and the chart read as one surface.
 struct StorageLedger: View {
+    @Environment(ScanModel.self) private var model
+    @State private var showingHistory = false
     let folder: FolderNode
     let palette: TreemapPalette
     let selected: Set<URL>
@@ -254,6 +256,9 @@ struct StorageLedger: View {
                 .fill(Theme.hairline)
                 .frame(width: 1)
         }
+        .sheet(isPresented: $showingHistory) {
+            TrashHistorySheet()
+        }
     }
 
     private var header: some View {
@@ -265,6 +270,13 @@ struct StorageLedger: View {
                     .lineLimit(1)
                     .accessibilityIdentifier("storage.ledger.header")
                 Spacer(minLength: Spacing.s2)
+                SecondaryActionButton(
+                    title: "Restore…",
+                    isEnabled: !DryRun.enabled && !model.trashLedger.restorableOperations().isEmpty,
+                    help: "Restore items moved to the Trash",
+                    action: { showingHistory = true }
+                )
+                .accessibilityIdentifier("storage.restore")
                 Text(folder.size.formatted(.byteCount(style: .file)))
                     .font(Typography.metric)
                     .monospacedDigit()
