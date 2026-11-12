@@ -52,6 +52,19 @@ struct TweaksTests {
         #expect(TweakEngine.state(for: absentIsOff, current: nil) == .off)
     }
 
+    @Test func correctedRowsShowTheirDeclaredDefault() throws {
+        let extensions = try #require(TweakCatalog.all.first { $0.id == "finder.extensions" })
+        #expect(TweakEngine.state(for: extensions, current: nil) == .off)
+        let search = try #require(TweakCatalog.all.first { $0.id == "finder.search-current" })
+        #expect(TweakEngine.state(for: search, current: nil) == .value("This Mac"))
+        let network = try #require(TweakCatalog.all.first { $0.id == "finder.ds-store-network" })
+        #expect(TweakEngine.state(for: network, current: nil) == .off)
+        let period = try #require(TweakCatalog.all.first { $0.id == "keyboard.double-space-period" })
+        #expect(TweakEngine.state(for: period, current: nil) == .on)
+        let completion = try #require(TweakCatalog.all.first { $0.id == "keyboard.text-completion" })
+        #expect(TweakEngine.state(for: completion, current: nil) == .off)
+    }
+
     @Test func customizedMeansWrittenAndDifferentFromDefault() {
         let tweak = toggleTweak(domain: domain())
         #expect(!TweakReading(tweak: tweak, state: .off, current: nil).isCustomized)

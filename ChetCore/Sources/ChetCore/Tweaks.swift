@@ -999,9 +999,9 @@ public enum TweakCatalog {
             name: "Show all filename extensions",
             summary: "Show the extension on every file name, not only on some.",
             detail:
-                "A name like report.pdf shows its extension. Without it, two files named report look identical.",
+                "A name like report.pdf shows its extension. Without it, two files named report look identical. The legacy com.apple.finder copy is not read, so a Mac that still writes it shows the NSGlobalDomain value.",
             impact: "Finder windows",
-            target: .defaults(domain: "com.apple.finder", key: "AppleShowAllExtensions", type: .boolean),
+            target: .defaults(domain: global, key: "AppleShowAllExtensions", type: .boolean),
             control: .toggle(on: .boolean(true), off: .boolean(false))),
         Tweak(
             id: "finder.path-bar",
@@ -1043,9 +1043,10 @@ public enum TweakCatalog {
             target: .defaults(domain: "com.apple.finder", key: "FXDefaultSearchScope", type: .string),
             control: .choice([
                 TweakOption(label: "Current folder", value: .string("SCcf")),
-                TweakOption(label: "This Mac", value: .string("SCsp")),
+                TweakOption(label: "This Mac", value: .string("SCev")),
+                TweakOption(label: "Previous scope", value: .string("SCsp")),
             ]),
-            defaultValue: .string("SCsp")),
+            defaultValue: .string("SCev")),
         Tweak(
             id: "finder.quit",
             category: .finder,
@@ -1087,7 +1088,7 @@ public enum TweakCatalog {
                 "A .DS_Store file stores icon positions. On a network share it appears for everyone who opens the folder.",
             impact: "Network folders",
             target: .defaults(
-                domain: "com.apple.finder", key: "DSDontWriteNetworkStores", type: .boolean),
+                domain: "com.apple.desktopservices", key: "DSDontWriteNetworkStores", type: .boolean),
             control: .toggle(on: .boolean(true), off: .boolean(false)),
             defaultValue: .boolean(false)),
         Tweak(
@@ -1272,7 +1273,7 @@ public enum TweakCatalog {
             impact: "Text input in every app",
             target: .defaults(
                 domain: global, key: "NSAutomaticPeriodSubstitutionEnabled", type: .boolean),
-            control: .toggle(on: .boolean(true), off: .boolean(false)), defaultValue: .boolean(false)),
+            control: .toggle(on: .boolean(true), off: .boolean(false)), defaultValue: .boolean(true)),
         Tweak(
             id: "keyboard.text-completion",
             category: .keyboard,
@@ -1282,7 +1283,7 @@ public enum TweakCatalog {
             impact: "Text input in every app",
             target: .defaults(
                 domain: global, key: "NSAutomaticTextCompletionEnabled", type: .boolean),
-            control: .toggle(on: .boolean(true), off: .boolean(false)), defaultValue: .boolean(true)),
+            control: .toggle(on: .boolean(true), off: .boolean(false)), defaultValue: .boolean(false)),
         Tweak(
             id: "keyboard.repeat-rate",
             category: .keyboard,
