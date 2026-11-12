@@ -102,9 +102,9 @@ struct StatusLabel: View {
                 .font(Typography.iconAction)
             Text(text)
                 .font(Typography.caption)
+                .help(help ?? text)
         }
         .foregroundStyle(tone.color)
-        .help(help ?? text)
         .accessibilityElement(children: .combine)
     }
 }

@@ -76,9 +76,9 @@ struct ItemNameCell: View {
                     .foregroundStyle(Theme.inkSecondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
+                    .help(item.url.path)
             }
         }
-        .help(item.url.path)
         .accessibilityElement(children: .combine)
     }
 }

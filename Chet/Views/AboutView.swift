@@ -68,7 +68,7 @@ struct AboutView: View {
         }
         .frame(maxWidth: .infinity)
         .multilineTextAlignment(.center)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(heroLabel)
     }
 
