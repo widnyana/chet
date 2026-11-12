@@ -49,7 +49,21 @@ final class UITestDriver {
     }
 
     func resolve(_ selector: AXSelector) throws -> UITestElement {
-        let projected = app.descendants(matching: .any).allElementsBoundByIndex.map(Self.project)
+        if let predicate = Self.predicate(for: selector) {
+            let query = app.chetWindow.descendants(matching: .any).matching(predicate)
+            let count = query.count
+            if count == 1 {
+                return Self.project(query.firstMatch)
+            }
+            if count == 0 {
+                throw UITestDriverError.noMatch(
+                    selector: Self.describe(selector), closestIdentifiers: [])
+            }
+            throw UITestDriverError.multipleMatches(
+                selector: Self.describe(selector),
+                matches: query.allElementsBoundByIndex.map { Self.project($0).description })
+        }
+        let projected = projectedElements()
         let matches = projected.filter { Self.matches($0, selector) }
         switch matches.count {
         case 1:
@@ -67,8 +81,19 @@ final class UITestDriver {
 
     func waitFor(_ selector: AXSelector, timeout: TimeInterval = 5) throws -> UITestElement {
         let deadline = Date().addingTimeInterval(timeout)
-        while true {
-            let projected = app.descendants(matching: .any).allElementsBoundByIndex.map(Self.project)
+        if let predicate = Self.predicate(for: selector) {
+            let query = app.chetWindow.descendants(matching: .any).matching(predicate)
+            if query.firstMatch.waitForExistence(timeout: timeout) {
+                if query.count == 1 {
+                    return Self.project(query.firstMatch)
+                }
+                throw UITestDriverError.multipleMatches(
+                    selector: Self.describe(selector),
+                    matches: query.allElementsBoundByIndex.map { Self.project($0).description })
+            }
+        }
+        while Date() < deadline {
+            let projected = projectedElements()
             let matches = projected.filter { Self.matches($0, selector) }
             if matches.count == 1 {
                 return matches[0]
@@ -78,13 +103,75 @@ final class UITestDriver {
                     selector: Self.describe(selector),
                     matches: matches.map(\.description))
             }
-            if Date() >= deadline {
-                throw UITestDriverError.noMatch(
-                    selector: Self.describe(selector),
-                    closestIdentifiers: Self.closestIdentifiers(selector, in: projected))
-            }
             let remaining = max(0, deadline.timeIntervalSinceNow)
-            RunLoop.current.run(until: Date().addingTimeInterval(min(0.1, remaining)))
+            RunLoop.current.run(until: Date().addingTimeInterval(min(0.5, remaining)))
+        }
+        let projected = projectedElements()
+        let matches = projected.filter { Self.matches($0, selector) }
+        if matches.count > 1 {
+            throw UITestDriverError.multipleMatches(
+                selector: Self.describe(selector),
+                matches: matches.map(\.description))
+        }
+        throw UITestDriverError.noMatch(
+            selector: Self.describe(selector),
+            closestIdentifiers: Self.closestIdentifiers(selector, in: projected))
+    }
+
+    private func projectedElements() -> [UITestElement] {
+        app.chetWindow.descendants(matching: .any).allElementsBoundByIndex.map(Self.project)
+    }
+
+    static func predicate(for selector: AXSelector) -> NSPredicate? {
+        var parts: [NSPredicate] = []
+        for term in selector.terms {
+            switch term.key {
+            case .id?:
+                parts.append(NSPredicate(format: "identifier == %@", term.value))
+            case .desc?, .description?:
+                parts.append(NSPredicate(format: "label == %@", term.value))
+            case .title?:
+                parts.append(NSPredicate(format: "title == %@", term.value))
+            case .value?:
+                parts.append(NSPredicate(format: "value == %@", term.value))
+            case .enabled?:
+                guard let expected = flag(term.value) else { return nil }
+                parts.append(NSPredicate(format: "enabled == %@", NSNumber(value: expected)))
+            case .contains?:
+                parts.append(
+                    NSPredicate(
+                        format:
+                            "identifier CONTAINS[c] %@ OR label CONTAINS[c] %@ OR title CONTAINS[c] %@ OR value CONTAINS[c] %@",
+                        term.value, term.value, term.value, term.value))
+            case .role?:
+                let types = elementTypes(named: term.value)
+                guard !types.isEmpty else { return nil }
+                if types.count == 1 {
+                    parts.append(NSPredicate(format: "elementType == %d", types[0].rawValue))
+                } else {
+                    parts.append(
+                        NSCompoundPredicate(
+                            orPredicateWithSubpredicates: types.map {
+                                NSPredicate(format: "elementType == %d", $0.rawValue)
+                            }))
+                }
+            case nil:
+                return nil
+            }
+        }
+        guard !parts.isEmpty else { return nil }
+        return NSCompoundPredicate(andPredicateWithSubpredicates: parts)
+    }
+
+    private static func elementTypes(named role: String) -> [XCUIElement.ElementType] {
+        roleNames.filter { $0.value == role }.map(\.key)
+    }
+
+    private static func flag(_ raw: String) -> Bool? {
+        switch raw.lowercased() {
+        case "true", "1": return true
+        case "false", "0": return false
+        default: return nil
         }
     }
 
@@ -275,4 +362,8 @@ final class UITestDriver {
         }
         return previous[b.count]
     }
+}
+
+extension XCUIApplication {
+    var chetWindow: XCUIElement { windows.element(boundBy: 0) }
 }

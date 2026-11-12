@@ -277,6 +277,8 @@ struct AXProbe {
             candidate = explicit.standardizedFileURL
         } else if let raw = environment["CHET_AXDRV"], !raw.isEmpty {
             candidate = fileURL(raw)
+        } else if let discovered = searchAncestors(from: Bundle.main.bundleURL) {
+            candidate = discovered
         } else {
             candidate =
                 URL(
@@ -287,6 +289,20 @@ struct AXProbe {
             throw AXProbeError.missingBinary(candidate.path)
         }
         return candidate
+    }
+
+    private static func searchAncestors(from bundle: URL) -> URL? {
+        var directory = bundle.deletingLastPathComponent()
+        for _ in 0..<8 {
+            let candidate = directory.appendingPathComponent(".build/tools/axdrv")
+            if FileManager.default.isExecutableFile(atPath: candidate.path) {
+                return candidate
+            }
+            let parent = directory.deletingLastPathComponent()
+            if parent.path == directory.path { break }
+            directory = parent
+        }
+        return nil
     }
 
     private static func fileURL(_ path: String) -> URL {

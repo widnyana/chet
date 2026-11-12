@@ -37,8 +37,14 @@ class UITestCase: XCTestCase {
         application.launchEnvironment["CHET_UITEST_SESSION"] = "1"
         application.launchArguments = ["-ApplePersistenceIgnoreState", "YES"]
         app = application
-        application.launch()
-        try FocusGuard.requireForeground(application)
+        do {
+            application.launch()
+            try FocusGuard.requireForeground(application)
+        } catch {
+            application.terminate()
+            try? FileManager.default.removeItem(at: root)
+            throw error
+        }
     }
 
     override func tearDownWithError() throws {

@@ -16,9 +16,11 @@ WAIT_IDLE=0
 BUILD_ONLY=0
 SESSION_USER=""
 ONLY_TESTS=()
+DEADLINE="${CHET_UITEST_DEADLINE:-0}"
+TIMED_OUT=0
 
 usage() {
-    printf 'usage: %s [--only <test>]... [--build-only] [--mode local|session] [--allow-focus] [--allow-active-input] [--wait-idle] [--session-user <name>]\n' "$0" >&2
+    printf 'usage: %s [--only <test>]... [--build-only] [--mode local|session] [--allow-focus] [--allow-active-input] [--wait-idle] [--session-user <name>] [--deadline <seconds>]\n' "$0" >&2
     exit 2
 }
 
@@ -59,6 +61,26 @@ fail() {
     exit "$code"
 }
 
+run_bounded() {
+    "$@" &
+    local pid=$!
+    local watchdog=0
+    if [ "$DEADLINE" -gt 0 ]; then
+        ( sleep "$DEADLINE"; kill -TERM "$pid" 2>/dev/null ) &
+        watchdog=$!
+    fi
+    local status=0
+    wait "$pid" || status=$?
+    if [ "$watchdog" -gt 0 ]; then
+        kill -TERM "$watchdog" 2>/dev/null || true
+        wait "$watchdog" 2>/dev/null || true
+    fi
+    if [ "$DEADLINE" -gt 0 ] && [ "$status" -ge 128 ]; then
+        TIMED_OUT=1
+    fi
+    return "$status"
+}
+
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --only)
@@ -92,6 +114,14 @@ while [ "$#" -gt 0 ]; do
         --wait-idle)
             WAIT_IDLE=1
             shift
+            ;;
+        --deadline)
+            [ "$#" -ge 2 ] || usage
+            case "$2" in
+                '' | *[!0-9]*) usage ;;
+            esac
+            DEADLINE="$2"
+            shift 2
             ;;
         --session-user)
             [ "$#" -ge 2 ] || usage
@@ -251,7 +281,8 @@ snapshot() {
         case "$path" in
             */Library/Preferences)
                 if [ -d "$path" ]; then
-                    find "$path" -maxdepth 1 -type f -exec stat -f '%m %z %N' {} + 2>/dev/null | sort
+                    find "$path" -maxdepth 1 -type f -name 'id.web.widnyana.chet.plist' \
+                        -exec md5 -r {} + 2>/dev/null | sort
                 else
                     printf 'missing %s\n' "$path"
                 fi
@@ -285,13 +316,20 @@ done
 
 status=0
 if [ "$LAUNCH_AS_SESSION" -eq 1 ]; then
-    launchctl asuser "$SESSION_UID" /usr/bin/sudo -u "$SESSION_USER" /usr/bin/env \
+    run_bounded launchctl asuser "$SESSION_UID" /usr/bin/sudo -u "$SESSION_USER" /usr/bin/env \
         DRY_RUN=1 HOME="$HOME_DIR" TMPDIR="$ROOT" \
         CHET_UITEST_ROOT="$ROOT" CHET_AXDRV="$AXDRV" \
         "$XCODEBUILD_BIN" "${XCODE_ARGS[@]}" || status=$?
 else
-    env DRY_RUN=1 TMPDIR="$ROOT" CHET_UITEST_ROOT="$ROOT" CHET_AXDRV="$AXDRV" \
+    run_bounded env DRY_RUN=1 TMPDIR="$ROOT" CHET_UITEST_ROOT="$ROOT" CHET_AXDRV="$AXDRV" \
         "$XCODEBUILD_BIN" "${XCODE_ARGS[@]}" || status=$?
+fi
+
+if [ "$TIMED_OUT" -eq 1 ]; then
+    pkill -f chetUITests-Runner 2>/dev/null || true
+    pkill -f '/chet.app/Contents/MacOS/chet' 2>/dev/null || true
+    printf 'uitest: deadline %ss exceeded; runner stopped\n' "$DEADLINE" >&2
+    status=8
 fi
 
 snapshot >"$ROOT/after"

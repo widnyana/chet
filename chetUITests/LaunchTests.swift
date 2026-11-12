@@ -17,15 +17,15 @@ final class LaunchTests: UITestCase {
         XCTAssertTrue(
             app.wait(for: .runningForeground, timeout: 10),
             "chet did not reach a running state")
-        let accessGate = app.descendants(matching: .any)["gate.continue"]
+        let accessGate = app.chetWindow.descendants(matching: .any)["gate.continue"]
         if accessGate.waitForExistence(timeout: 2) {
             accessGate.click()
         }
         XCTAssertTrue(
-            app.descendants(matching: .any)["home.scan"].waitForExistence(timeout: 10),
+            app.chetWindow.descendants(matching: .any)["home.scan"].waitForExistence(timeout: 10),
             "home.scan is missing")
         XCTAssertTrue(
-            app.descendants(matching: .any)["home.scope"].waitForExistence(timeout: 10),
+            app.chetWindow.descendants(matching: .any)["home.scope"].waitForExistence(timeout: 10),
             "home.scope is missing")
         let pidURL = scratchRoot.appendingPathComponent("app.pid")
         XCTAssertTrue(
