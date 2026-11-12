@@ -198,4 +198,151 @@ struct TweakAutomationTests {
             WALStore.defaultURL.path.hasSuffix(
                 "Library/Application Support/Chet/tweak-automation-state.json"))
     }
+
+    @Test func executorAppliesAndRecordsTheEngineBaseline() async {
+        let rule = rule("finder.hidden-files")
+        let record = TweakRecord(
+            tweakID: "finder.hidden-files", action: .set, before: .boolean(false),
+            after: .boolean(true))
+        let engine = FakeEngine(
+            currents: ["finder.hidden-files": .boolean(false)],
+            outcomes: ["finder.hidden-files": .applied(recorded: record)])
+        let executor = AutomationExecutor(
+            rules: [rule], state: WALState(), engine: engine, dryRun: false)
+        let result = await executor.reconcile(running: ["com.example.app"])
+        let calls = await engine.calls
+        #expect(calls == ["apply:finder.hidden-files"])
+        #expect(result.state.applied["finder.hidden-files"]?.phase == "applied")
+        #expect(result.state.applied["finder.hidden-files"]?.baselineSource == "engine")
+    }
+
+    @Test func executorRemovesTheEntryOnRefusal() async {
+        let rule = rule("finder.hidden-files")
+        let engine = FakeEngine(
+            currents: ["finder.hidden-files": .boolean(false)],
+            outcomes: ["finder.hidden-files": .refused("no")])
+        let executor = AutomationExecutor(
+            rules: [rule], state: WALState(), engine: engine, dryRun: false)
+        let result = await executor.reconcile(running: ["com.example.app"])
+        #expect(result.state.applied["finder.hidden-files"] == nil)
+    }
+
+    @Test func executorRevertsAndRemovesTheEntry() async {
+        let rule = rule("finder.hidden-files", enabled: false)
+        let state = WALState(applied: [
+            "finder.hidden-files": .init(
+                ruleID: rule.id, tweakID: "finder.hidden-files", appliedValue: .boolean(true),
+                baseline: .boolean(false), baselineSource: "engine", phase: "applied",
+                appliedAt: Date(timeIntervalSince1970: 1), conflict: nil)
+        ])
+        let engine = FakeEngine(
+            currents: ["finder.hidden-files": .boolean(true)],
+            outcomes: ["finder.hidden-files": .applied(recorded: nil)])
+        let executor = AutomationExecutor(
+            rules: [rule], state: state, engine: engine, dryRun: false)
+        let result = await executor.reconcile(running: ["com.example.app"])
+        let calls = await engine.calls
+        #expect(calls == ["revert:finder.hidden-files"])
+        #expect(result.state.applied["finder.hidden-files"] == nil)
+    }
+
+    @Test func executorKeepsTheEntryOnAFailedRevert() async {
+        let rule = rule("finder.hidden-files", enabled: false)
+        let state = WALState(applied: [
+            "finder.hidden-files": .init(
+                ruleID: rule.id, tweakID: "finder.hidden-files", appliedValue: .boolean(true),
+                baseline: .boolean(false), baselineSource: "engine", phase: "applied",
+                appliedAt: Date(timeIntervalSince1970: 1), conflict: nil)
+        ])
+        let engine = FakeEngine(
+            currents: ["finder.hidden-files": .boolean(true)],
+            outcomes: ["finder.hidden-files": .failed("no")])
+        let executor = AutomationExecutor(
+            rules: [rule], state: state, engine: engine, dryRun: false)
+        let result = await executor.reconcile(running: ["com.example.app"])
+        #expect(result.state.applied["finder.hidden-files"]?.phase == "reverting")
+    }
+
+    @Test func dryRunCallsNoEngineWrite() async {
+        let rule = rule("finder.hidden-files")
+        let engine = FakeEngine(currents: ["finder.hidden-files": .boolean(false)])
+        let executor = AutomationExecutor(
+            rules: [rule], state: WALState(), engine: engine, dryRun: true)
+        let result = await executor.reconcile(running: ["com.example.app"])
+        let calls = await engine.calls
+        #expect(calls.isEmpty)
+        #expect(result.state == WALState())
+        #expect(result.decisions == [.apply(ruleID: rule.id, value: .boolean(true))])
+    }
+
+    @Test func sessionStartsInOrder() async {
+        let order = OrderRecorder()
+        let session = AutomationSession(
+            loadRules: {
+                order.append("rules")
+                return []
+            },
+            loadState: {
+                order.append("state")
+                return WALState()
+            },
+            running: {
+                order.append("running")
+                return []
+            },
+            reconcile: { _ in
+                order.append("reconcile")
+                return (WALState(), [])
+            })
+        _ = await session.start()
+        #expect(order.values == ["rules", "state", "running", "reconcile"])
+    }
+}
+
+private actor FakeEngine: TweakAutomationEngine {
+    private let currents: [String: TweakValue?]
+    private let outcomes: [String: AutomationEngineOutcome]
+    private var recorded: [String] = []
+
+    init(
+        currents: [String: TweakValue?] = [:],
+        outcomes: [String: AutomationEngineOutcome] = [:]
+    ) {
+        self.currents = currents
+        self.outcomes = outcomes
+    }
+
+    var calls: [String] { recorded }
+
+    func current(tweakID: String) async -> TweakCurrent? {
+        guard let value = currents[tweakID] else { return nil }
+        return TweakCurrent(tweakID: tweakID, value: value)
+    }
+
+    func apply(tweakID: String, value: TweakValue?) async -> AutomationEngineOutcome {
+        recorded.append("apply:\(tweakID)")
+        return outcomes[tweakID] ?? .applied(recorded: nil)
+    }
+
+    func revert(tweakID: String, to value: TweakValue?) async -> AutomationEngineOutcome {
+        recorded.append("revert:\(tweakID)")
+        return outcomes[tweakID] ?? .applied(recorded: nil)
+    }
+}
+
+private final class OrderRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var items: [String] = []
+
+    var values: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return items
+    }
+
+    func append(_ value: String) {
+        lock.lock()
+        items.append(value)
+        lock.unlock()
+    }
 }

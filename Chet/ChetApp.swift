@@ -108,6 +108,7 @@ struct ChetApp: App {
                 .environment(tweaks)
                 .environment(mise)
                 .frame(minWidth: 960, minHeight: 632)
+                .task { tweaks.startAutomation() }
         }
         .commands {
             AboutCommand()

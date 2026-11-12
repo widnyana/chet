@@ -50,6 +50,23 @@ final class TweaksGateTests: UITestCase {
     }
 
     @MainActor
+    func testNoAutomationFilesUnderTheGate() throws {
+        let driver = UITestDriver(app: app)
+        try driver.requireFocus()
+        try selectSidebar("sidebar.tweaks", probe: try AXProbe(root: scratchRoot), driver: driver)
+        _ = try driver.waitFor(AXSelector(["id=tweaks.page"]), timeout: 60)
+        try relaunch(environment: [:])
+        let directory = scratchRoot.appendingPathComponent(
+            "Application Support/Chet", isDirectory: true)
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: directory.appendingPathComponent("tweak-automation-rules.json").path))
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: directory.appendingPathComponent("tweak-automation-state.json").path))
+    }
+
+    @MainActor
     func testConfirmSheetAppearsOnlyWithThePreviewHook() throws {
         let driver = UITestDriver(app: app)
         try driver.requireFocus()

@@ -57,6 +57,78 @@ final class TweaksModel {
     /// disabled and the model refuses a write before it reaches the engine.
     let isGated = DryRun.enabled
 
+    private let automation: TweakAutomationController
+    private(set) var automationRuleCount = 0
+    private(set) var automatedTweakIDs: Set<String> = []
+    private(set) var automationError: String?
+
+    init() {
+        let engine = TweakEngineAutomationEngine(history: historyStore, dryRun: isGated)
+        automation = TweakAutomationController(
+            ruleStore: TriggerStore(
+                url: TestEnvironment.paths.applicationSupport.appendingPathComponent(
+                    "Chet/tweak-automation-rules.json")),
+            stateStore: WALStore(
+                url: TestEnvironment.paths.applicationSupport.appendingPathComponent(
+                    "Chet/tweak-automation-state.json")),
+            engine: engine,
+            dryRun: isGated)
+    }
+
+    func startAutomation() {
+        automation.start()
+        refreshAutomation()
+    }
+
+    func stopAutomation() {
+        automation.stop()
+    }
+
+    func isAutomated(_ id: String) -> Bool {
+        automatedTweakIDs.contains(id)
+    }
+
+    func setAutomationRule(_ rule: TweakRule) async {
+        guard !isGated else {
+            automationError = TweakError.gatedCopy
+            return
+        }
+        do {
+            try await automation.setRule(rule)
+        } catch {
+            automationError = error.localizedDescription
+        }
+        refreshAutomation()
+    }
+
+    func deleteAutomationRule(_ id: UUID) async {
+        guard !isGated else {
+            automationError = TweakError.gatedCopy
+            return
+        }
+        do {
+            try await automation.deleteRule(id)
+        } catch {
+            automationError = error.localizedDescription
+        }
+        refreshAutomation()
+    }
+
+    func revertAllAutomated() async {
+        guard !isGated else {
+            automationError = TweakError.gatedCopy
+            return
+        }
+        await automation.revertAll()
+        refreshAutomation()
+    }
+
+    private func refreshAutomation() {
+        automationRuleCount = automation.ruleCount
+        automatedTweakIDs = Set(automation.currentRules.map(\.tweakID))
+        automationError = automation.lastError
+    }
+
     // MARK: Queries
 
     func reading(for id: String) -> TweakReading? {
@@ -306,5 +378,35 @@ final class TweaksModel {
         if tweak.restart != .none {
             pendingRestarts[tweak.restart, default: []].insert(tweak.id)
         }
+    }
+}
+
+struct TweakEngineAutomationEngine: TweakAutomationEngine {
+    let history: TweakHistory
+    let dryRun: Bool
+
+    func current(tweakID: String) async -> TweakCurrent? {
+        guard let tweak = TweakCatalog.tweak(id: tweakID) else { return nil }
+        return TweakCurrent(tweakID: tweakID, value: TweakEngine.read(tweak).current)
+    }
+
+    func apply(tweakID: String, value: TweakValue?) async -> AutomationEngineOutcome {
+        guard let tweak = TweakCatalog.tweak(id: tweakID) else {
+            return .refused("Unknown tweak.")
+        }
+        let change = TweakEngine.set(tweak, to: value, history: history, dryRun: dryRun)
+        if let error = change.record.error { return .failed(error) }
+        if change.unchanged { return .unchanged }
+        return .applied(recorded: change.record)
+    }
+
+    func revert(tweakID: String, to value: TweakValue?) async -> AutomationEngineOutcome {
+        guard let tweak = TweakCatalog.tweak(id: tweakID) else {
+            return .refused("Unknown tweak.")
+        }
+        let change = TweakEngine.set(tweak, to: value, history: history, dryRun: dryRun)
+        if let error = change.record.error { return .failed(error) }
+        if change.unchanged { return .unchanged }
+        return .applied(recorded: change.record)
     }
 }
