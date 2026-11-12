@@ -72,6 +72,9 @@ struct TweakCatalogFixtureTests {
             "defaults:NSGlobalDomain:com.apple.swipescrolldirection", .boolean(true)),
         "appearance.clock-format": row("defaults:com.apple.menuextra.clock:DateFormat"),
         "finder.posix-path": row("defaults:com.apple.finder:_FXShowPosixPathInTitle"),
+        "finder.desktop-icons": row("defaults:com.apple.finder:CreateDesktop"),
+        "security.siri-sharing": row(
+            "defaults:com.apple.assistant.support:Siri Data Sharing Opt-In Status"),
         "keyboard.repeat": row("defaults:NSGlobalDomain:ApplePressAndHoldEnabled", .boolean(true)),
         "keyboard.full-access": row("defaults:NSGlobalDomain:AppleKeyboardUIMode", .integer(0)),
         "keyboard.smart-quotes": row(

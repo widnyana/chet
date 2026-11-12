@@ -1179,6 +1179,17 @@ public enum TweakCatalog {
             target: .defaults(domain: "com.apple.finder", key: "_FXShowPosixPathInTitle", type: .boolean),
             control: .toggle(on: .boolean(true), off: nil),
             restart: .finder),
+        Tweak(
+            id: "finder.desktop-icons",
+            category: .finder,
+            name: "Hide desktop icons",
+            summary: "Hide every item on the desktop without deleting it.",
+            detail:
+                "Finder stops drawing desktop icons. The files stay in the Desktop folder and reappear when the row is turned off.",
+            impact: "Desktop",
+            target: .defaults(domain: "com.apple.finder", key: "CreateDesktop", type: .boolean),
+            control: .toggle(on: .boolean(false), off: nil),
+            restart: .finder),
     ]
 
     // MARK: Dock
@@ -1708,6 +1719,18 @@ public enum TweakCatalog {
                 "macOS checks for updates in the background when this is on. Install updates in Software Update settings.",
             impact: "Software updates",
             target: .probe(.automaticUpdates), control: .inspect),
+        Tweak(
+            id: "security.siri-sharing",
+            category: .security,
+            name: "Siri and Dictation data sharing",
+            summary: "Control whether Siri and Dictation audio is shared with Apple.",
+            detail:
+                "The stored value 2 means sharing is on. Turning the row off deletes the key and returns to the system default.",
+            impact: "Siri and Dictation",
+            target: .defaults(
+                domain: "com.apple.assistant.support", key: "Siri Data Sharing Opt-In Status",
+                type: .integer),
+            control: .toggle(on: .integer(2), off: nil)),
     ]
 
     // MARK: Developer
