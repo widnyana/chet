@@ -275,6 +275,51 @@ struct CleanerTests {
         let entry = try JSONDecoder().decode(AuditLog.Entry.self, from: Data(line.utf8))
         #expect(entry.result == "dry-removed")
     }
+
+    @Test func skippedResultCarriesItsReason() throws {
+        let dir = try TempDir()
+        let file = try dir.file("cache/x", bytes: 1000)
+        let scanned = try item(file)
+        try FileManager.default.removeItem(at: file)
+        let report = cleaner(dir).clean([scanned])
+        #expect(report.results.first?.refusal == .missing)
+    }
+
+    @Test func removedResultCarriesNoReason() throws {
+        let dir = try TempDir()
+        let file = try dir.file("cache/x", bytes: 1000)
+        let report = cleaner(dir).clean([try item(file)])
+        #expect(report.results.first?.refusal == nil)
+    }
+
+    @Test func auditRowCarriesTheRefusalReason() throws {
+        let dir = try TempDir()
+        let logURL = dir.url.appendingPathComponent("audit.log")
+        let file = try dir.file("cache/x", bytes: 1000)
+        let scanned = try item(file)
+        try FileManager.default.removeItem(at: file)
+        _ = Cleaner(policy: dir.policy, log: AuditLog(url: logURL), dryRun: false).clean([scanned])
+        let line = try #require(String(contentsOf: logURL, encoding: .utf8).split(separator: "\n").first)
+        let entry = try JSONDecoder().decode(AuditLog.Entry.self, from: Data(line.utf8))
+        #expect(entry.reason == RefusalReason.missing.rawValue)
+    }
+
+    @Test func refusedRowCarriesTheRefusalCode() throws {
+        let dir = try TempDir()
+        let logURL = dir.url.appendingPathComponent("activity.log")
+        VerboseLog.install(ActivityLog(url: logURL))
+        defer { VerboseLog.install(nil) }
+        try dir.file("Library/Caches/a", bytes: 10)
+        let caches = dir.url.appendingPathComponent("Library/Caches")
+        let (outcome, reason) = cleaner(dir).clean(try item(caches))
+        VerboseLog.flush()
+        #expect(outcome == .skipped(.policy))
+        #expect(reason == .containerFolder)
+        let text = try String(contentsOf: logURL, encoding: .utf8)
+        #expect(text.contains("clean.refused"))
+        #expect(text.contains("\"key\":\"refusal\""))
+        #expect(text.contains("\"status\":306"))
+    }
 }
 
 private final class ProgressRecorder: @unchecked Sendable {

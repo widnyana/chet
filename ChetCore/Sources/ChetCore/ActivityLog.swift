@@ -113,6 +113,7 @@ public enum LogFieldKey: String, Sendable, Encodable {
     case category
     case mode
     case outcome
+    case refusal
     case sizeBasis
     case settingsKey
     case reply
@@ -249,6 +250,7 @@ public enum LogCode: Int32, Sendable {
     case outcomeOk = 303
     case outcomeRefused = 304
     case outcomeCancelled = 305
+    case refusal = 306
 
     case sizeBasisAllocated = 400
 

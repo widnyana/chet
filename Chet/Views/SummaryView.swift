@@ -64,10 +64,10 @@ struct SummaryView: View {
                                         Text(result.item.url.lastPathComponent)
                                             .font(Typography.row)
                                             .foregroundStyle(Theme.ink)
-                                        Text(Self.reason(result.outcome))
+                                        Text(Self.reason(result))
                                             .font(Typography.caption)
                                             .foregroundStyle(Theme.inkSecondary)
-                                            .help(Self.detail(result.outcome) ?? Self.reason(result.outcome))
+                                            .help(Self.detail(result.outcome) ?? Self.reason(result))
                                     }
                                     Spacer()
                                 }
@@ -101,16 +101,9 @@ struct SummaryView: View {
         }
     }
 
-    static func reason(_ outcome: CleanOutcome) -> String {
-        switch outcome {
-        case .skipped(.changed): "Changed since the scan"
-        case .skipped(.missing): "Already gone"
-        case .skipped(.policy): "Protected by Chet"
-        case .skipped(.appRunning): "The app is open"
-        case .skipped(.localState): "A project is using it"
-        case .failed: "Could not remove this item"
-        case .removed, .trashed: "Removed"
-        }
+    static func reason(_ result: CleanResult) -> String {
+        if case .failed = result.outcome { return "Could not remove this item" }
+        return RefusalCopy.reason(result.refusal ?? .protectedFolder)
     }
 
     /// The raw error for a failure, kept in a tooltip so the row stays one line.

@@ -44,6 +44,36 @@ struct AuditLogTests {
         let line = #"{"bytes":1,"mode":"permanent","path":"/tmp/a","result":"removed","time":"2026-01-01T00:00:00Z"}"#
         let entry = try JSONDecoder().decode(AuditLog.Entry.self, from: Data(line.utf8))
         #expect(entry.category == nil)
+        #expect(entry.reason == nil)
+    }
+
+    @Test func lineWithReasonDecodes() throws {
+        let dir = try TempDir()
+        let logURL = dir.url.appendingPathComponent("logs/clean.log")
+        AuditLog(url: logURL).append(
+            category: "test", path: "/tmp/a", bytes: 1, mode: .permanent, result: "skipped:policy",
+            dryRun: false, reason: .protectedFolder)
+        let line = try String(contentsOf: logURL, encoding: .utf8)
+        let entry = try JSONDecoder().decode(AuditLog.Entry.self, from: Data(line.utf8))
+        #expect(entry.reason == "protected folder")
+    }
+
+    @Test func logRotatesAtTheSizeLimit() throws {
+        let dir = try TempDir()
+        let logURL = dir.url.appendingPathComponent("logs/clean.log")
+        try FileManager.default.createDirectory(
+            at: logURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(repeating: 0x41, count: Int(AuditLog.maxBytes)).write(to: logURL)
+        let log = AuditLog(url: logURL)
+        log.append(
+            category: "test", path: "/tmp/a", bytes: 1, mode: .permanent, result: "removed", dryRun: false)
+        #expect(FileManager.default.fileExists(atPath: log.rotatedURL.path))
+        let rotatedSize =
+            (try FileManager.default.attributesOfItem(atPath: log.rotatedURL.path)[.size] as? NSNumber)?
+            .int64Value
+        #expect(rotatedSize == AuditLog.maxBytes)
+        let fresh = try String(contentsOf: logURL, encoding: .utf8)
+        #expect(fresh.contains("\"path\":\"/tmp/a\""))
     }
 
     @Test func skipReasonIsLogged() {

@@ -314,3 +314,32 @@ Uninstall complete
 - Gate: `Preview only. No tweak is changed.`
 - Empty: `No tweaks match`, `No changed tweaks`. Loading: `Reading your settings.`
 - These strings live in `TweakCopy`; a view does not retype them.
+
+## Refusal copy
+
+`RefusalCopy` is the only place a refusal reason becomes a sentence. A view
+does not retype these strings.
+
+| Reason | Row sentence | Detail |
+|---|---|---|
+| `excludedFolder` | `In an excluded folder` | `This folder is on your excluded list.` |
+| `outsideHome` | `Outside your home folder` | `Chet only removes files inside your home folder.` |
+| `containerFolder` | `A folder Chet never removes` | `Chet never removes a whole container folder.` |
+| `protectedFolder` | `Protected by Chet` | `macOS keeps this folder, so Chet leaves it alone.` |
+| `gitRepository` | `A git repository` | `A git repository holds work you cannot rebuild.` |
+| `appBundle` | `An app bundle` | `Remove an app from the Apps page instead.` |
+| `photosLibrary` | `A Photos library` | `A Photos library holds originals you cannot rebuild.` |
+| `symlink` | `A symbolic link` | `A link can point anywhere, so Chet does not follow it.` |
+| `mountPoint` | `A mounted volume` | `A mounted volume is not part of this disk.` |
+| `missing` | `Already gone` | `The item was gone before the clean pass reached it.` |
+| `changed` | `Changed since the scan` | `The item changed after the scan, so Chet left it alone.` |
+| `appRunning` | `The app is open` | `Quit the app, then scan again.` |
+| `localState` | `A project is using it` | `Terraform state cannot be downloaded again.` |
+| `informational` | `Listed for information only` | `This item is shown for size only.` |
+| `batchEmpty` | `Nothing was selected` | `Select at least one item.` |
+| `batchTooLarge` | `Too many items at once` | `Clean in smaller groups.` |
+| `batchMalformed` | `A path was not valid` | `The selection held a path Chet cannot check.` |
+| `batchOutsideRoot` | `A path was outside the scan` | `The selection held a path outside the scan.` |
+
+Summary row: `N of M items would be cleaned. Nothing was deleted.` in a dry
+run, and `N of M items cleaned.` after a real run.
